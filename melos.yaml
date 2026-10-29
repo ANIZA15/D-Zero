@@ -23,6 +23,10 @@ scripts:
       dirExists: test
     description: Run flutter test in all packages with tests.
 
+  complexity:
+    run: dart run tool/check_complexity.dart
+    description: Measure and enforce cyclomatic complexity across the workspace.
+
   benchmark:
     run: dart run benchmarks/run_benchmarks.dart
     description: Run all terminal microbenchmarks.

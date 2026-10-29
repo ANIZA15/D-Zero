@@ -3,8 +3,8 @@ import '../controller.dart';
 import 'direct_seek_bar.dart';
 import 'direct_time_label.dart';
 
-/// A zero-jank, high-performance Flutter video player view widget.
-class ZeroPlayerView extends StatelessWidget {
+/// A zero-jank, high-performance Flutter video player widget with Impeller zero-copy texture support.
+class ZPlayer extends StatelessWidget {
   /// The [ZeroPlayerController] managing the active video session.
   final ZeroPlayerController controller;
 
@@ -14,8 +14,8 @@ class ZeroPlayerView extends StatelessWidget {
   /// Whether to display the built-in zero-rebuild controls HUD.
   final bool showControls;
 
-  /// Creates a [ZeroPlayerView].
-  const ZeroPlayerView({
+  /// Creates a [ZPlayer].
+  const ZPlayer({
     super.key,
     required this.controller,
     this.overlay,
@@ -50,11 +50,11 @@ class ZeroPlayerView extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      DirectTimeLabel(controller: controller),
+                      ZDirectTimeLabel(controller: controller),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  DirectSeekBar(
+                  ZDirectSeekBar(
                     controller: controller,
                     onSeek: (position) {
                       controller.seekTo(position);
@@ -68,3 +68,10 @@ class ZeroPlayerView extends StatelessWidget {
     );
   }
 }
+
+/// Backward compatibility alias for [ZPlayer].
+@Deprecated('Use ZPlayer instead.')
+typedef ZeroPlayerView = ZPlayer;
+
+/// Optional alias for [ZPlayer].
+typedef ZPlayerView = ZPlayer;

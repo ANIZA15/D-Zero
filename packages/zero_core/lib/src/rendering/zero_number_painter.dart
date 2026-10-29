@@ -30,6 +30,10 @@ class ZeroNumberPainter {
 
   // Reusable scratch buffer for digit extraction (up to 32 digits, never reallocated)
   final Uint8List _digitBuffer = Uint8List(32);
+  bool _isDisposed = false;
+
+  /// Whether this painter has been disposed.
+  bool get isDisposed => _isDisposed;
 
   ZeroNumberPainter({
     this.style = const TextStyle(
@@ -212,8 +216,10 @@ class ZeroNumberPainter {
     return currentX - offset.dx;
   }
 
-  /// Disposes all underlying painters.
+  /// Disposes all underlying painters safely.
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
     for (final p in _digitPainters) {
       p.dispose();
     }

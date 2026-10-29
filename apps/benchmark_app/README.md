@@ -19,7 +19,7 @@ flutter run -d macos
 
 1. **Live Performance HUD**: Real-time FPS, frame duration (ms), dropped frame counter, and 120Hz detection.
 2. **Counter & Stopwatch Comparison**:
-   - Compares traditional `setState` + `Text` (generating thousands of String allocations and continuous widget rebuilds) vs `ZeroCounter` / `ZeroStopwatch` (zero rebuild, zero allocation direct Canvas paint).
+   - Compares traditional `setState` + `Text` (generating thousands of String allocations and continuous widget rebuilds) vs `ZCounter` / `ZStopwatch` (zero rebuild, zero allocation direct Canvas paint).
    - Frequency control slider (30Hz to 500Hz).
 3. **Buffer & Memory Pool Comparison**:
    - `FloatRingBuffer` vs `List.removeAt(0)` sliding queue throughput.

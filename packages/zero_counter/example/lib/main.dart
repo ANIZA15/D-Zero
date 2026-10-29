@@ -72,10 +72,10 @@ class _ZeroCounterShowcaseScreenState extends State<ZeroCounterShowcaseScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildCard(
-              title: '1. ZeroCounter (超高速 100Hz カウンター)',
+              title: '1. ZCounter (超高速 100Hz カウンター)',
               subtitle: '毎秒 100 回の更新でも Widget リビルド 0、String 生成 0',
               child: Center(
-                child: ZeroCounter(
+                child: ZCounter(
                   valueListenable: _fastCounter,
                   minDigits: 6,
                   style: const TextStyle(
@@ -89,12 +89,12 @@ class _ZeroCounterShowcaseScreenState extends State<ZeroCounterShowcaseScreen> {
             ),
             const SizedBox(height: 24),
             _buildCard(
-              title: '2. ZeroStopwatch (120fps 高精度ストップウォッチ)',
+              title: '2. ZStopwatch (120fps 高精度ストップウォッチ)',
               subtitle: 'V-Sync に同期し、Canvas へ直接タイムコードをペイント',
               child: Column(
                 children: [
                   Center(
-                    child: ZeroStopwatch(
+                    child: ZStopwatch(
                       isRunning: _isRunning,
                       includeHours: true,
                       style: const TextStyle(

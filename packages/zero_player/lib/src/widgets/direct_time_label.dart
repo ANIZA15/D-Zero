@@ -8,15 +8,15 @@ import '../playback_state_ffi.dart';
 
 /// A timecode display [LeafRenderObjectWidget] that paints elapsed/total time directly
 /// on the Canvas with zero widget rebuilds and zero String allocations.
-class DirectTimeLabel extends LeafRenderObjectWidget {
+class ZDirectTimeLabel extends LeafRenderObjectWidget {
   /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
 
   /// The text style applied to the timecode label.
   final TextStyle style;
 
-  /// Creates a zero-rebuild [DirectTimeLabel].
-  const DirectTimeLabel({
+  /// Creates a zero-rebuild [ZDirectTimeLabel].
+  const ZDirectTimeLabel({
     super.key,
     required this.controller,
     this.style = const TextStyle(
@@ -42,6 +42,13 @@ class DirectTimeLabel extends LeafRenderObjectWidget {
       ..style = style;
   }
 }
+
+/// Backward compatibility alias for [ZDirectTimeLabel].
+@Deprecated('Use ZDirectTimeLabel instead.')
+typedef DirectTimeLabel = ZDirectTimeLabel;
+
+/// Shorthand alias for [ZDirectTimeLabel].
+typedef ZTimeLabel = ZDirectTimeLabel;
 
 class RenderDirectTimeLabel extends RenderBox {
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;

@@ -95,7 +95,7 @@ d-zero/
 | パッケージ | バージョン | 説明 | リンク | サンプル App |
 | :--- | :---: | :--- | :---: | :---: |
 | **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、文字列を生成しない数値・タイムコード描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) | [📱 サンプル](packages/zero_core/example) |
-| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ハードウェアゼロコピーテクスチャ、ゼロリビルド UI（`DirectSeekBar`, `DirectTimeLabel`）、Impeller 最適化 Kawase Blur シェーダーを備えた完全ゼロジャンク動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
+| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ハードウェアゼロコピーテクスチャ、ゼロリビルド UI（`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`）、Impeller 最適化 Kawase Blur シェーダーを備えた完全ゼロジャンク動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
 | **`zero_counter`** | `0.1.0` | **【超高速計器・カウンター】** 秒間数百回〜数千回のインクリメントやストップウォッチを、Widget リビルド 0・String アロケーション 0 で滑らかに描画する Widget 群。 | [📦 パッケージ詳細](packages/zero_counter) | [📱 サンプル](packages/zero_counter/example) |
 | *(Planned)* **`zero_waveform`** | - | **【リアルタイムオーディオ】** SoA（Structure of Arrays）リングバッファを用いた、音声波形およびスペクトラムアナライザー描画 Widget。 | 企画中 | - |
 | *(Planned)* **`zero_chart`** | - | **【高頻度時系列チャート】** 金融ティックデータ・IoT センサー向けの超高頻度リアルタイム折れ線・オシロスコープ Widget。 | 企画中 | - |

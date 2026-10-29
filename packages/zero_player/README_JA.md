@@ -39,7 +39,7 @@
      │                                                         │
      └─ [ 再生ミリ秒 ] ──── (C++ Atomic 共有メモリ)               │
                                    │                           ▼
-                        (Dart FFI ポインタ直読み)       [ DirectSeekBar / DirectTimeLabel ]
+                        (Dart FFI ポインタ直読み)       [ ZDirectSeekBar / ZDirectTimeLabel ]
                                    │                           │ (RenderBox.paint)
                                    └──────► Canvas.draw ───────┘ (120fps 完全同期)
 ```
@@ -60,11 +60,11 @@
 
 ## 📦 提供される Widget & コンポーネント
 
-* **`ZeroPlayerView`**:
+* **`ZPlayer`** (旧エイリアス: `ZeroPlayerView`):
   ネイティブハードウェア映像テクスチャと、ゼロリビルド型コントロールを統合したメイン Widget。
-* **`DirectSeekBar`**:
+* **`ZDirectSeekBar`** (または `ZSeekBar`, 旧: `DirectSeekBar`):
   `build()` メソッドを持たず、FFI ポインタから現在ミリ秒を直接読み取って `Canvas.drawLine` するシークバー。ドラッグ・タップ操作にも完全対応。
-* **`DirectTimeLabel`**:
+* **`ZDirectTimeLabel`** (または `ZTimeLabel`, 旧: `DirectTimeLabel`):
   秒数の変化（`00:11` など）の瞬間だけ局所的に差分描画する高効率タイムコード Widget。
 * **`shaders/zero_blur.frag`**:
   Impeller 向けに設計されたシングルパス Kawase ブラーシェーダー。`BackdropFilter` の重いレンダーターゲット退避を完全回避。
@@ -125,7 +125,7 @@ class _VideoScreenState extends State<VideoScreen> {
 
     return Scaffold(
       body: Center(
-        child: ZeroPlayerView(
+        child: ZPlayer(
           controller: _controller!,
           showControls: true, // ゼロリビルドシークバーが自動配置されます
         ),

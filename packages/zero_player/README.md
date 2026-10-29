@@ -41,7 +41,7 @@ Conventional Flutter video players (`video_player`), however, incur significant 
      │                                                         │
      └─ [ Playback Ms ] ─── (C++ Atomic Shared Memory)         │
                                     │                           ▼
-                         (Dart FFI Direct Pointer)     [ DirectSeekBar / DirectTimeLabel ]
+                         (Dart FFI Direct Pointer)     [ ZDirectSeekBar / ZDirectTimeLabel ]
                                     │                           │ (RenderBox.paint)
                                     └──────► Canvas.draw ───────┘ (120fps Synchronized)
 ```
@@ -62,11 +62,11 @@ Conventional Flutter video players (`video_player`), however, incur significant 
 
 ## 📦 Widgets & Components
 
-* **`ZeroPlayerView`**:
+* **`ZPlayer`** (legacy alias: `ZeroPlayerView`):
   Integrates zero-copy hardware textures with high-performance, zero-rebuild controls.
-* **`DirectSeekBar`**:
+* **`ZDirectSeekBar`** (or `ZSeekBar`, legacy: `DirectSeekBar`):
   An ultra-efficient seek bar widget without a `build()` method. Reads position directly from atomic memory and draws via `Canvas.drawLine`. Fully interactive with drag and tap support.
-* **`DirectTimeLabel`**:
+* **`ZDirectTimeLabel`** (or `ZTimeLabel`, legacy: `DirectTimeLabel`):
   A zero-rebuild timecode widget that updates time text locally only when seconds transition.
 * **`shaders/zero_blur.frag`**:
   Impeller-optimized single-pass Kawase blur shader preventing expensive off-screen buffer flushes.
@@ -129,7 +129,7 @@ class _VideoScreenState extends State<VideoScreen> {
 
     return Scaffold(
       body: Center(
-        child: ZeroPlayerView(
+        child: ZPlayer(
           controller: _controller!,
           showControls: true, // Automatically embeds zero-rebuild seek controls
         ),

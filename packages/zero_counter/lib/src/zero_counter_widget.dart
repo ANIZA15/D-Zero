@@ -7,7 +7,7 @@ import 'package:zero_core/zero_core.dart';
 /// 
 /// Listens to a [ValueListenable<int>] and repaints the latest value directly
 /// to the Canvas without rebuilding the widget tree or allocating [String]s.
-class ZeroCounter extends LeafRenderObjectWidget {
+class ZCounter extends LeafRenderObjectWidget {
   /// The integer source to display.
   final ValueListenable<int> valueListenable;
 
@@ -20,7 +20,7 @@ class ZeroCounter extends LeafRenderObjectWidget {
   /// Whether each digit should be monospaced for consistent tabular alignment.
   final bool monospaceAlignment;
 
-  const ZeroCounter({
+  const ZCounter({
     super.key,
     required this.valueListenable,
     this.style = const TextStyle(
@@ -51,6 +51,10 @@ class ZeroCounter extends LeafRenderObjectWidget {
       ..monospaceAlignment = monospaceAlignment;
   }
 }
+
+/// Backward compatibility alias for [ZCounter].
+@Deprecated('Use ZCounter instead.')
+typedef ZeroCounter = ZCounter;
 
 class RenderZeroCounter extends ZeroRenderBox {
   ValueListenable<int> _valueListenable;

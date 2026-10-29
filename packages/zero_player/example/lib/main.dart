@@ -388,7 +388,7 @@ class _ComparisonScreenState extends State<ComparisonScreen>
               ),
             )
           else if (_zeroController != null)
-            ZeroPlayerView(
+            ZPlayer(
               controller: _zeroController!,
               showControls: true,
             )

@@ -3,7 +3,7 @@ import 'package:zero_core/zero_core.dart';
 
 /// A zero-allocation, zero-rebuild stopwatch widget that renders elapsed time
 /// directly onto the Canvas using Impeller/Flutter rendering pipeline.
-class ZeroStopwatch extends LeafRenderObjectWidget {
+class ZStopwatch extends LeafRenderObjectWidget {
   /// Whether the stopwatch is currently running.
   final bool isRunning;
 
@@ -13,7 +13,7 @@ class ZeroStopwatch extends LeafRenderObjectWidget {
   /// Whether to include hours in the timecode.
   final bool includeHours;
 
-  const ZeroStopwatch({
+  const ZStopwatch({
     super.key,
     this.isRunning = true,
     this.style = const TextStyle(
@@ -41,6 +41,10 @@ class ZeroStopwatch extends LeafRenderObjectWidget {
       ..includeHours = includeHours;
   }
 }
+
+/// Backward compatibility alias for [ZStopwatch].
+@Deprecated('Use ZStopwatch instead.')
+typedef ZeroStopwatch = ZStopwatch;
 
 class RenderZeroStopwatch extends ZeroRenderBox {
   bool _isRunning;

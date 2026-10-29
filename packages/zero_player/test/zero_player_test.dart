@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zero_player/src/playback_state_ffi.dart';
 import 'package:zero_player/zero_player.dart';
@@ -227,6 +228,91 @@ void main() {
       controller.setPositionSimulated(1234);
       expect(controller.positionMs, equals(1234));
 
+      controller.dispose();
+    });
+  });
+
+  group('【5. Widget ライフサイクル & Z-Prefix 互換テスト】', () {
+    testWidgets('ZPlayer, ZDirectSeekBar, ZDirectTimeLabel がマウント・アンマウントで正常動作すること',
+        (tester) async {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(120000);
+      controller.setPositionSimulated(30000);
+
+      // マウント
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZPlayer(
+              controller: controller,
+              showControls: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(ZPlayer), findsOneWidget);
+      expect(find.byType(ZDirectSeekBar), findsOneWidget);
+      expect(find.byType(ZDirectTimeLabel), findsOneWidget);
+
+      // フレームを進める
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // アンマウント
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // コントローラを破棄
+      controller.dispose();
+    });
+
+    testWidgets('コントローラ破棄後の Widget アンマウントでも SIGSEGV せず安全であること',
+        (tester) async {
+      final controller = ZeroPlayerController.simulated();
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZPlayer(
+              controller: controller,
+              showControls: true,
+            ),
+          ),
+        ),
+      );
+
+      // コントローラを先に破棄（Use-After-Free 境界テスト）
+      controller.dispose();
+
+      // ウィジェットのアンマウント
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('後方互換性エイリアス (ZeroPlayerView, DirectSeekBar, DirectTimeLabel) が透過的に機能すること',
+        (tester) async {
+      final controller = ZeroPlayerController.simulated();
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              // ignore: deprecated_member_use_from_same_package
+              ZeroPlayerView(controller: controller, showControls: false),
+              // ignore: deprecated_member_use_from_same_package
+              DirectSeekBar(controller: controller),
+              // ignore: deprecated_member_use_from_same_package
+              DirectTimeLabel(controller: controller),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.byType(ZPlayer), findsOneWidget);
+      expect(find.byType(ZDirectSeekBar), findsOneWidget);
+      expect(find.byType(ZDirectTimeLabel), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
     });
   });

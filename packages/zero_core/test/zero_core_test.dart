@@ -1,11 +1,12 @@
 import 'dart:ui';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zero_core/zero_core.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('FloatRingBuffer Tests', () {
+  group('【1. FloatRingBuffer 基本 & メモリ・ストレステスト】', () {
     test('push and index access correctly retrieve circular values', () {
       final buffer = FloatRingBuffer(3);
       expect(buffer.isEmpty, isTrue);
@@ -42,9 +43,20 @@ void main() {
       expect(buffer.length, equals(0));
       expect(buffer.rawData.length, equals(5));
     });
+
+    test('100,000 回の超高速連続 push でもメモリ再確保・ヒープ肥大化を起こさないこと', () {
+      final buffer = FloatRingBuffer(128);
+      for (int i = 0; i < 100000; i++) {
+        buffer.push(i.toDouble());
+      }
+      expect(buffer.length, equals(128));
+      expect(buffer.rawData.length, equals(128));
+      // 最新の値が正しく反映されていること
+      expect(buffer[127], equals(99999.0));
+    });
   });
 
-  group('ZeroPool Tests', () {
+  group('【2. ZeroPool 基本 & メモリ再利用テスト】', () {
     test('acquires and releases items without reallocating', () {
       int creations = 0;
       final pool = ZeroPool<List<int>>(
@@ -68,9 +80,48 @@ void main() {
       expect(item1.isEmpty, isTrue); // reset called
       expect(creations, equals(2)); // No extra allocations
     });
+
+    test('大量取得・解放サイクルでのメモリプーリング健全性', () {
+      int creations = 0;
+      final pool = ZeroPool<List<int>>(
+        factory: () {
+          creations++;
+          return <int>[];
+        },
+        reset: (list) => list.clear(),
+        initialCapacity: 10,
+      );
+
+      final acquired = <List<int>>[];
+      // 50個一括取得（初期 10 個 + 動的 40 個）
+      for (int i = 0; i < 50; i++) {
+        final item = pool.acquire();
+        item.add(i);
+        acquired.add(item);
+      }
+      expect(creations, equals(50));
+      expect(pool.availableCount, equals(0));
+
+      // 全て返却
+      for (final item in acquired) {
+        pool.release(item);
+      }
+      expect(pool.availableCount, equals(50));
+
+      // 再度 50 個取得 -> 新規アロケーションは 0 件であること
+      final reacquired = <List<int>>[];
+      for (int i = 0; i < 50; i++) {
+        reacquired.add(pool.acquire());
+      }
+      expect(creations, equals(50)); // 再確保なし！
+      expect(pool.availableCount, equals(0));
+
+      pool.clear();
+      expect(pool.availableCount, equals(0));
+    });
   });
 
-  group('ZeroNumberPainter Tests', () {
+  group('【3. ZeroNumberPainter & Canvas 描画ライフサイクルテスト】', () {
     test('initializes and formats numbers without string allocation in loop', () {
       final painter = ZeroNumberPainter();
       expect(painter.height, greaterThan(0));
@@ -89,5 +140,61 @@ void main() {
       pictureRecorder.endRecording();
       painter.dispose();
     });
+
+    test('10,000 回の連続描画ループでメモリ破壊・例外が起きないこと', () {
+      final painter = ZeroNumberPainter();
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      for (int i = 0; i < 10000; i++) {
+        painter.paintInt(canvas, Offset.zero, i, minDigits: 6);
+        painter.paintTimecode(canvas, Offset.zero, i * 1000, includeHours: true);
+        painter.paintTimeProgress(canvas, Offset.zero, i * 100, (i + 10) * 100);
+      }
+
+      final pic = recorder.endRecording();
+      pic.dispose();
+      painter.dispose();
+    });
+
+    test('ZeroNumberPainter dispose の二重呼び出し安全性', () {
+      final painter = ZeroNumberPainter();
+      expect(() {
+        painter.dispose();
+        painter.dispose(); // 二重破棄耐性
+      }, returnsNormally);
+    });
   });
+
+  group('【4. ZeroRenderBox ライフサイクル & Ticker 管理テスト】', () {
+    test('attach と detach で Ticker が自動制御されること', () {
+      final box = _TestZeroRenderBox(animatePerFrame: true);
+      expect(box.isRepaintBoundary, isTrue);
+      expect(box.animatePerFrame, isTrue);
+
+      final pipelineOwner = PipelineOwner();
+      box.attach(pipelineOwner);
+
+      // 動的に animatePerFrame をトグル
+      box.animatePerFrame = false;
+      expect(box.animatePerFrame, isFalse);
+      box.animatePerFrame = true;
+      expect(box.animatePerFrame, isTrue);
+
+      box.detach();
+      box.dispose();
+    });
+  });
+}
+
+class _TestZeroRenderBox extends ZeroRenderBox {
+  _TestZeroRenderBox({super.animatePerFrame});
+
+  @override
+  void performLayout() {
+    size = constraints.biggest;
+  }
+
+  @override
+  void paintZero(PaintingContext context, Offset offset) {}
 }

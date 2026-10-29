@@ -8,7 +8,7 @@ import '../playback_state_ffi.dart';
 
 /// A high-performance seek bar [LeafRenderObjectWidget] that paints directly to the
 /// Canvas at 120fps by reading current playback position directly from atomic shared memory.
-class DirectSeekBar extends LeafRenderObjectWidget {
+class ZDirectSeekBar extends LeafRenderObjectWidget {
   /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
 
@@ -30,8 +30,8 @@ class DirectSeekBar extends LeafRenderObjectWidget {
   /// Optional callback invoked when the user drags or taps to seek.
   final ValueChanged<Duration>? onSeek;
 
-  /// Creates a zero-rebuild [DirectSeekBar].
-  const DirectSeekBar({
+  /// Creates a zero-rebuild [ZDirectSeekBar].
+  const ZDirectSeekBar({
     super.key,
     required this.controller,
     this.activeTrackColor = const Color(0xFFFF0055),
@@ -68,6 +68,13 @@ class DirectSeekBar extends LeafRenderObjectWidget {
       ..onSeek = onSeek;
   }
 }
+
+/// Backward compatibility alias for [ZDirectSeekBar].
+@Deprecated('Use ZDirectSeekBar instead.')
+typedef DirectSeekBar = ZDirectSeekBar;
+
+/// Shorthand alias for [ZDirectSeekBar].
+typedef ZSeekBar = ZDirectSeekBar;
 
 class RenderDirectSeekBar extends RenderBox {
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;

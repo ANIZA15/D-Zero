@@ -250,12 +250,12 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
               Expanded(
                 child: _buildPanel(
                   title: '⚡️ d-zero Suite',
-                  subtitle: 'ZeroCounter (Direct Canvas)',
+                  subtitle: 'ZCounter (Direct Canvas)',
                   badgeColor: const Color(0xFF00FF88),
                   rebuildCount: 0,
                   allocationEstimate: '0 Heap allocations',
                   child: Center(
-                    child: ZeroCounter(
+                    child: ZCounter(
                       valueListenable: _dZeroCounter,
                       minDigits: 6,
                       style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF00FF88)),
@@ -374,12 +374,12 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('⚡️ 120fps V-Sync 高精度ストップウォッチ (ZeroStopwatch)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text('⚡️ 120fps V-Sync 高精度ストップウォッチ (ZStopwatch)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 4),
           const Text('毎フレームの経過時間を Canvas へ直接描画。String を一切生成しないゼロアロケーション時間表示。', style: TextStyle(color: Colors.grey, fontSize: 11)),
           const SizedBox(height: 20),
           const Center(
-            child: ZeroStopwatch(
+            child: ZStopwatch(
               isRunning: true,
               includeHours: true,
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF), fontFamily: 'monospace'),
