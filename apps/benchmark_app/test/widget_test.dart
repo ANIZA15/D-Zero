@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:benchmark_app/main.dart';
+import 'package:benchmark_app/particles_benchmark_view.dart';
 
 void main() {
   testWidgets('Benchmark app smoke test', (WidgetTester tester) async {
@@ -21,7 +22,7 @@ void main() {
     await tester.pumpWidget(const DZeroBenchmarkApp());
 
     // Verify header exists.
-    expect(find.text('⚡️ d-zero Benchmark Suite'), findsOneWidget);
+    expect(find.text('⚡️ d-zero'), findsOneWidget);
 
     // Switch to Particle Stress tab
     await tester.tap(find.text('Particle Stress'));
@@ -30,18 +31,24 @@ void main() {
     // Verify Particle Stress view rendered
     expect(find.text('レンダリング方式の切り替え'), findsOneWidget);
     expect(find.text('⚡️ d-zero Suite'), findsOneWidget);
-    expect(find.text('❌ Traditional Flutter'), findsOneWidget);
+    expect(find.text('❌ Traditional'), findsOneWidget);
 
     // Switch to d-zero single view
-    await tester.tap(find.text('⚡️ d-zero'));
+    await tester.tap(find.descendant(
+      of: find.byType(SegmentedButton<ParticleRenderMode>),
+      matching: find.text('⚡️ d-zero'),
+    ));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('⚡️ d-zero Suite'), findsOneWidget);
-    expect(find.text('❌ Traditional Flutter'), findsNothing);
+    expect(find.text('❌ Traditional'), findsNothing);
 
     // Switch to Traditional single view
-    await tester.tap(find.text('❌ 従来'));
+    await tester.tap(find.descendant(
+      of: find.byType(SegmentedButton<ParticleRenderMode>),
+      matching: find.text('❌ 従来'),
+    ));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('❌ Traditional Flutter'), findsOneWidget);
+    expect(find.text('❌ Traditional'), findsOneWidget);
     expect(find.text('⚡️ d-zero Suite'), findsNothing);
   });
 }

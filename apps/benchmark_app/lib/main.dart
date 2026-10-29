@@ -44,7 +44,6 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
   // グローバル FPS & パフォーマンス監視
   double _fps = 60.0;
   double _frameTimeMs = 16.6;
-  int _droppedFrames = 0;
   DateTime _lastFrame = DateTime.now();
 
   @override
@@ -59,9 +58,6 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
         final currentFps = 1000.0 / diff;
         _fps = (_fps * 0.9) + (currentFps * 0.1);
         _frameTimeMs = diff;
-        if (diff > 16.6) {
-          _droppedFrames++;
-        }
       }
     });
   }
@@ -73,8 +69,14 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
         backgroundColor: const Color(0xFF121420),
         title: Row(
           children: [
-            const Text('⚡️ d-zero Benchmark Suite', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const Spacer(),
+            const Flexible(
+              child: Text(
+                '⚡️ d-zero',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             _buildFpsBadge(),
           ],
         ),
@@ -114,30 +116,30 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
     final is120 = _fps > 90;
     final color = _fps >= 55 ? const Color(0xFF00FF88) : (_fps >= 30 ? Colors.orange : Colors.red);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt, size: 14, color: color),
-          const SizedBox(width: 4),
+          Icon(Icons.bolt, size: 13, color: color),
+          const SizedBox(width: 3),
           Text(
-            '${_fps.toStringAsFixed(1)} FPS (${_frameTimeMs.toStringAsFixed(1)}ms) • Janks: $_droppedFrames',
-            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+            '${_fps.toStringAsFixed(1)} FPS (${_frameTimeMs.toStringAsFixed(1)}ms)',
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10),
           ),
           if (is120) ...[
             const SizedBox(width: 4),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
               decoration: BoxDecoration(
                 color: const Color(0xFF00E5FF),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(3),
               ),
-              child: const Text('120Hz', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+              child: const Text('120Hz', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
             ),
           ],
         ],

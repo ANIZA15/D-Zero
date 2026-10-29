@@ -48,6 +48,9 @@ class ZeroParticleController with ChangeNotifier {
   /// Whether this controller has been disposed.
   bool get isDisposed => _isDisposed;
 
+  /// Whether particles have been initialized.
+  bool get isInitialized => _isInitialized;
+
   /// The underlying [ZeroParticleBuffer]. Returns an empty safe buffer if disposed.
   ZeroParticleBuffer get buffer {
     if (_isDisposed || _buffer == null) {

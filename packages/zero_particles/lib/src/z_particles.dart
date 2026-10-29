@@ -21,12 +21,16 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
   /// The size/diameter of each particle point in pixels.
   final double pointSize;
 
+  /// Optional callback invoked on frame ticks with current FPS and frame time in ms.
+  final void Function(double fps, double frameTimeMs)? onFpsUpdate;
+
   const ZParticles({
     super.key,
     required this.controller,
     this.isRunning = true,
     this.color = const Color(0xFF00FF88),
-    this.pointSize = 3.0,
+    this.pointSize = 3.5,
+    this.onFpsUpdate,
   });
 
   @override
@@ -36,6 +40,7 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
       isRunning: isRunning,
       color: color,
       pointSize: pointSize,
+      onFpsUpdate: onFpsUpdate,
     );
   }
 
@@ -45,7 +50,8 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
       ..controller = controller
       ..isRunning = isRunning
       ..color = color
-      ..pointSize = pointSize;
+      ..pointSize = pointSize
+      ..onFpsUpdate = onFpsUpdate;
   }
 }
 
@@ -59,15 +65,19 @@ class RenderZParticles extends ZeroRenderBox {
   bool _isRunning;
   Color _color;
   double _pointSize;
+  void Function(double fps, double frameTimeMs)? onFpsUpdate;
 
   late final Paint _paint;
   Duration _lastElapsed = Duration.zero;
+  double _fps = 60.0;
+  int _fpsUpdateCounter = 0;
 
   RenderZParticles({
     required ZeroParticleController controller,
     required bool isRunning,
     required Color color,
     required double pointSize,
+    this.onFpsUpdate,
   })  : _controller = controller,
         _isRunning = isRunning,
         _color = color,
@@ -77,7 +87,8 @@ class RenderZParticles extends ZeroRenderBox {
       ..color = _color
       ..strokeWidth = _pointSize
       ..strokeCap = StrokeCap.round
-      ..isAntiAlias = false;
+      ..style = PaintingStyle.stroke
+      ..isAntiAlias = true;
   }
 
   ZeroParticleController get controller => _controller;
@@ -116,17 +127,29 @@ class RenderZParticles extends ZeroRenderBox {
     if (!_isRunning || _controller.isDisposed) return false;
 
     final double dt = _calculateDeltaSeconds(elapsed);
+    _recordFps(dt);
     _lastElapsed = elapsed;
 
-    if (size.width > 0 && size.height > 0) {
-      _controller.step(
-        dt: dt,
-        width: size.width,
-        height: size.height,
-      );
-      return true;
+    final double renderW = size.width > 0 ? size.width : 400.0;
+    final double renderH = size.height > 0 ? size.height : 400.0;
+
+    _controller.step(
+      dt: dt,
+      width: renderW,
+      height: renderH,
+    );
+    return true;
+  }
+
+  void _recordFps(double dt) {
+    if (dt <= 0) return;
+    final double currentFps = 1.0 / dt;
+    _fps = (_fps * 0.9) + (currentFps * 0.1);
+    _fpsUpdateCounter++;
+    // Notify periodically (every ~10 frames) to avoid calling callback too frequently
+    if (_fpsUpdateCounter % 10 == 0) {
+      onFpsUpdate?.call(_fps, dt * 1000.0);
     }
-    return false;
   }
 
   double _calculateDeltaSeconds(Duration elapsed) {
@@ -138,7 +161,6 @@ class RenderZParticles extends ZeroRenderBox {
       return 1.0 / 60.0;
     }
     final double dt = microDelta / 1000000.0;
-    // Clamp to 100ms max to prevent tunneling during app pause
     return dt > 0.1 ? 0.1 : dt;
   }
 

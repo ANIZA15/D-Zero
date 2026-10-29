@@ -24,14 +24,18 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   int _particleCount = 5000;
   bool _isRunning = true;
 
-  // d-zero controller
+  // d-zero controller & metrics
   late ZeroParticleController _zController;
+  double _dZeroFps = 60.0;
+  double _dZeroFrameTimeMs = 16.6;
 
-  // Traditional simulation state
+  // Traditional simulation state & metrics
   late List<TraditionalParticle> _traditionalParticles;
   Ticker? _traditionalTicker;
   Duration _lastTraditionalElapsed = Duration.zero;
   int _traditionalRebuildCount = 0;
+  double _traditionalFps = 60.0;
+  double _traditionalFrameTimeMs = 16.6;
 
   @override
   void initState() {
@@ -43,6 +47,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
 
   void _initDZero() {
     _zController = ZeroParticleController(capacity: _particleCount);
+    _zController.ensureInitialized(width: 400.0, height: 400.0);
   }
 
   void _initTraditional() {
@@ -68,6 +73,12 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
     if (!_isRunning) return;
     final dt = _calcTraditionalDt(elapsed);
     _lastTraditionalElapsed = elapsed;
+
+    if (dt > 0) {
+      final currentFps = 1.0 / dt;
+      _traditionalFps = (_traditionalFps * 0.9) + (currentFps * 0.1);
+      _traditionalFrameTimeMs = dt * 1000.0;
+    }
 
     _updateTraditionalPhysics(dt);
 
@@ -140,12 +151,12 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildControlHeader(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildActiveViewLayout(),
         ],
       ),
@@ -154,30 +165,26 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
 
   Widget _buildControlHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF121420),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E2235)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Text('レンダリング方式の切り替え', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          _buildModeSelector(),
+          const SizedBox(height: 12),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('レンダリング方式の切り替え', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const Spacer(),
-              _buildModeSelector(),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Text('パーティクル数 (Particle Count)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              const Spacer(),
+              const Text('パーティクル数', style: TextStyle(fontSize: 12, color: Colors.grey)),
               Text(
                 '$_particleCount 個',
-                style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ],
           ),
@@ -189,15 +196,13 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
             activeColor: const Color(0xFF00FF88),
             onChanged: (val) => _updateParticleCount(val.round()),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => setState(() => _isRunning = !_isRunning),
-                icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow),
-                label: Text(_isRunning ? '一時停止' : '再開'),
-              ),
-            ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: () => setState(() => _isRunning = !_isRunning),
+              icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow, size: 16),
+              label: Text(_isRunning ? '一時停止' : '再開', style: const TextStyle(fontSize: 12)),
+            ),
           ),
         ],
       ),
@@ -205,16 +210,19 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   }
 
   Widget _buildModeSelector() {
-    return SegmentedButton<ParticleRenderMode>(
-      segments: const [
-        ButtonSegment(value: ParticleRenderMode.sideBySide, label: Text('2画面比較', style: TextStyle(fontSize: 11))),
-        ButtonSegment(value: ParticleRenderMode.dZero, label: Text('⚡️ d-zero', style: TextStyle(fontSize: 11))),
-        ButtonSegment(value: ParticleRenderMode.traditional, label: Text('❌ 従来', style: TextStyle(fontSize: 11))),
-      ],
-      selected: {_mode},
-      onSelectionChanged: (set) {
-        setState(() => _mode = set.first);
-      },
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<ParticleRenderMode>(
+        segments: const [
+          ButtonSegment(value: ParticleRenderMode.sideBySide, label: Text('2画面比較', style: TextStyle(fontSize: 11))),
+          ButtonSegment(value: ParticleRenderMode.dZero, label: Text('⚡️ d-zero', style: TextStyle(fontSize: 11))),
+          ButtonSegment(value: ParticleRenderMode.traditional, label: Text('❌ 従来', style: TextStyle(fontSize: 11))),
+        ],
+        selected: {_mode},
+        onSelectionChanged: (set) {
+          setState(() => _mode = set.first);
+        },
+      ),
     );
   }
 
@@ -229,15 +237,16 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: _buildTraditionalCard(height: 320)),
-        const SizedBox(width: 16),
+        const SizedBox(width: 8),
         Expanded(child: _buildDZeroCard(height: 320)),
       ],
     );
   }
 
   Widget _buildTraditionalCard({required double height}) {
+    final fpsColor = _calcFpsColor(_traditionalFps);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF121420),
         borderRadius: BorderRadius.circular(12),
@@ -246,37 +255,41 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('❌ Traditional Flutter', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.redAccent)),
-          const Text('setState() + CustomPainter + Heap Objects', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 12),
+          const Text('❌ Traditional', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+          const Text('setState() + CustomPainter', style: TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 8),
           Container(
             height: height,
+            width: double.infinity,
             decoration: BoxDecoration(
               color: const Color(0xFF0A0C14),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFF1E2235)),
             ),
             clipBehavior: Clip.antiAlias,
-            child: CustomPaint(
-              painter: TraditionalParticlePainter(
-                particles: _traditionalParticles,
-                color: Colors.redAccent,
+            child: SizedBox.expand(
+              child: CustomPaint(
+                painter: TraditionalParticlePainter(
+                  particles: _traditionalParticles,
+                  color: Colors.redAccent,
+                ),
               ),
-              size: Size.infinite,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _buildMetricRow('描画 FPS', '${_traditionalFps.toStringAsFixed(1)} FPS (${_traditionalFrameTimeMs.toStringAsFixed(1)}ms)', fpsColor),
           _buildMetricRow('Widget Rebuilds', '$_traditionalRebuildCount 回', Colors.redAccent),
-          _buildMetricRow('Heap Allocations', '毎フレーム $_particleCount 回のオブジェクト走査 & Paint 生成', Colors.orangeAccent),
-          _buildMetricRow('Draw Calls', '個別 drawCircle() × $_particleCount 回', Colors.redAccent),
+          _buildMetricRow('Heap Allocations', '毎フレーム $_particleCount 回の参照', Colors.orangeAccent),
+          _buildMetricRow('Draw Calls', '個別 drawCircle() × $_particleCount', Colors.redAccent),
         ],
       ),
     );
   }
 
   Widget _buildDZeroCard({required double height}) {
+    final fpsColor = _calcFpsColor(_dZeroFps);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF121420),
         borderRadius: BorderRadius.circular(12),
@@ -285,31 +298,49 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('⚡️ d-zero Suite', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF00FF88))),
-          const Text('ZParticles (Float32List SoA + drawRawPoints)', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 12),
+          const Text('⚡️ d-zero Suite', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00FF88))),
+          const Text('ZParticles (Float32List SoA)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 8),
           Container(
             height: height,
+            width: double.infinity,
             decoration: BoxDecoration(
               color: const Color(0xFF0A0C14),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFF1E2235)),
             ),
             clipBehavior: Clip.antiAlias,
-            child: ZParticles(
-              controller: _zController,
-              isRunning: _isRunning,
-              color: const Color(0xFF00FF88),
-              pointSize: 2.5,
+            child: SizedBox.expand(
+              child: ZParticles(
+                controller: _zController,
+                isRunning: _isRunning,
+                color: const Color(0xFF00FF88),
+                pointSize: 3.5,
+                onFpsUpdate: (fps, ms) {
+                  if (mounted) {
+                    setState(() {
+                      _dZeroFps = fps;
+                      _dZeroFrameTimeMs = ms;
+                    });
+                  }
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _buildMetricRow('描画 FPS', '${_dZeroFps.toStringAsFixed(1)} FPS (${_dZeroFrameTimeMs.toStringAsFixed(1)}ms)', fpsColor),
           _buildMetricRow('Widget Rebuilds', '0 回 (Zero Rebuild)', Colors.green),
-          _buildMetricRow('Heap Allocations', '0 Heap Allocations (Zero Allocation)', Colors.green),
-          _buildMetricRow('Draw Calls', 'GPU バッチ一括転送 1 回 (drawRawPoints)', Colors.green),
+          _buildMetricRow('Heap Allocations', '0 Heap Allocations', Colors.green),
+          _buildMetricRow('Draw Calls', 'GPU バッチ一括 1 回', Colors.green),
         ],
       ),
     );
+  }
+
+  Color _calcFpsColor(double fps) {
+    if (fps >= 55.0) return const Color(0xFF00FF88);
+    if (fps >= 30.0) return Colors.orange;
+    return Colors.redAccent;
   }
 
   Widget _buildMetricRow(String label, String value, Color color) {
@@ -318,14 +349,14 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
             ),
           ),
         ],
