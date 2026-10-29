@@ -7,6 +7,7 @@ import 'dart:typed_data';
 /// pre-allocates all [Float64List.sublistView] slices at construction time.
 /// This allows:
 /// - Branch-only wrap-around on [push] and `operator[]` (no integer modulo `%`),
+/// - Bulk `memcpy`-backed [pushAll] via [Float64List.setRange],
 /// - Zero-allocation [contiguousView] returning the elements in oldest-to-newest
 ///   order for direct batch consumption.
 class FloatRingBuffer {
@@ -56,6 +57,22 @@ class FloatRingBuffer {
   @pragma('vm:prefer-inline')
   bool get isEmpty => _length == 0;
 
+  /// Returns the oldest element currently in the buffer, or `0.0` if empty.
+  @pragma('vm:prefer-inline')
+  double get oldest {
+    if (_length == 0) return 0.0;
+    final int idx = _length < capacity ? 0 : _head;
+    return _data[idx];
+  }
+
+  /// Returns the most recently pushed element in the buffer, or `0.0` if empty.
+  @pragma('vm:prefer-inline')
+  double get latest {
+    if (_length == 0) return 0.0;
+    final int idx = _head == 0 ? capacity - 1 : _head - 1;
+    return _data[idx];
+  }
+
   /// Pushes a new value into the buffer. If full, overwrites the oldest element.
   ///
   /// Uses a single comparison branch instead of integer modulo (`%`).
@@ -71,12 +88,38 @@ class FloatRingBuffer {
     }
   }
 
-  /// Pushes multiple values into the buffer from an existing [source] array.
+  /// Pushes multiple values from [source] using bulk [Float64List.setRange] copies.
   void pushAll(List<double> source) {
     final int n = source.length;
-    for (int i = 0; i < n; i++) {
-      push(source[i]);
+    if (n == 0) return;
+    final int cap = capacity;
+    if (n >= cap) {
+      final int srcOffset = n - cap;
+      _data.setRange(0, cap, source, srcOffset);
+      _data.setRange(cap, cap * 2, source, srcOffset);
+      _head = 0;
+      _length = cap;
+      return;
     }
+    _pushSlice(source, n, cap);
+  }
+
+  void _pushSlice(List<double> source, int n, int cap) {
+    final int h = _head;
+    final int firstPart = (h + n <= cap) ? n : (cap - h);
+    _data.setRange(h, h + firstPart, source, 0);
+    _data.setRange(h + cap, h + cap + firstPart, source, 0);
+    final int secondPart = n - firstPart;
+    if (secondPart > 0) {
+      _data.setRange(0, secondPart, source, firstPart);
+      _data.setRange(cap, cap + secondPart, source, firstPart);
+      _head = secondPart;
+    } else {
+      final int next = h + firstPart;
+      _head = next == cap ? 0 : next;
+    }
+    final int newLen = _length + n;
+    _length = newLen < cap ? newLen : cap;
   }
 
   /// Retrieves the element at [index], where 0 is the oldest element currently in the buffer.
@@ -89,13 +132,63 @@ class FloatRingBuffer {
     return _data[start + index];
   }
 
+  /// Copies currently stored elements (oldest to newest) into [dest] at [destOffset].
+  /// Returns the number of elements copied.
+  int copyInto(List<double> dest, [int destOffset = 0]) {
+    final int len = _length;
+    if (len == 0) return 0;
+    final int start = len < capacity ? 0 : _head;
+    dest.setRange(destOffset, destOffset + len, _data, start);
+    return len;
+  }
+
+  /// Computes the arithmetic mean of all currently stored elements (zero allocation).
+  double get average {
+    final int len = _length;
+    if (len == 0) return 0.0;
+    final int start = len < capacity ? 0 : _head;
+    final int end = start + len;
+    double sum = 0.0;
+    for (int i = start; i < end; i++) {
+      sum += _data[i];
+    }
+    return sum / len;
+  }
+
+  /// Returns the minimum value currently stored in the buffer, or `0.0` if empty.
+  double get min {
+    final int len = _length;
+    if (len == 0) return 0.0;
+    final int start = len < capacity ? 0 : _head;
+    final int end = start + len;
+    double m = _data[start];
+    for (int i = start + 1; i < end; i++) {
+      final double v = _data[i];
+      if (v < m) m = v;
+    }
+    return m;
+  }
+
+  /// Returns the maximum value currently stored in the buffer, or `0.0` if empty.
+  double get max {
+    final int len = _length;
+    if (len == 0) return 0.0;
+    final int start = len < capacity ? 0 : _head;
+    final int end = start + len;
+    double m = _data[start];
+    for (int i = start + 1; i < end; i++) {
+      final double v = _data[i];
+      if (v > m) m = v;
+    }
+    return m;
+  }
+
   /// Retrieves the raw first-half buffer of length [capacity].
-  Float64List get rawData =>
-      _rawView.length == capacity ? _rawView : Float64List.sublistView(_data, 0, capacity);
+  Float64List get rawData => _rawView;
 
   /// Returns a contiguous view of all currently stored elements in oldest-to-newest order.
   Float64List get contiguousView {
-    if (_length == capacity && _fullViews.isNotEmpty) {
+    if (_length == capacity) {
       return _fullViews[_head];
     }
     final int start = _length < capacity ? 0 : _head;
@@ -153,6 +246,22 @@ class Float32RingBuffer {
   @pragma('vm:prefer-inline')
   bool get isEmpty => _length == 0;
 
+  /// Returns the oldest element currently in the buffer, or `0.0` if empty.
+  @pragma('vm:prefer-inline')
+  double get oldest {
+    if (_length == 0) return 0.0;
+    final int idx = _length < capacity ? 0 : _head;
+    return _data[idx];
+  }
+
+  /// Returns the most recently pushed element in the buffer, or `0.0` if empty.
+  @pragma('vm:prefer-inline')
+  double get latest {
+    if (_length == 0) return 0.0;
+    final int idx = _head == 0 ? capacity - 1 : _head - 1;
+    return _data[idx];
+  }
+
   /// Pushes a new value into the buffer without integer modulo (`%`).
   @pragma('vm:prefer-inline')
   void push(double value) {
@@ -166,12 +275,38 @@ class Float32RingBuffer {
     }
   }
 
-  /// Pushes multiple values into the buffer from an existing [source] array.
+  /// Pushes multiple values from [source] using bulk [Float32List.setRange] copies.
   void pushAll(List<double> source) {
     final int n = source.length;
-    for (int i = 0; i < n; i++) {
-      push(source[i]);
+    if (n == 0) return;
+    final int cap = capacity;
+    if (n >= cap) {
+      final int srcOffset = n - cap;
+      _data.setRange(0, cap, source, srcOffset);
+      _data.setRange(cap, cap * 2, source, srcOffset);
+      _head = 0;
+      _length = cap;
+      return;
     }
+    _pushSlice(source, n, cap);
+  }
+
+  void _pushSlice(List<double> source, int n, int cap) {
+    final int h = _head;
+    final int firstPart = (h + n <= cap) ? n : (cap - h);
+    _data.setRange(h, h + firstPart, source, 0);
+    _data.setRange(h + cap, h + cap + firstPart, source, 0);
+    final int secondPart = n - firstPart;
+    if (secondPart > 0) {
+      _data.setRange(0, secondPart, source, firstPart);
+      _data.setRange(cap, cap + secondPart, source, firstPart);
+      _head = secondPart;
+    } else {
+      final int next = h + firstPart;
+      _head = next == cap ? 0 : next;
+    }
+    final int newLen = _length + n;
+    _length = newLen < cap ? newLen : cap;
   }
 
   @pragma('vm:prefer-inline')
@@ -181,6 +316,29 @@ class Float32RingBuffer {
     }
     final int start = _length < capacity ? 0 : _head;
     return _data[start + index];
+  }
+
+  /// Copies currently stored elements (oldest to newest) into [dest] at [destOffset].
+  /// Returns the number of elements copied.
+  int copyInto(List<double> dest, [int destOffset = 0]) {
+    final int len = _length;
+    if (len == 0) return 0;
+    final int start = len < capacity ? 0 : _head;
+    dest.setRange(destOffset, destOffset + len, _data, start);
+    return len;
+  }
+
+  /// Computes the arithmetic mean of all currently stored elements (zero allocation).
+  double get average {
+    final int len = _length;
+    if (len == 0) return 0.0;
+    final int start = len < capacity ? 0 : _head;
+    final int end = start + len;
+    double sum = 0.0;
+    for (int i = start; i < end; i++) {
+      sum += _data[i];
+    }
+    return sum / len;
   }
 
   /// Retrieves the raw first-half buffer of length [capacity].

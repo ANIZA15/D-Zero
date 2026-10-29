@@ -66,6 +66,46 @@ void main() {
       expect(f32.isFull, isTrue);
       expect(f32.contiguousView, equals([2.0, 3.0, 4.0, 5.0]));
       expect(identical(f32.contiguousView, f32.contiguousView), isTrue);
+      expect(f32.oldest, equals(2.0));
+      expect(f32.latest, equals(5.0));
+    });
+
+    test('bulk pushAll handles wrap-around and n >= capacity, plus oldest/latest/copyInto/stats', () {
+      final buf = FloatRingBuffer(4);
+      expect(buf.oldest, equals(0.0));
+      expect(buf.latest, equals(0.0));
+      expect(buf.average, equals(0.0));
+      expect(buf.min, equals(0.0));
+      expect(buf.max, equals(0.0));
+
+      // Partial pushAll
+      buf.pushAll([10.0, 20.0, 30.0]);
+      expect(buf.length, equals(3));
+      expect(buf.oldest, equals(10.0));
+      expect(buf.latest, equals(30.0));
+      expect(buf.average, equals(20.0));
+      expect(buf.min, equals(10.0));
+      expect(buf.max, equals(30.0));
+
+      // Wrap-around pushAll (head=3, capacity=4, pushing 2 elements)
+      buf.pushAll([40.0, 50.0]);
+      expect(buf.isFull, isTrue);
+      expect(buf.contiguousView, equals([20.0, 30.0, 40.0, 50.0]));
+      expect(buf.oldest, equals(20.0));
+      expect(buf.latest, equals(50.0));
+
+      // CopyInto test
+      final dest = List<double>.filled(6, -1.0);
+      final copied = buf.copyInto(dest, 1);
+      expect(copied, equals(4));
+      expect(dest, equals([-1.0, 20.0, 30.0, 40.0, 50.0, -1.0]));
+
+      // n >= capacity pushAll
+      buf.pushAll([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+      expect(buf.contiguousView, equals([3.0, 4.0, 5.0, 6.0]));
+      expect(buf.average, equals(4.5));
+      expect(buf.min, equals(3.0));
+      expect(buf.max, equals(6.0));
     });
   });
 
@@ -132,6 +172,36 @@ void main() {
       pool.clear();
       expect(pool.availableCount, equals(0));
     });
+
+    test('prewarm, acquireBatch, and releaseBatch operate without allocations', () {
+      int creations = 0;
+      final pool = ZeroPool<List<int>>(
+        factory: () {
+          creations++;
+          return <int>[];
+        },
+        reset: (list) => list.clear(),
+        initialCapacity: 2,
+      );
+
+      pool.prewarm(8);
+      expect(pool.availableCount, equals(8));
+      expect(creations, equals(8));
+
+      final batch = List<List<int>?>.filled(10, null);
+      pool.acquireBatch(batch, 10);
+      expect(pool.availableCount, equals(0));
+      expect(creations, equals(10));
+
+      final nonNullBatch = batch.cast<List<int>>();
+      for (int i = 0; i < 10; i++) {
+        nonNullBatch[i].add(i);
+      }
+
+      pool.releaseBatch(nonNullBatch, 10);
+      expect(pool.availableCount, equals(10));
+      expect(nonNullBatch.every((l) => l.isEmpty), isTrue);
+    });
   });
 
   group('【3. ZeroNumberPainter & Canvas 描画ライフサイクルテスト】', () {
@@ -176,6 +246,37 @@ void main() {
         painter.dispose();
         painter.dispose(); // 二重破棄耐性
       }, returnsNormally);
+    });
+
+    test('paintDouble renders positive, negative, and zero values without string allocation', () {
+      final painter = ZeroNumberPainter();
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      final wPos = painter.paintDouble(canvas, Offset.zero, 119.95, fractionDigits: 2);
+      final wNeg = painter.paintDouble(canvas, Offset.zero, -0.5, fractionDigits: 1);
+      final wInt = painter.paintDouble(canvas, Offset.zero, 42.0, fractionDigits: 0);
+      expect(wPos, greaterThan(wInt));
+      expect(wNeg, greaterThan(0));
+
+      recorder.endRecording().dispose();
+      painter.dispose();
+    });
+
+    test('shared GPU glyph atlas deduplicates identical styles and releases on last dispose', () {
+      const style = TextStyle(fontSize: 19, color: Color(0xFF112233));
+      final p1 = ZeroNumberPainter(style: style, devicePixelRatio: 2.0);
+      final p2 = ZeroNumberPainter(style: style, devicePixelRatio: 2.0);
+
+      expect(ZeroNumberPainter.cachedAtlasCount, greaterThanOrEqualTo(1));
+      final countBefore = ZeroNumberPainter.cachedAtlasCount;
+
+      p1.dispose();
+      // Atlas is still held by p2
+      expect(ZeroNumberPainter.cachedAtlasCount, equals(countBefore));
+
+      p2.dispose();
+      expect(ZeroNumberPainter.cachedAtlasCount, equals(countBefore - 1));
     });
   });
 
@@ -262,6 +363,62 @@ void main() {
       // Unmount
       await tester.pumpWidget(const SizedBox.shrink());
       expect(find.byType(_DummyZSingleChildWidget), findsNothing);
+    });
+  });
+
+  group('【6. ZeroIntNotifier / ZeroDoubleNotifier ゼロボクシング通知テスト】', () {
+    test('ZeroIntNotifier updates, notifies, and compacts removed listeners safely', () {
+      final notifier = ZeroIntNotifier(10);
+      int calls1 = 0;
+      int calls2 = 0;
+      late VoidCallback listener1;
+      listener1 = () {
+        calls1++;
+        if (notifier.value == 20) {
+          notifier.removeListener(listener1);
+        }
+      };
+      void listener2() {
+        calls2++;
+      }
+
+      notifier.addListener(listener1);
+      notifier.addListener(listener2);
+      expect(notifier.hasListeners, isTrue);
+
+      // Identical value should not notify
+      notifier.value = 10;
+      expect(calls1, equals(0));
+      expect(calls2, equals(0));
+
+      // Update to 20 -> listener1 removes itself during dispatch
+      notifier.add(10);
+      expect(notifier.value, equals(20));
+      expect(calls1, equals(1));
+      expect(calls2, equals(1));
+
+      // Update to 25 -> only listener2 is called
+      notifier.add(5);
+      expect(calls1, equals(1));
+      expect(calls2, equals(2));
+
+      notifier.dispose();
+      notifier.dispose(); // Double-dispose safety
+      notifier.value = 99; // Ignored after dispose
+      expect(calls2, equals(2));
+    });
+
+    test('ZeroDoubleNotifier updates and notifies properly', () {
+      final notifier = ZeroDoubleNotifier(1.5);
+      int calls = 0;
+      notifier.addListener(() => calls++);
+
+      notifier.add(0.5);
+      expect(notifier.value, equals(2.0));
+      expect(calls, equals(1));
+
+      notifier.dispose();
+      notifier.dispose();
     });
   });
 }

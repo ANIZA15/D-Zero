@@ -1,4 +1,6 @@
 import 'dart:ffi' as ffi;
+import 'dart:typed_data';
+import 'dart:ui' show PointMode;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -86,15 +88,19 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   double _thumbRadius;
   ValueChanged<Duration>? onSeek;
 
-  // Pre-allocated Paints reused across every frame (zero allocation in paintZero)
+  // Pre-allocated Paints and raw coordinate buffers reused across every frame
+  // (zero Offset / Paint allocations in paintZero)
   final Paint _bgPaint = Paint()..strokeCap = StrokeCap.round;
   final Paint _activePaint = Paint()..strokeCap = StrokeCap.round;
-  final Paint _thumbPaint = Paint();
+  final Paint _thumbPaint = Paint()..strokeCap = StrokeCap.round;
+  final Float32List _bgLineCoords = Float32List(4);
+  final Float32List _activeLineCoords = Float32List(4);
+  final Float32List _thumbCoord = Float32List(2);
 
   late final HorizontalDragGestureRecognizer _dragRecognizer;
   late final TapGestureRecognizer _tapRecognizer;
 
-  int _lastPositionMs = -1;
+  int _lastQuantizedStep = -1;
   int _lastDurationMs = -1;
 
   RenderDirectSeekBar({
@@ -119,7 +125,9 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     _activePaint
       ..color = _activeTrackColor
       ..strokeWidth = _trackHeight;
-    _thumbPaint.color = _thumbColor;
+    _thumbPaint
+      ..color = _thumbColor
+      ..strokeWidth = _thumbRadius * 2.0;
 
     _dragRecognizer = HorizontalDragGestureRecognizer()
       ..onStart = _handleDragStart
@@ -133,7 +141,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     if (_statePointer == val) return;
     _statePointer = val;
     _view = ZeroPlaybackStateView(val);
-    _lastPositionMs = -1;
+    _lastQuantizedStep = -1;
     _lastDurationMs = -1;
     markDirty();
   }
@@ -170,17 +178,26 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   set thumbRadius(double val) {
     if (_thumbRadius == val) return;
     _thumbRadius = val;
+    _thumbPaint.strokeWidth = val * 2.0;
     markNeedsLayout();
+  }
+
+  int _quantizePositionStep(int posMs, int durMs) {
+    if (!hasSize || durMs <= 0) return posMs;
+    final double w = size.width;
+    if (w <= 0.0) return posMs;
+    return (posMs * w * 4.0) ~/ durMs;
   }
 
   @override
   bool onFrameTick(Duration elapsed) {
     final int posMs = _view.displayPositionMs;
     final int durMs = _view.durationMs;
-    if (posMs == _lastPositionMs && durMs == _lastDurationMs) {
+    final int step = _quantizePositionStep(posMs, durMs);
+    if (step == _lastQuantizedStep && durMs == _lastDurationMs) {
       return false;
     }
-    _lastPositionMs = posMs;
+    _lastQuantizedStep = step;
     _lastDurationMs = durMs;
     return true;
   }
@@ -239,7 +256,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
 
     final int positionMs = _view.displayPositionMs;
     final int durationMs = _view.durationMs;
-    _lastPositionMs = positionMs;
+    _lastQuantizedStep = _quantizePositionStep(positionMs, durationMs);
     _lastDurationMs = durationMs;
 
     double progress = 0.0;
@@ -254,21 +271,23 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     final double trackRight = offset.dx + width;
     final double activeRight = trackLeft + width * progress;
 
-    canvas.drawLine(
-      Offset(trackLeft, centerY),
-      Offset(trackRight, centerY),
-      _bgPaint,
-    );
+    _bgLineCoords[0] = trackLeft;
+    _bgLineCoords[1] = centerY;
+    _bgLineCoords[2] = trackRight;
+    _bgLineCoords[3] = centerY;
+    canvas.drawRawPoints(PointMode.lines, _bgLineCoords, _bgPaint);
 
     if (progress > 0.0) {
-      canvas.drawLine(
-        Offset(trackLeft, centerY),
-        Offset(activeRight, centerY),
-        _activePaint,
-      );
+      _activeLineCoords[0] = trackLeft;
+      _activeLineCoords[1] = centerY;
+      _activeLineCoords[2] = activeRight;
+      _activeLineCoords[3] = centerY;
+      canvas.drawRawPoints(PointMode.lines, _activeLineCoords, _activePaint);
     }
 
-    canvas.drawCircle(Offset(activeRight, centerY), _thumbRadius, _thumbPaint);
+    _thumbCoord[0] = activeRight;
+    _thumbCoord[1] = centerY;
+    canvas.drawRawPoints(PointMode.points, _thumbCoord, _thumbPaint);
   }
 
   @override

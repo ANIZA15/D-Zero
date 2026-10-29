@@ -418,7 +418,7 @@ class ZeroWebSocketStreamHandler(
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 if (isDisposed) return
                 try {
-                    pipedOutput.write(bytes.toByteArray())
+                    bytes.write(pipedOutput)
                     pipedOutput.flush()
                 } catch (e: IOException) {
                     // パイプ破損・クローズ時の例外

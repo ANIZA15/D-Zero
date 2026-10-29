@@ -8,14 +8,23 @@ import '../scheduler/zero_frame_scheduler.dart';
 /// 2. Optional frame-synchronized rendering via [ZeroFrameScheduler] (single shared Ticker)
 ///    with dirty state tracking.
 /// 3. Memory reuse: prevents recreating painters, paths, or text objects per frame.
-abstract class ZeroRenderBox extends RenderBox implements ZeroFrameListener {
+abstract class ZeroRenderBox extends RenderBox implements ZeroSlottedFrameListener {
   bool _isDirty = true;
   bool _animatePerFrame;
   bool _isSubscribed = false;
+  int _schedulerSlot = -1;
 
   /// Creates a [ZeroRenderBox].
   /// If [animatePerFrame] is true, subscribes to [ZeroFrameScheduler] when attached.
   ZeroRenderBox({bool animatePerFrame = false}) : _animatePerFrame = animatePerFrame;
+
+  @override
+  int get zeroSchedulerSlot => _schedulerSlot;
+
+  @override
+  set zeroSchedulerSlot(int slot) {
+    _schedulerSlot = slot;
+  }
 
   @override
   bool get isRepaintBoundary => true;

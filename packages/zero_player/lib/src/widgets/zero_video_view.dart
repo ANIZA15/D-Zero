@@ -46,13 +46,9 @@ class ZPlayer extends StatelessWidget {
               bottom: 12,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ZDirectTimeLabel(controller: controller),
-                    ],
-                  ),
+                  ZDirectTimeLabel(controller: controller),
                   const SizedBox(height: 6),
                   ZDirectSeekBar(
                     controller: controller,
