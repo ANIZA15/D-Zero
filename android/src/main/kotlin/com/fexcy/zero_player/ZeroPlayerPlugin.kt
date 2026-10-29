@@ -152,10 +152,23 @@ class ZeroExoPlayerWrapper(
     init {
         exoPlayer.setVideoSurface(surface)
 
-        // OkHttp クライアント（HTTP/2, HTTP/3, 高速キープアライブ）
+        // OkHttp クライアント（HTTP/2, HTTP/3, 高速キープアライブ, リダイレクト追跡）
         val okHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .addInterceptor { chain ->
+                val originalRequest = chain.request()
+                val requestBuilder = originalRequest.newBuilder()
+                if (originalRequest.header("User-Agent") == null) {
+                    requestBuilder.header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    )
+                }
+                chain.proceed(requestBuilder.build())
+            }
             .build()
 
         val isWs = url.startsWith("ws://", ignoreCase = true) || url.startsWith("wss://", ignoreCase = true)
@@ -201,22 +214,41 @@ class ZeroExoPlayerWrapper(
             }
 
             val lowerUrl = url.lowercase()
-            if (protocol == "hls" || lowerUrl.contains(".m3u8") || lowerUrl.contains("format=m3u8")) {
+            val uri = Uri.parse(url)
+            val scheme = uri.scheme?.lowercase() ?: ""
+            val isHls = protocol == "hls" || lowerUrl.contains(".m3u8") || lowerUrl.contains("format=m3u8") || lowerUrl.contains("type=m3u8")
+            val isDash = protocol == "dash" || lowerUrl.contains(".mpd")
+            val isRtsp = protocol == "rtsp" || scheme == "rtsp"
+
+            if (isHls) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-            } else if (protocol == "dash" || lowerUrl.contains(".mpd")) {
+            } else if (isDash) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
             } else if (customMimeType != null) {
                 mediaItemBuilder.setMimeType(customMimeType)
             }
 
             val mediaItem = mediaItemBuilder.build()
-            val uri = Uri.parse(url)
-            val scheme = uri.scheme?.lowercase() ?: ""
 
-            val mediaSource: MediaSource = if (protocol == "rtsp" || scheme == "rtsp") {
-                RtspMediaSource.Factory().createMediaSource(mediaItem)
-            } else {
-                DefaultMediaSourceFactory(httpDataSourceFactory).createMediaSource(mediaItem)
+            val mediaSource: MediaSource = when {
+                isRtsp -> {
+                    android.util.Log.d("ZeroPlayer", "Playing via RtspMediaSource: $url")
+                    RtspMediaSource.Factory().createMediaSource(mediaItem)
+                }
+                isDash -> {
+                    android.util.Log.d("ZeroPlayer", "Playing via DashMediaSource: $url")
+                    DashMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
+                }
+                isHls -> {
+                    android.util.Log.d("ZeroPlayer", "Playing via HlsMediaSource: $url")
+                    HlsMediaSource.Factory(httpDataSourceFactory)
+                        .setAllowChunklessPreparation(true)
+                        .createMediaSource(mediaItem)
+                }
+                else -> {
+                    android.util.Log.d("ZeroPlayer", "Playing via ProgressiveMediaSource: $url")
+                    ProgressiveMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
+                }
             }
 
             exoPlayer.setMediaSource(mediaSource)
