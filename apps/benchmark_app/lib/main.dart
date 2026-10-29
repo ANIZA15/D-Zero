@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:zero_core/zero_core.dart';
 import 'package:zero_counter/zero_counter.dart';
+import 'particles_benchmark_view.dart';
 
 void main() {
   runApp(const DZeroBenchmarkApp());
@@ -81,14 +82,17 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
           preferredSize: const Size.fromHeight(48),
           child: Container(
             color: const Color(0xFF0D0F18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildTabItem(0, Icons.speed, 'Counter & Timer'),
-                _buildTabItem(1, Icons.memory, 'Buffer & Pool'),
-                _buildTabItem(2, Icons.play_circle_outline, 'Video Player'),
-                _buildTabItem(3, Icons.analytics_outlined, 'Architecture'),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTabItem(0, Icons.speed, 'Counter & Timer'),
+                  _buildTabItem(1, Icons.auto_awesome, 'Particle Stress'),
+                  _buildTabItem(2, Icons.memory, 'Buffer & Pool'),
+                  _buildTabItem(3, Icons.play_circle_outline, 'Video Player'),
+                  _buildTabItem(4, Icons.analytics_outlined, 'Architecture'),
+                ],
+              ),
             ),
           ),
         ),
@@ -97,6 +101,7 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
         index: _selectedTabIndex,
         children: const [
           CounterBenchmarkView(),
+          ParticlesBenchmarkView(),
           BufferPoolBenchmarkView(),
           VideoBenchmarkView(),
           ArchitectureOverviewView(),

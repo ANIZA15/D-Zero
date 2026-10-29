@@ -11,3 +11,4 @@ resolution: workspace
 dependencies:
   zero_core:
   zero_counter:
+  zero_particles:

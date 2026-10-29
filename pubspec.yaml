@@ -12,6 +12,7 @@ workspace:
   - packages/zero_player/example
   - packages/zero_counter
   - packages/zero_counter/example
+  - packages/zero_particles
   - apps/benchmark_app
   - benchmarks
 
