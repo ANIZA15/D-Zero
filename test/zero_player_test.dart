@@ -1,5 +1,7 @@
 import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zero_player/src/playback_state_ffi.dart';
 import 'package:zero_player/zero_player.dart';
 
 void main() {
@@ -119,6 +121,111 @@ void main() {
       // 100,000 回の直読み書きがミリ秒オーダーで完了すること（FFI 共有メモリの速度証明）
       expect(stopwatch.elapsedMilliseconds, lessThan(200),
           reason: 'FFI 共有メモリの読み書きは 100,000 回で 200ms 未満で完了すべき');
+
+      controller.dispose();
+    });
+  });
+
+  group('【4. マルチプロトコル・全フェーズ拡張テスト】', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+
+    final List<MethodCall> methodCalls = [];
+
+    setUp(() {
+      methodCalls.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('com.fexcy.zero_player'),
+        (MethodCall call) async {
+          methodCalls.add(call);
+          if (call.method == 'create') {
+            return {
+              'textureId': 42,
+              'stateAddress':
+                  ZeroPlayerNativeBindings.instance.createState().address,
+            };
+          }
+          return null;
+        },
+      );
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('com.fexcy.zero_player'),
+        null,
+      );
+    });
+
+    test('Phase 1: HTTP Headers & Cookie パラメータが MethodChannel に正しく渡されること',
+        () async {
+      final controller = await ZeroPlayerController.network(
+        'https://example.com/stream.m3u8',
+        headers: {
+          'Referer': 'https://live.erinn.biz/',
+          'Cookie': 'session=xyz',
+          'User-Agent': 'ZeroPlayer/1.0',
+        },
+      );
+
+      expect(methodCalls.length, equals(1));
+      final call = methodCalls.first;
+      expect(call.method, equals('create'));
+      expect(call.arguments['url'], equals('https://example.com/stream.m3u8'));
+      expect(call.arguments['headers'], equals({
+        'Referer': 'https://live.erinn.biz/',
+        'Cookie': 'session=xyz',
+        'User-Agent': 'ZeroPlayer/1.0',
+      }));
+
+      controller.dispose();
+    });
+
+    test('Phase 2: RTSP / DASH / HLS プロトコル指定が正しく渡されること', () async {
+      final controller = await ZeroPlayerController.network(
+        'rtsp://192.168.1.1:554/live',
+        protocol: ZeroStreamProtocol.rtsp,
+        isLive: true,
+      );
+
+      final call = methodCalls.first;
+      expect(call.arguments['protocol'], equals('rtsp'));
+      expect(call.arguments['isLive'], isTrue);
+
+      controller.dispose();
+    });
+
+    test('Phase 3: ZeroPlayerController.webSocket で WebSocket ストリームが作成できること',
+        () async {
+      final controller = await ZeroPlayerController.webSocket(
+        'wss://live.erinn.biz/stream/live_123',
+        headers: {'Origin': 'https://live.erinn.biz'},
+        mimeType: 'video/mp4',
+      );
+
+      final call = methodCalls.first;
+      expect(call.arguments['url'], equals('wss://live.erinn.biz/stream/live_123'));
+      expect(call.arguments['protocol'], equals('websocket'));
+      expect(call.arguments['isLive'], isTrue);
+      expect(call.arguments['mimeType'], equals('video/mp4'));
+      expect(call.arguments['headers'], equals({'Origin': 'https://live.erinn.biz'}));
+
+      controller.dispose();
+    });
+
+    test('Phase 4: WebRTC / ExternalStream ファクトリで外部バインドが機能すること', () {
+      final dummyPtr = ZeroPlayerNativeBindings.instance.createState();
+      final controller = ZeroPlayerController.externalStream(
+        textureId: 99,
+        stateAddress: dummyPtr.address,
+      );
+
+      expect(controller.textureId, equals(99));
+      expect(controller.positionMs, equals(0));
+
+      controller.setPositionSimulated(1234);
+      expect(controller.positionMs, equals(1234));
 
       controller.dispose();
     });

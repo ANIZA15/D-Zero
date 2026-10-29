@@ -33,8 +33,14 @@
             return;
         }
 
+        NSDictionary<NSString *, NSString *> *headers = call.arguments[@"headers"];
+        BOOL isLive = [call.arguments[@"isLive"] boolValue];
+
         NSURL *url = [NSURL URLWithString:urlStr];
-        ZeroPlayerTexture *player = [[ZeroPlayerTexture alloc] initWithURL:url registry:_registry];
+        ZeroPlayerTexture *player = [[ZeroPlayerTexture alloc] initWithURL:url
+                                                                   headers:headers
+                                                                    isLive:isLive
+                                                                  registry:_registry];
         _players[@(player.textureId)] = player;
 
         // Dart 側へ textureId と C++ 共有メモリアドレス(stateAddress) を返す

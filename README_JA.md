@@ -135,12 +135,47 @@ class _VideoScreenState extends State<VideoScreen> {
 }
 ```
 
-### 3. HLS ライブストリーミングの再生
+### 3. マルチプロトコル・全フェーズ対応（HLS, DASH, RTSP, WebSocket, WebRTC）
 
+`zero_player` は、**デコード・通信処理をすべてネイティブ / C++ 側に閉じ込める** ことで、Dart ヒープを一切汚染せずに多種多様な配信プロトコルをゼロアロケーションで再生できます。
+
+#### Phase 1: HTTP ヘッダー & Cookie 認証（保護されたストリーム）
 ```dart
-// Apple HLS (.m3u8) 形式のライブストリームもそのまま渡すだけで低遅延再生
 final controller = await ZeroPlayerController.network(
-  'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+  'https://example.com/protected/stream.m3u8',
+  headers: {
+    'Referer': 'https://live.erinn.biz/',
+    'Cookie': 'session_token=xyz123',
+    'User-Agent': 'Mozilla/5.0 ZeroPlayer/1.0',
+  },
+);
+```
+
+#### Phase 2: 低遅延 HLS / MPEG-DASH / RTSP ライブ配信
+```dart
+// RTSP 監視カメラや低遅延 HLS 配信
+final controller = await ZeroPlayerController.live(
+  'rtsp://192.168.1.100:554/live',
+  protocol: ZeroStreamProtocol.rtsp,
+);
+```
+
+#### Phase 3: WebSocket リアルタイムストリーミング（kukuluLIVE 等）
+```dart
+// WebSocket 経由で fMP4 / TS チャンクが流れてくるリアルタイム配信
+final controller = await ZeroPlayerController.webSocket(
+  'wss://live.erinn.biz/stream/live_session_id',
+  headers: {'Origin': 'https://live.erinn.biz'},
+  mimeType: 'video/mp4', // または video/mp2t
+);
+```
+
+#### Phase 4: WebRTC / 外部ネイティブフレームのバインド
+```dart
+// WebRTC や外部 C++ パイプラインから直接供給されるテクスチャを 0 コピーでバインド
+final controller = ZeroPlayerController.externalStream(
+  textureId: externalTextureId,
+  stateAddress: cStateAddress,
 );
 ```
 

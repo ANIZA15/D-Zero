@@ -21,7 +21,9 @@
 @synthesize playbackState = _playbackState;
 
 - (instancetype)initWithURL:(NSURL *)url
-                  registry:(NSObject<FlutterTextureRegistry> *)registry {
+                    headers:(nullable NSDictionary<NSString *, NSString *> *)headers
+                     isLive:(BOOL)isLive
+                   registry:(NSObject<FlutterTextureRegistry> *)registry {
     self = [super init];
     if (self) {
         _registry = registry;
@@ -39,11 +41,30 @@
         };
         _videoOutput = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:pixBuffAttributes];
 
-        _playerItem = [AVPlayerItem playerItemWithURL:url];
+        // Phase 1: HTTP Headers & Cookie 設定
+        AVURLAsset *asset = nil;
+        if (headers && headers.count > 0) {
+            NSDictionary *options = @{ @"AVURLAssetHTTPHeaderFieldsKey": headers };
+            asset = [AVURLAsset URLAssetWithURL:url options:options];
+        } else {
+            asset = [AVURLAsset URLAssetWithURL:url options:nil];
+        }
+
+        _playerItem = [AVPlayerItem playerItemWithAsset:asset];
         [_playerItem addOutput:_videoOutput];
+
+        // Phase 2: 低遅延ライブ配信（LL-HLS）のレイテンシー最適化
+        if (isLive) {
+            _playerItem.automaticallyPreservesTimeOffsetFromLive = YES;
+            _playerItem.configuredTimeOffsetFromLive = 1.5;
+        }
 
         _player = [AVPlayer playerWithPlayerItem:_playerItem];
         _player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+
+        if (isLive) {
+            _player.automaticallyWaitsToMinimizeStalling = NO;
+        }
 
         // 3. Flutter Texture 登録
         _textureId = [_registry registerTexture:self];

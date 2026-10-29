@@ -2,6 +2,30 @@ import 'dart:ffi' as ffi;
 import 'package:flutter/services.dart';
 import 'playback_state_ffi.dart';
 
+/// 対応ストリーミングプロトコル
+enum ZeroStreamProtocol {
+  /// URL のスキームや拡張子から自動判別
+  auto('auto'),
+
+  /// HLS / LL-HLS (.m3u8)
+  hls('hls'),
+
+  /// MPEG-DASH (.mpd)
+  dash('dash'),
+
+  /// RTSP (rtsp://)
+  rtsp('rtsp'),
+
+  /// WebSocket チャンクストリーム (ws://, wss:// - kukuluLIVE 等)
+  webSocket('websocket'),
+
+  /// 通常のプログレッシブ動画 (MP4, MKV, WebM 等)
+  progressive('progressive');
+
+  final String value;
+  const ZeroStreamProtocol(this.value);
+}
+
 /// ゼロ通信・共有メモリ直結型のビデオコントローラ
 class ZeroPlayerController {
   static const MethodChannel _channel = MethodChannel('com.fexcy.zero_player');
@@ -15,12 +39,23 @@ class ZeroPlayerController {
     required this.textureId,
   });
 
-  /// ネットワーク URL からプレイヤーを作成する
+  /// ネットワーク URL からプレイヤーを作成する（Phase 1: Headers & Phase 2: 多プロトコル対応）
   /// ネイティブ側（iOS: AVPlayer, Android: ExoPlayer）でデコーダを立ち上げ、
   /// C++ 共有メモリのアドレス（stateAddress）を Dart FFI ポインタとして受け取ります。
-  static Future<ZeroPlayerController> network(String url) async {
-    final result =
-        await _channel.invokeMapMethod<String, dynamic>('create', {'url': url});
+  static Future<ZeroPlayerController> network(
+    String url, {
+    Map<String, String>? headers,
+    bool isLive = false,
+    ZeroStreamProtocol protocol = ZeroStreamProtocol.auto,
+    String? mimeType,
+  }) async {
+    final result = await _channel.invokeMapMethod<String, dynamic>('create', {
+      'url': url,
+      if (headers != null && headers.isNotEmpty) 'headers': headers,
+      'isLive': isLive,
+      'protocol': protocol.value,
+      if (mimeType != null) 'mimeType': mimeType,
+    });
     if (result == null) {
       throw StateError('Failed to initialize zero_player');
     }
@@ -30,6 +65,50 @@ class ZeroPlayerController {
     final pointer =
         ffi.Pointer<ZeroPlaybackStateNative>.fromAddress(stateAddress);
 
+    return ZeroPlayerController._(
+      statePointer: pointer,
+      textureId: textureId,
+    );
+  }
+
+  /// ライブ配信専用プレイヤーを作成する（超低遅延バッファリング最適化）
+  static Future<ZeroPlayerController> live(
+    String url, {
+    Map<String, String>? headers,
+    ZeroStreamProtocol protocol = ZeroStreamProtocol.auto,
+  }) {
+    return network(
+      url,
+      headers: headers,
+      isLive: true,
+      protocol: protocol,
+    );
+  }
+
+  /// WebSocket チャンクストリームからプレイヤーを作成する（Phase 3: kukuluLIVE 等対応）
+  /// Dart ヒープを汚染せず、C++/ネイティブ側だけでバイナリチャンクを受信・再生します。
+  static Future<ZeroPlayerController> webSocket(
+    String wsUrl, {
+    Map<String, String>? headers,
+    String mimeType = 'video/mp4',
+  }) {
+    return network(
+      wsUrl,
+      headers: headers,
+      isLive: true,
+      protocol: ZeroStreamProtocol.webSocket,
+      mimeType: mimeType,
+    );
+  }
+
+  /// WebRTC / 外部ネイティブフレームソースからプレイヤーを作成する（Phase 4: WebRTC 統合）
+  /// 外部 C++ / WebRTC パイプラインから直接供給されるテクスチャと共有メモリをバインドします。
+  factory ZeroPlayerController.externalStream({
+    required int textureId,
+    required int stateAddress,
+  }) {
+    final pointer =
+        ffi.Pointer<ZeroPlaybackStateNative>.fromAddress(stateAddress);
     return ZeroPlayerController._(
       statePointer: pointer,
       textureId: textureId,

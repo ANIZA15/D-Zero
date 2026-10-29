@@ -11,7 +11,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) ZeroPlaybackState* playbackState;
 
 - (instancetype)initWithURL:(NSURL *)url
-                  registry:(NSObject<FlutterTextureRegistry> *)registry;
+                    headers:(nullable NSDictionary<NSString *, NSString *> *)headers
+                     isLive:(BOOL)isLive
+                   registry:(NSObject<FlutterTextureRegistry> *)registry;
 
 - (void)play;
 - (void)pause;

@@ -1,18 +1,41 @@
 package com.fexcy.zero_player
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.Surface
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.dash.DashMediaSource
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
+import java.io.IOException
+import java.io.InputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
+import java.util.concurrent.TimeUnit
 
 class ZeroPlayerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var channel: MethodChannel
@@ -36,8 +59,22 @@ class ZeroPlayerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     return
                 }
 
+                @Suppress("UNCHECKED_CAST")
+                val headers = call.argument<Map<String, String>>("headers") ?: emptyMap()
+                val isLive = call.argument<Boolean>("isLive") ?: false
+                val protocol = call.argument<String>("protocol") ?: "auto"
+                val mimeType = call.argument<String>("mimeType")
+
                 val textureEntry = textureRegistry.createSurfaceTexture()
-                val playerWrapper = ZeroExoPlayerWrapper(context, textureEntry, url)
+                val playerWrapper = ZeroExoPlayerWrapper(
+                    context = context,
+                    textureEntry = textureEntry,
+                    url = url,
+                    headers = headers,
+                    isLive = isLive,
+                    protocol = protocol,
+                    customMimeType = mimeType
+                )
                 players[textureEntry.id()] = playerWrapper
 
                 result.success(
@@ -79,39 +116,125 @@ class ZeroPlayerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 }
 
+/**
+ * マルチプロトコル（HLS, DASH, RTSP, WebSocket, HTTP/HTTPS）対応
+ * ゼロアロケーション型 ExoPlayer ラッパー
+ */
 class ZeroExoPlayerWrapper(
     context: Context,
     private val textureEntry: TextureRegistry.SurfaceTextureEntry,
-    url: String
+    url: String,
+    headers: Map<String, String> = emptyMap(),
+    isLive: Boolean = false,
+    protocol: String = "auto",
+    customMimeType: String? = null
 ) {
     val statePtr: Long = ZeroNativeBridge.createState()
     private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
     private val surface: Surface = Surface(textureEntry.surfaceTexture())
     private val handler = Handler(Looper.getMainLooper())
     private var isDisposed = false
+    private var webSocketStreamHandler: ZeroWebSocketStreamHandler? = null
 
-    // 再生位置を高速ポーリングして C++ 共有メモリに直接書き込む Runnable
+    // 再生位置を高速ポーリングして C++ 共有メモリに直接書き込む Runnable (16ms / 60fps)
     private val syncRunnable = object : Runnable {
         override fun run() {
             if (isDisposed) return
             val pos = exoPlayer.currentPosition
+            val buffered = exoPlayer.bufferedPosition
             ZeroNativeBridge.setPosition(statePtr, pos)
-            // 次のフレーム更新をスケジューリング（約16ms間隔）
+            ZeroNativeBridge.setBuffered(statePtr, buffered)
             handler.postDelayed(this, 16)
         }
     }
 
     init {
         exoPlayer.setVideoSurface(surface)
-        val mediaItem = MediaItem.fromUri(url)
-        exoPlayer.setMediaItem(mediaItem)
+
+        // OkHttp クライアント（HTTP/2, HTTP/3, 高速キープアライブ）
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+
+        val isWs = url.startsWith("ws://", ignoreCase = true) || url.startsWith("wss://", ignoreCase = true)
+
+        if (isWs) {
+            // =========================================================================
+            // Phase 3: ネイティブ WebSocket ストリーミング（kukuluLIVE 等のリアルタイム配信対応）
+            // =========================================================================
+            val wsHandler = ZeroWebSocketStreamHandler(okHttpClient, url, headers)
+            webSocketStreamHandler = wsHandler
+            wsHandler.start()
+
+            val dataSourceFactory = DataSource.Factory { wsHandler.createDataSource() }
+            val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse("zero://websocket-stream"))
+            if (customMimeType != null) {
+                mediaItemBuilder.setMimeType(customMimeType)
+            } else {
+                mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP4)
+            }
+            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(mediaItemBuilder.build())
+            exoPlayer.setMediaSource(mediaSource)
+        } else {
+            // =========================================================================
+            // Phase 1 & 2: HTTP Headers + RTSP / HLS / DASH / Progressive 自動選択
+            // =========================================================================
+            val httpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
+            if (headers.isNotEmpty()) {
+                httpDataSourceFactory.setDefaultRequestProperties(headers)
+            }
+
+            val mediaItemBuilder = MediaItem.Builder().setUri(url)
+
+            // 低遅延ライブ配信（LL-HLS / Live Stream）のレイテンシー最適化
+            if (isLive) {
+                mediaItemBuilder.setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        .setMaxPlaybackSpeed(1.05f)
+                        .setMinPlaybackSpeed(0.95f)
+                        .setTargetOffsetMs(1500) // 1.5秒低遅延ターゲット
+                        .build()
+                )
+            }
+
+            val mediaItem = mediaItemBuilder.build()
+            val uri = Uri.parse(url)
+            val scheme = uri.scheme?.lowercase() ?: ""
+            val path = uri.path?.lowercase() ?: ""
+
+            val mediaSource: MediaSource = when {
+                protocol == "rtsp" || scheme == "rtsp" -> {
+                    // RTSP ストリーム
+                    RtspMediaSource.Factory().createMediaSource(mediaItem)
+                }
+                protocol == "dash" || path.endsWith(".mpd") -> {
+                    // MPEG-DASH ストリーム
+                    DashMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
+                }
+                protocol == "hls" || path.endsWith(".m3u8") -> {
+                    // HLS / LL-HLS ストリーム
+                    HlsMediaSource.Factory(httpDataSourceFactory)
+                        .setAllowChunklessPreparation(true)
+                        .createMediaSource(mediaItem)
+                }
+                else -> {
+                    // 通常のプログレッシブ動画 (MP4, MKV, WebM 等)
+                    ProgressiveMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
+                }
+            }
+
+            exoPlayer.setMediaSource(mediaSource)
+        }
+
         exoPlayer.prepare()
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (isDisposed) return
                 val dur = exoPlayer.duration
-                if (dur > 0) {
+                if (dur > 0 && dur != C.TIME_UNSET) {
                     ZeroNativeBridge.setDuration(statePtr, dur)
                 }
 
@@ -162,10 +285,93 @@ class ZeroExoPlayerWrapper(
         if (isDisposed) return
         isDisposed = true
         handler.removeCallbacks(syncRunnable)
+        webSocketStreamHandler?.dispose()
         exoPlayer.stop()
         exoPlayer.release()
         surface.release()
         textureEntry.release()
         ZeroNativeBridge.destroyState(statePtr)
+    }
+}
+
+/**
+ * Phase 3: ネイティブ WebSocket ストリームハンドラー
+ * Dart のヒープを汚染せず、OkHttp のバックグラウンドスレッドで
+ * fMP4 / TS チャンクを受信して PipedStream 経由で ExoPlayer に直結する
+ */
+class ZeroWebSocketStreamHandler(
+    private val client: OkHttpClient,
+    private val wsUrl: String,
+    private val headers: Map<String, String>
+) {
+    private var webSocket: WebSocket? = null
+    private val pipedOutput = PipedOutputStream()
+    private val pipedInput = PipedInputStream(pipedOutput, 1024 * 1024) // 1MB バッファ
+    private var isDisposed = false
+
+    fun start() {
+        val requestBuilder = Request.Builder().url(wsUrl)
+        headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+        val request = requestBuilder.build()
+
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (isDisposed) return
+                try {
+                    pipedOutput.write(bytes.toByteArray())
+                    pipedOutput.flush()
+                } catch (e: IOException) {
+                    // パイプ破損・クローズ時の例外
+                }
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                closeStreams()
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                closeStreams()
+            }
+        })
+    }
+
+    fun createDataSource(): DataSource {
+        return object : DataSource {
+            private var opened = false
+
+            override fun open(dataSpec: DataSpec): Long {
+                opened = true
+                return C.LENGTH_UNSET.toLong() // ライブストリームなので長さ未定
+            }
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                if (!opened || isDisposed) return C.RESULT_END_OF_INPUT
+                val bytesRead = pipedInput.read(buffer, offset, length)
+                return if (bytesRead == -1) C.RESULT_END_OF_INPUT else bytesRead
+            }
+
+            override fun getUri(): Uri? = Uri.parse(wsUrl)
+
+            override fun close() {
+                opened = false
+            }
+
+            override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {}
+        }
+    }
+
+    private fun closeStreams() {
+        try {
+            pipedOutput.close()
+        } catch (_: Exception) {}
+    }
+
+    fun dispose() {
+        isDisposed = true
+        webSocket?.cancel()
+        closeStreams()
+        try {
+            pipedInput.close()
+        } catch (_: Exception) {}
     }
 }
