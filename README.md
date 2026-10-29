@@ -117,4 +117,4 @@ melos run clean
 
 ## 📜 ライセンス
 
-MIT License © 2026 Kotaro Fujimoto (ANIZA15 / fexcy)
+MIT License © 2026 ANIZA15
