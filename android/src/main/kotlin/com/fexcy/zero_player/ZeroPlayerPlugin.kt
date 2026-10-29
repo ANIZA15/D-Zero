@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -199,30 +200,23 @@ class ZeroExoPlayerWrapper(
                 )
             }
 
+            val lowerUrl = url.lowercase()
+            if (protocol == "hls" || lowerUrl.contains(".m3u8") || lowerUrl.contains("format=m3u8")) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+            } else if (protocol == "dash" || lowerUrl.contains(".mpd")) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
+            } else if (customMimeType != null) {
+                mediaItemBuilder.setMimeType(customMimeType)
+            }
+
             val mediaItem = mediaItemBuilder.build()
             val uri = Uri.parse(url)
             val scheme = uri.scheme?.lowercase() ?: ""
-            val path = uri.path?.lowercase() ?: ""
 
-            val mediaSource: MediaSource = when {
-                protocol == "rtsp" || scheme == "rtsp" -> {
-                    // RTSP ストリーム
-                    RtspMediaSource.Factory().createMediaSource(mediaItem)
-                }
-                protocol == "dash" || path.endsWith(".mpd") -> {
-                    // MPEG-DASH ストリーム
-                    DashMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
-                }
-                protocol == "hls" || path.endsWith(".m3u8") -> {
-                    // HLS / LL-HLS ストリーム
-                    HlsMediaSource.Factory(httpDataSourceFactory)
-                        .setAllowChunklessPreparation(true)
-                        .createMediaSource(mediaItem)
-                }
-                else -> {
-                    // 通常のプログレッシブ動画 (MP4, MKV, WebM 等)
-                    ProgressiveMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
-                }
+            val mediaSource: MediaSource = if (protocol == "rtsp" || scheme == "rtsp") {
+                RtspMediaSource.Factory().createMediaSource(mediaItem)
+            } else {
+                DefaultMediaSourceFactory(httpDataSourceFactory).createMediaSource(mediaItem)
             }
 
             exoPlayer.setMediaSource(mediaSource)
