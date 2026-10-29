@@ -84,5 +84,9 @@ src/libzero_player_native.dylib
 # Symbols
 app.*.symbols
 
+# Mock experiments (MOC)
+moc/
+**/moc/
+
 # Exceptions to above rules.
 !**/android/**/gradle-wrapper.jar
