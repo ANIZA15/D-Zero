@@ -19,7 +19,12 @@ let package = Package(
                 .product(name: "FlutterFramework", package: "FlutterFramework")
             ],
             path: "Sources/zero_player",
-            resources: []
+            resources: [],
+            publicHeadersPath: ".",
+            cxxSettings: [
+                .headerSearchPath(".")
+            ]
         )
-    ]
+    ],
+    cxxLanguageStandard: .cxx17
 )

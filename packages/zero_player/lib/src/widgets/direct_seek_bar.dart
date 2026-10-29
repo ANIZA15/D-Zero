@@ -1,7 +1,6 @@
 import 'dart:ffi' as ffi;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:zero_core/zero_core.dart';
 import '../controller.dart';
@@ -77,8 +76,9 @@ typedef DirectSeekBar = ZDirectSeekBar;
 /// Shorthand alias for [ZDirectSeekBar].
 typedef ZSeekBar = ZDirectSeekBar;
 
-class RenderDirectSeekBar extends RenderBox {
+class RenderDirectSeekBar extends ZeroRenderBox {
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
+  ZeroPlaybackStateView _view;
   Color _activeTrackColor;
   Color _inactiveTrackColor;
   Color _thumbColor;
@@ -86,9 +86,16 @@ class RenderDirectSeekBar extends RenderBox {
   double _thumbRadius;
   ValueChanged<Duration>? onSeek;
 
+  // Pre-allocated Paints reused across every frame (zero allocation in paintZero)
+  final Paint _bgPaint = Paint()..strokeCap = StrokeCap.round;
+  final Paint _activePaint = Paint()..strokeCap = StrokeCap.round;
+  final Paint _thumbPaint = Paint();
+
   late final HorizontalDragGestureRecognizer _dragRecognizer;
   late final TapGestureRecognizer _tapRecognizer;
-  Ticker? _ticker;
+
+  int _lastPositionMs = -1;
+  int _lastDurationMs = -1;
 
   RenderDirectSeekBar({
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
@@ -99,11 +106,21 @@ class RenderDirectSeekBar extends RenderBox {
     required double thumbRadius,
     this.onSeek,
   })  : _statePointer = statePointer,
+        _view = ZeroPlaybackStateView(statePointer),
         _activeTrackColor = activeTrackColor,
         _inactiveTrackColor = inactiveTrackColor,
         _thumbColor = thumbColor,
         _trackHeight = trackHeight,
-        _thumbRadius = thumbRadius {
+        _thumbRadius = thumbRadius,
+        super(animatePerFrame: true) {
+    _bgPaint
+      ..color = _inactiveTrackColor
+      ..strokeWidth = _trackHeight;
+    _activePaint
+      ..color = _activeTrackColor
+      ..strokeWidth = _trackHeight;
+    _thumbPaint.color = _thumbColor;
+
     _dragRecognizer = HorizontalDragGestureRecognizer()
       ..onStart = _handleDragStart
       ..onUpdate = _handleDragUpdate
@@ -115,30 +132,38 @@ class RenderDirectSeekBar extends RenderBox {
   set statePointer(ffi.Pointer<ZeroPlaybackStateNative> val) {
     if (_statePointer == val) return;
     _statePointer = val;
-    markNeedsPaint();
+    _view = ZeroPlaybackStateView(val);
+    _lastPositionMs = -1;
+    _lastDurationMs = -1;
+    markDirty();
   }
 
   set activeTrackColor(Color val) {
     if (_activeTrackColor == val) return;
     _activeTrackColor = val;
-    markNeedsPaint();
+    _activePaint.color = val;
+    markDirty();
   }
 
   set inactiveTrackColor(Color val) {
     if (_inactiveTrackColor == val) return;
     _inactiveTrackColor = val;
-    markNeedsPaint();
+    _bgPaint.color = val;
+    markDirty();
   }
 
   set thumbColor(Color val) {
     if (_thumbColor == val) return;
     _thumbColor = val;
-    markNeedsPaint();
+    _thumbPaint.color = val;
+    markDirty();
   }
 
   set trackHeight(double val) {
     if (_trackHeight == val) return;
     _trackHeight = val;
+    _bgPaint.strokeWidth = val;
+    _activePaint.strokeWidth = val;
     markNeedsLayout();
   }
 
@@ -149,28 +174,16 @@ class RenderDirectSeekBar extends RenderBox {
   }
 
   @override
-  void attach(PipelineOwner owner) {
-    super.attach(owner);
-    // 描画フレームごとに markNeedsPaint() のみを直接叩く
-    // 【重要】Widgetの再構築（build）や Layout は一切発生しない！
-    _ticker = Ticker((_) {
-      if (attached) {
-        markNeedsPaint();
-      }
-    })
-      ..start();
+  bool onFrameTick(Duration elapsed) {
+    final int posMs = _view.displayPositionMs;
+    final int durMs = _view.durationMs;
+    if (posMs == _lastPositionMs && durMs == _lastDurationMs) {
+      return false;
+    }
+    _lastPositionMs = posMs;
+    _lastDurationMs = durMs;
+    return true;
   }
-
-  @override
-  void detach() {
-    _ticker?.stop();
-    _ticker?.dispose();
-    _ticker = null;
-    super.detach();
-  }
-
-  @override
-  bool get isRepaintBoundary => true; // 独立したレイヤーとして分離し、周囲の再描画を完全に遮断
 
   @override
   bool hitTestSelf(Offset position) => true;
@@ -198,59 +211,64 @@ class RenderDirectSeekBar extends RenderBox {
   void _handleDragEnd(DragEndDetails details) {}
 
   void _seekByLocalOffset(double dx) {
-    final dur = _statePointer.ref.durationMs;
-    if (dur <= 0 || size.width <= 0) return;
-    final ratio = (dx / size.width).clamp(0.0, 1.0);
-    final targetMs = (ratio * dur).toInt();
+    final int dur = _view.durationMs;
+    final double w = size.width;
+    if (dur <= 0 || w <= 0.0) return;
+    double ratio = dx / w;
+    if (ratio < 0.0) ratio = 0.0;
+    if (ratio > 1.0) ratio = 1.0;
+    final int targetMs = (ratio * dur).toInt();
     onSeek?.call(Duration(milliseconds: targetMs));
   }
 
   @override
   void performLayout() {
-    final desiredHeight = (_thumbRadius * 2).clamp(_trackHeight, 48.0);
+    final double thumbDiameter = _thumbRadius * 2.0;
+    double desiredHeight = thumbDiameter < _trackHeight ? _trackHeight : thumbDiameter;
+    if (desiredHeight > 48.0) desiredHeight = 48.0;
     size = constraints.constrain(
       Size(constraints.maxWidth, desiredHeight),
     );
   }
 
   @override
-  void paint(PaintingContext context, Offset offset) {
-    final canvas = context.canvas;
-    final width = size.width;
-    final height = size.height;
+  void paintZero(PaintingContext context, Offset offset) {
+    final Canvas canvas = context.canvas;
+    final double width = size.width;
+    final double height = size.height;
 
-    // FFI 共有メモリから 0 ナノ秒で最新の再生位置を取得
-    final positionMs = _statePointer.ref.positionMs;
-    final durationMs = _statePointer.ref.durationMs;
-    final progress =
-        durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final int positionMs = _view.displayPositionMs;
+    final int durationMs = _view.durationMs;
+    _lastPositionMs = positionMs;
+    _lastDurationMs = durationMs;
 
-    final centerY = offset.dy + height / 2;
-    final trackLeft = offset.dx;
-    final trackRight = offset.dx + width;
-    final activeRight = trackLeft + width * progress;
-
-    // 非アクティブトラック（背景）
-    final bgPaint = Paint()
-      ..color = _inactiveTrackColor
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = _trackHeight;
-    canvas.drawLine(
-        Offset(trackLeft, centerY), Offset(trackRight, centerY), bgPaint);
-
-    // アクティブトラック（進捗）
-    if (progress > 0) {
-      final activePaint = Paint()
-        ..color = _activeTrackColor
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = _trackHeight;
-      canvas.drawLine(Offset(trackLeft, centerY), Offset(activeRight, centerY),
-          activePaint);
+    double progress = 0.0;
+    if (durationMs > 0) {
+      progress = positionMs / durationMs;
+      if (progress < 0.0) progress = 0.0;
+      if (progress > 1.0) progress = 1.0;
     }
 
-    // つまみ（Thumb）
-    final thumbPaint = Paint()..color = _thumbColor;
-    canvas.drawCircle(Offset(activeRight, centerY), _thumbRadius, thumbPaint);
+    final double centerY = offset.dy + height * 0.5;
+    final double trackLeft = offset.dx;
+    final double trackRight = offset.dx + width;
+    final double activeRight = trackLeft + width * progress;
+
+    canvas.drawLine(
+      Offset(trackLeft, centerY),
+      Offset(trackRight, centerY),
+      _bgPaint,
+    );
+
+    if (progress > 0.0) {
+      canvas.drawLine(
+        Offset(trackLeft, centerY),
+        Offset(activeRight, centerY),
+        _activePaint,
+      );
+    }
+
+    canvas.drawCircle(Offset(activeRight, centerY), _thumbRadius, _thumbPaint);
   }
 
   @override

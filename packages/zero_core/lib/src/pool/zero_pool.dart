@@ -59,9 +59,25 @@ class ZeroPool<T> {
   }
 
   /// Releases multiple items back into the pool for future reuse.
+  ///
+  /// Uses a fast index loop without iterator allocation when [items] is a [List].
+  @pragma('vm:prefer-inline')
   void releaseAll(Iterable<T> items) {
+    if (items is List<T>) {
+      releaseList(items);
+      return;
+    }
     for (final item in items) {
       release(item);
+    }
+  }
+
+  /// Releases all items from a [List] back into the pool without allocating an [Iterator].
+  @pragma('vm:prefer-inline')
+  void releaseList(List<T> items) {
+    final int len = items.length;
+    for (int i = 0; i < len; i++) {
+      release(items[i]);
     }
   }
 

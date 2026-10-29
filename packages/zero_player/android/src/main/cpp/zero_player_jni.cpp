@@ -22,6 +22,18 @@ Java_com_fexcy_zero_1player_ZeroNativeBridge_setPosition(JNIEnv *env, jclass cla
 }
 
 JNIEXPORT void JNICALL
+Java_com_fexcy_zero_1player_ZeroNativeBridge_setPositionAnchor(JNIEnv *env, jclass clazz, jlong statePtr, jlong positionMs, jfloat speed) {
+    auto* state = reinterpret_cast<ZeroPlaybackState*>(statePtr);
+    zero_set_position_anchor(state, positionMs, speed);
+}
+
+JNIEXPORT void JNICALL
+Java_com_fexcy_zero_1player_ZeroNativeBridge_setPlaybackSpeed(JNIEnv *env, jclass clazz, jlong statePtr, jfloat speed) {
+    auto* state = reinterpret_cast<ZeroPlaybackState*>(statePtr);
+    zero_set_playback_speed(state, speed);
+}
+
+JNIEXPORT void JNICALL
 Java_com_fexcy_zero_1player_ZeroNativeBridge_setDuration(JNIEnv *env, jclass clazz, jlong statePtr, jlong durationMs) {
     auto* state = reinterpret_cast<ZeroPlaybackState*>(statePtr);
     zero_set_duration(state, durationMs);

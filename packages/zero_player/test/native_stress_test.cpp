@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 #include "../src/zero_playback_state.h"
 
@@ -21,16 +22,21 @@
     std::cout << "✅ PASSED: " << msg << std::endl;
 
 // ==========================================
-// 1. 正常系テスト (Happy Path)
+// 1. 正常系テスト (Happy Path & Cache Line Alignment)
 // ==========================================
 void test_normal_lifecycle_and_values() {
-    std::cout << "\n--- [1. 正常系テスト] ---" << std::endl;
+    std::cout << "\n--- [1. 正常系テスト & 64-byte キャッシュライン検証] ---" << std::endl;
+
+    TEST_ASSERT(sizeof(ZeroPlaybackState) == 64, "ZeroPlaybackState は 64 bytes (1 キャッシュライン) であること");
+    TEST_ASSERT(alignof(ZeroPlaybackState) == 64, "ZeroPlaybackState は 64-byte アライメントであること");
 
     ZeroPlaybackState* state = zero_create_playback_state();
     TEST_ASSERT(state != nullptr, "共有メモリの割り当てに成功すること");
+    TEST_ASSERT((reinterpret_cast<uintptr_t>(state) & 63u) == 0u, "ポインタアドレスが 64-byte 境界に揃っていること");
 
     // 初期値確認
     TEST_ASSERT(zero_get_position(state) == 0, "初期 position は 0 であること");
+    TEST_ASSERT(zero_get_display_position(state) == 0, "初期 display_position は 0 であること");
     TEST_ASSERT(zero_get_duration(state) == 0, "初期 duration は 0 であること");
     TEST_ASSERT(zero_get_status(state) == ZERO_STATUS_IDLE, "初期 status は IDLE であること");
 
@@ -41,11 +47,11 @@ void test_normal_lifecycle_and_values() {
     zero_set_video_size(state, 1920, 1080);
 
     TEST_ASSERT(zero_get_duration(state) == 120000, "duration が正しく更新されること");
-    TEST_ASSERT(zero_get_position(state) == 45000, "position が正しく更新されること");
+    TEST_ASSERT(zero_get_position(state) >= 45000, "position が正しく更新されること");
     TEST_ASSERT(zero_get_status(state) == ZERO_STATUS_PLAYING, "status が正しく更新されること");
 
     zero_destroy_playback_state(state);
-    TEST_PASS("ライフサイクルと基本的な値の読み書き");
+    TEST_PASS("ライフサイクル・キャッシュラインアライメント・基本的な値の読み書き");
 }
 
 // ==========================================
@@ -56,6 +62,8 @@ void test_abnormal_and_edge_cases() {
 
     // 2-1. nullptr 安全性（防護策）
     zero_set_position(nullptr, 1000);
+    zero_set_position_anchor(nullptr, 1000, 1.5f);
+    zero_set_playback_speed(nullptr, 2.0f);
     zero_set_duration(nullptr, 2000);
     zero_set_status(nullptr, ZERO_STATUS_PLAYING);
     zero_set_buffered(nullptr, 500);
@@ -64,8 +72,10 @@ void test_abnormal_and_edge_cases() {
     zero_destroy_playback_state(nullptr);
 
     TEST_ASSERT(zero_get_position(nullptr) == 0, "nullptr 参照時に 0 が返りクラッシュしないこと");
+    TEST_ASSERT(zero_get_display_position(nullptr) == 0, "nullptr 参照時に display_position が 0 を返すこと");
     TEST_ASSERT(zero_get_duration(nullptr) == 0, "nullptr 参照時に 0 が返りクラッシュしないこと");
     TEST_ASSERT(zero_get_status(nullptr) == ZERO_STATUS_IDLE, "nullptr 参照時に IDLE が返ること");
+    TEST_ASSERT(zero_get_seq(nullptr) == 0u, "nullptr 参照時に seq が 0 を返すこと");
     TEST_PASS("nullptr 引数に対する防護（SIGSEGV 防止）");
 
     // 2-2. 境界値・極端な値テスト
@@ -92,19 +102,18 @@ void test_abnormal_and_edge_cases() {
 // 3. ペネトレーション / 耐久 / 並行性テスト (Concurrency & Stress)
 // ==========================================
 void test_concurrency_race_condition() {
-    std::cout << "\n--- [3-1. ペネトレーション: マルチスレッド競合テスト] ---" << std::endl;
+    std::cout << "\n--- [3-1. ペネトレーション: マルチスレッド競合 & Seqlock 一貫性テスト] ---" << std::endl;
 
     ZeroPlaybackState* state = zero_create_playback_state();
     std::atomic<bool> running{true};
     std::atomic<uint64_t> read_count{0};
     std::atomic<uint64_t> torn_reads{0};
 
-    // Producer スレッド: デコーダ役として超高速で position を更新 (1,000,000回)
+    // Producer スレッド: デコーダ役として超高速で position と anchor を更新 (1,000,000回)
     std::thread producer([&]() {
         for (int64_t i = 0; i < 1000000; ++i) {
-            // 上位32bitと下位32bitに同じ値を書き込み、Torn Read（断片読み込み）を検出可能にする
             int64_t test_val = (i << 32) | (i & 0xFFFFFFFF);
-            zero_set_position(state, test_val);
+            zero_set_position_anchor(state, test_val, 1.0f);
         }
         running.store(false);
     });
@@ -114,7 +123,7 @@ void test_concurrency_race_condition() {
     for (int t = 0; t < 4; ++t) {
         consumers.emplace_back([&]() {
             while (running.load(std::memory_order_relaxed)) {
-                int64_t val = zero_get_position(state);
+                int64_t val = zero_get_display_position(state);
                 int64_t high = (val >> 32) & 0xFFFFFFFF;
                 int64_t low = val & 0xFFFFFFFF;
                 if (high != low && val != 0) {
@@ -130,33 +139,64 @@ void test_concurrency_race_condition() {
         c.join();
     }
 
+    // 書き込み完了後の seq は必ず偶数であること
+    TEST_ASSERT((zero_get_seq(state) & 1u) == 0u, "書き込み完了後の seqlock カウンタは偶数であること");
     std::cout << "  総読み出しサンプリング数: " << read_count.load() << " 回" << std::endl;
     std::cout << "  データ破損（Torn Read）件数: " << torn_reads.load() << " 件" << std::endl;
     TEST_ASSERT(torn_reads.load() == 0, "高負荷マルチスレッド下でアトミック性が保たれ、Torn Read が 0 件であること");
 
     zero_destroy_playback_state(state);
-    TEST_PASS("並行書き込み・読み出しにおけるデータ破損なし（Data Race フリー）");
+    TEST_PASS("並行書き込み・読み出しにおけるデータ破損なし（Seqlock Data Race フリー）");
+}
+
+void test_timestamp_extrapolation() {
+    std::cout << "\n--- [3-2. アンカー時刻外挿 & 速度スケーリング検証] ---" << std::endl;
+
+    ZeroPlaybackState* state = zero_create_playback_state();
+    zero_set_duration(state, 100000);
+    zero_set_position_anchor(state, 1000, 1.0f);
+    zero_set_status(state, ZERO_STATUS_PLAYING);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    int64_t extrapolated = zero_get_display_position(state);
+    TEST_ASSERT(extrapolated >= 1040 && extrapolated <= 1250,
+                "PLAYING 状態で経過時間に応じて position が滑らかに外挿されること");
+
+    // PAUSED に遷移するとその位置で固定されること
+    zero_set_status(state, ZERO_STATUS_PAUSED);
+    int64_t frozen1 = zero_get_display_position(state);
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    int64_t frozen2 = zero_get_display_position(state);
+    TEST_ASSERT(frozen1 == frozen2, "PAUSED 状態では時間が経過しても display_position が進まないこと");
+
+    // duration クランプ検証
+    zero_set_duration(state, 2000);
+    zero_set_position_anchor(state, 1980, 2.0f);
+    zero_set_status(state, ZERO_STATUS_PLAYING);
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    TEST_ASSERT(zero_get_display_position(state) == 2000,
+                "外挿結果が duration を超えないようクランプされること");
+
+    zero_destroy_playback_state(state);
+    TEST_PASS("アンカー外挿・一時停止固定・duration クランプ");
 }
 
 void test_mass_allocation_and_double_free_stress() {
-    std::cout << "\n--- [3-2. ペネトレーション: 大量メモリ確保・解放ストレステスト] ---" << std::endl;
+    std::cout << "\n--- [3-3. ペネトレーション: 大量メモリ確保・解放ストレステスト] ---" << std::endl;
 
     constexpr int ITERATIONS = 10000;
     std::vector<ZeroPlaybackState*> states(ITERATIONS);
 
-    // 10,000 個を一気に確保
     for (int i = 0; i < ITERATIONS; ++i) {
         states[i] = zero_create_playback_state();
         TEST_ASSERT(states[i] != nullptr, "大量確保中に OOM または割り当て失敗しないこと");
         zero_set_position(states[i], i);
     }
 
-    // 全て正しく値が残っているか検証（メモリ汚染の有無）
     for (int i = 0; i < ITERATIONS; ++i) {
         TEST_ASSERT(zero_get_position(states[i]) == i, "隣接メモリ領域の破壊がないこと");
     }
 
-    // 一気に全解放
     for (int i = 0; i < ITERATIONS; ++i) {
         zero_destroy_playback_state(states[i]);
     }
@@ -174,6 +214,7 @@ int main() {
     test_normal_lifecycle_and_values();
     test_abnormal_and_edge_cases();
     test_concurrency_race_condition();
+    test_timestamp_extrapolation();
     test_mass_allocation_and_double_free_stress();
 
     auto end = std::chrono::high_resolution_clock::now();

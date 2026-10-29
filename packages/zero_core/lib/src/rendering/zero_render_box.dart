@@ -1,19 +1,20 @@
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
+import '../scheduler/zero_frame_scheduler.dart';
 
 /// Base RenderBox class for zero-allocation, direct-to-Canvas rendering.
-/// 
+///
 /// Enforces:
 /// 1. [isRepaintBoundary] = true to isolate repaint operations from the ancestor widget tree.
-/// 2. Optional frame-synchronized rendering via a ticker with dirty state tracking.
+/// 2. Optional frame-synchronized rendering via [ZeroFrameScheduler] (single shared Ticker)
+///    with dirty state tracking.
 /// 3. Memory reuse: prevents recreating painters, paths, or text objects per frame.
-abstract class ZeroRenderBox extends RenderBox {
-  Ticker? _ticker;
+abstract class ZeroRenderBox extends RenderBox implements ZeroFrameListener {
   bool _isDirty = true;
   bool _animatePerFrame;
+  bool _isSubscribed = false;
 
   /// Creates a [ZeroRenderBox].
-  /// If [animatePerFrame] is true, a frame ticker is created when attached.
+  /// If [animatePerFrame] is true, subscribes to [ZeroFrameScheduler] when attached.
   ZeroRenderBox({bool animatePerFrame = false}) : _animatePerFrame = animatePerFrame;
 
   @override
@@ -26,9 +27,9 @@ abstract class ZeroRenderBox extends RenderBox {
     _animatePerFrame = value;
     if (attached) {
       if (_animatePerFrame) {
-        _startTicker();
+        _subscribeScheduler();
       } else {
-        _stopTicker();
+        _unsubscribeScheduler();
       }
     }
   }
@@ -42,18 +43,20 @@ abstract class ZeroRenderBox extends RenderBox {
   /// Whether internal state is dirty and needs repainting.
   bool get isDirty => _isDirty;
 
-  void _startTicker() {
-    if (_ticker != null) return;
-    _ticker = Ticker(_onTick)..start();
+  void _subscribeScheduler() {
+    if (_isSubscribed) return;
+    _isSubscribed = true;
+    ZeroFrameScheduler.instance.subscribe(this);
   }
 
-  void _stopTicker() {
-    _ticker?.stop();
-    _ticker?.dispose();
-    _ticker = null;
+  void _unsubscribeScheduler() {
+    if (!_isSubscribed) return;
+    _isSubscribed = false;
+    ZeroFrameScheduler.instance.unsubscribe(this);
   }
 
-  void _onTick(Duration elapsed) {
+  @override
+  void onZeroFrame(Duration elapsed) {
     if (!attached) return;
     if (onFrameTick(elapsed)) {
       markNeedsPaint();
@@ -68,13 +71,13 @@ abstract class ZeroRenderBox extends RenderBox {
   void attach(PipelineOwner owner) {
     super.attach(owner);
     if (_animatePerFrame) {
-      _startTicker();
+      _subscribeScheduler();
     }
   }
 
   @override
   void detach() {
-    _stopTicker();
+    _unsubscribeScheduler();
     super.detach();
   }
 

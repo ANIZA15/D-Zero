@@ -54,6 +54,18 @@ void main() {
       expect(buffer.rawData.length, equals(128));
       // 最新の値が正しく反映されていること
       expect(buffer[127], equals(99999.0));
+      expect(buffer.contiguousView.length, equals(128));
+      expect(buffer.contiguousView.last, equals(99999.0));
+      // 満杯時の contiguousView は事前確保スライスを返し新規生成しないこと
+      expect(identical(buffer.contiguousView, buffer.contiguousView), isTrue);
+    });
+
+    test('Float32RingBuffer mirrors data and returns zero-allocation contiguousView', () {
+      final f32 = Float32RingBuffer(4);
+      f32.pushAll([1.0, 2.0, 3.0, 4.0, 5.0]);
+      expect(f32.isFull, isTrue);
+      expect(f32.contiguousView, equals([2.0, 3.0, 4.0, 5.0]));
+      expect(identical(f32.contiguousView, f32.contiguousView), isTrue);
     });
   });
 
@@ -167,23 +179,31 @@ void main() {
     });
   });
 
-  group('【4. ZeroRenderBox ライフサイクル & Ticker 管理テスト】', () {
-    test('attach と detach で Ticker が自動制御されること', () {
-      final box = _TestZeroRenderBox(animatePerFrame: true);
-      expect(box.isRepaintBoundary, isTrue);
-      expect(box.animatePerFrame, isTrue);
+  group('【4. ZeroRenderBox ライフサイクル & ZeroFrameScheduler 共有 Ticker テスト】', () {
+    test('attach と detach で ZeroFrameScheduler の共有 Ticker が自動制御されること', () {
+      final box1 = _TestZeroRenderBox(animatePerFrame: true);
+      final box2 = _TestZeroRenderBox(animatePerFrame: true);
+      expect(box1.isRepaintBoundary, isTrue);
+      expect(box1.animatePerFrame, isTrue);
 
       final pipelineOwner = PipelineOwner();
-      box.attach(pipelineOwner);
+      box1.attach(pipelineOwner);
+      box2.attach(pipelineOwner);
+      expect(ZeroFrameScheduler.instance.subscriberCount, greaterThanOrEqualTo(2));
+      expect(ZeroFrameScheduler.instance.isTicking, isTrue);
 
       // 動的に animatePerFrame をトグル
-      box.animatePerFrame = false;
-      expect(box.animatePerFrame, isFalse);
-      box.animatePerFrame = true;
-      expect(box.animatePerFrame, isTrue);
+      box1.animatePerFrame = false;
+      expect(box1.animatePerFrame, isFalse);
+      box1.animatePerFrame = true;
+      expect(box1.animatePerFrame, isTrue);
 
-      box.detach();
-      box.dispose();
+      box1.detach();
+      box2.detach();
+      expect(ZeroFrameScheduler.instance.subscriberCount, equals(0));
+      expect(ZeroFrameScheduler.instance.isTicking, isFalse);
+      box1.dispose();
+      box2.dispose();
     });
   });
 

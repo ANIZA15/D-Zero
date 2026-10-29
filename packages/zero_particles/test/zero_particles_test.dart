@@ -56,8 +56,32 @@ void main() {
 
       // Accessing buffer or methods post-dispose must not throw SIGSEGV or StateError
       expect(() => controller.buffer, returnsNormally);
+      // Disposed controller returns a shared singleton empty buffer (zero allocation)
+      expect(identical(controller.buffer, controller.buffer), isTrue);
       expect(() => controller.step(dt: 0.016, width: 500, height: 500), returnsNormally);
       expect(() => controller.reset(width: 500, height: 500), returnsNormally);
+    });
+
+    test('SIMD step と スカラー step の結果が許容誤差内で完全一致し、奇数 capacity でも安全であること', () {
+      final simdBuf = ZeroParticleBuffer(101); // 奇数 capacity (パディング検証)
+      final scalarBuf = ZeroParticleBuffer(101);
+      expect(simdBuf.positions.length, equals(202));
+
+      for (int i = 0; i < 202; i++) {
+        simdBuf.positions[i] = (i * 3.7) % 400.0;
+        scalarBuf.positions[i] = simdBuf.positions[i];
+        simdBuf.velocities[i] = ((i % 7) - 3) * 25.0;
+        scalarBuf.velocities[i] = simdBuf.velocities[i];
+      }
+
+      for (int step = 0; step < 60; step++) {
+        simdBuf.step(dt: 0.016, width: 400, height: 300, useSimd: true);
+        scalarBuf.step(dt: 0.016, width: 400, height: 300, useSimd: false);
+      }
+
+      for (int i = 0; i < 202; i++) {
+        expect((simdBuf.positions[i] - scalarBuf.positions[i]).abs(), lessThan(1e-3));
+      }
     });
 
     test('二重解放（Double Free）防止: dispose() を複数回呼んでも例外が起きないこと', () {

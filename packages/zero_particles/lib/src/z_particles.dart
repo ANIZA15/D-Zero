@@ -3,6 +3,16 @@ import 'package:flutter/widgets.dart';
 import 'package:zero_core/zero_core.dart';
 import 'zero_particle_controller.dart';
 
+/// Point geometry style for [ZParticles] rendering on Impeller / Skia.
+enum ZParticlePointStyle {
+  /// Anti-aliased circular points (`StrokeCap.round`, `isAntiAlias = true`).
+  round,
+
+  /// Fast non-anti-aliased square points (`StrokeCap.square`, `isAntiAlias = false`).
+  /// Minimizes vertex expansion and fragment shader overhead on high particle counts.
+  square,
+}
+
 /// An ultra high-performance, zero-allocation particle rendering widget.
 ///
 /// Directly drives physics simulation and batch draws up to tens of thousands
@@ -21,6 +31,9 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
   /// The size/diameter of each particle point in pixels.
   final double pointSize;
 
+  /// Point geometry mode ([ZParticlePointStyle.round] or [ZParticlePointStyle.square]).
+  final ZParticlePointStyle pointStyle;
+
   /// Optional callback invoked on frame ticks with current FPS and frame time in ms.
   final void Function(double fps, double frameTimeMs)? onFpsUpdate;
 
@@ -30,6 +43,7 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
     this.isRunning = true,
     this.color = const Color(0xFF00FF88),
     this.pointSize = 3.5,
+    this.pointStyle = ZParticlePointStyle.round,
     this.onFpsUpdate,
   });
 
@@ -40,6 +54,7 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
       isRunning: isRunning,
       color: color,
       pointSize: pointSize,
+      pointStyle: pointStyle,
       onFpsUpdate: onFpsUpdate,
     );
   }
@@ -51,6 +66,7 @@ class ZParticles extends ZLeafWidget<RenderZParticles> {
       ..isRunning = isRunning
       ..color = color
       ..pointSize = pointSize
+      ..pointStyle = pointStyle
       ..onFpsUpdate = onFpsUpdate;
   }
 }
@@ -65,6 +81,7 @@ class RenderZParticles extends ZeroRenderBox {
   bool _isRunning;
   Color _color;
   double _pointSize;
+  ZParticlePointStyle _pointStyle;
   void Function(double fps, double frameTimeMs)? onFpsUpdate;
 
   late final Paint _paint;
@@ -77,18 +94,31 @@ class RenderZParticles extends ZeroRenderBox {
     required bool isRunning,
     required Color color,
     required double pointSize,
+    ZParticlePointStyle pointStyle = ZParticlePointStyle.round,
     this.onFpsUpdate,
   })  : _controller = controller,
         _isRunning = isRunning,
         _color = color,
         _pointSize = pointSize,
+        _pointStyle = pointStyle,
         super(animatePerFrame: isRunning) {
     _paint = Paint()
       ..color = _color
       ..strokeWidth = _pointSize
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke
-      ..isAntiAlias = true;
+      ..style = PaintingStyle.stroke;
+    _applyPointStyle(_pointStyle);
+  }
+
+  void _applyPointStyle(ZParticlePointStyle style) {
+    if (style == ZParticlePointStyle.square) {
+      _paint
+        ..strokeCap = StrokeCap.square
+        ..isAntiAlias = false;
+    } else {
+      _paint
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true;
+    }
   }
 
   ZeroParticleController get controller => _controller;
@@ -119,6 +149,14 @@ class RenderZParticles extends ZeroRenderBox {
     if (_pointSize == value) return;
     _pointSize = value;
     _paint.strokeWidth = value;
+    markDirty();
+  }
+
+  ZParticlePointStyle get pointStyle => _pointStyle;
+  set pointStyle(ZParticlePointStyle value) {
+    if (_pointStyle == value) return;
+    _pointStyle = value;
+    _applyPointStyle(value);
     markDirty();
   }
 
@@ -178,14 +216,13 @@ class RenderZParticles extends ZeroRenderBox {
     if (positions.isEmpty) return;
 
     final Canvas canvas = context.canvas;
-    canvas.save();
-    if (offset != Offset.zero) {
-      canvas.translate(offset.dx, offset.dy);
+    if (offset == Offset.zero) {
+      canvas.drawRawPoints(PointMode.points, positions, _paint);
+      return;
     }
-
-    // Direct batch-draw all particles to the GPU in a single call!
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
     canvas.drawRawPoints(PointMode.points, positions, _paint);
-
     canvas.restore();
   }
 }

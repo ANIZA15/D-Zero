@@ -53,6 +53,7 @@ class RenderZeroStopwatch extends ZeroRenderBox {
   late ZeroNumberPainter _painter;
 
   final Stopwatch _stopwatch = Stopwatch();
+  int _lastPaintedSecond = -1;
 
   RenderZeroStopwatch({
     required bool isRunning,
@@ -100,11 +101,18 @@ class RenderZeroStopwatch extends ZeroRenderBox {
   /// Resets the stopwatch to zero.
   void reset() {
     _stopwatch.reset();
+    _lastPaintedSecond = -1;
     markDirty();
   }
 
   @override
-  bool onFrameTick(Duration elapsed) => _isRunning;
+  bool onFrameTick(Duration elapsed) {
+    if (!_isRunning) return false;
+    final int currentSecond = _stopwatch.elapsedMilliseconds ~/ 1000;
+    if (currentSecond == _lastPaintedSecond) return false;
+    _lastPaintedSecond = currentSecond;
+    return true;
+  }
 
   @override
   void performLayout() {
@@ -115,7 +123,8 @@ class RenderZeroStopwatch extends ZeroRenderBox {
 
   @override
   void paintZero(PaintingContext context, Offset offset) {
-    final elapsedMs = _stopwatch.elapsedMilliseconds;
+    final int elapsedMs = _stopwatch.elapsedMilliseconds;
+    _lastPaintedSecond = elapsedMs ~/ 1000;
     _painter.paintTimecode(
       context.canvas,
       offset,

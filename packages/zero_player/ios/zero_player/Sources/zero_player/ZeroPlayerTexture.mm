@@ -1,6 +1,10 @@
 #import "ZeroPlayerTexture.h"
 #import <CoreVideo/CoreVideo.h>
 #import <QuartzCore/CADisplayLink.h>
+#import <os/lock.h>
+
+static void *kZeroPlayerStatusKVOContext = &kZeroPlayerStatusKVOContext;
+static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
 
 @interface ZeroPlayerTexture () {
     NSObject<FlutterTextureRegistry> *_registry;
@@ -11,6 +15,11 @@
     CVPixelBufferRef _latestPixelBuffer;
     ZeroPlaybackState *_playbackState;
     int64_t _textureId;
+    os_unfair_lock _pixelBufferLock;
+    CFTimeInterval _lastAnchorSyncTime;
+    id _endObserver;
+    BOOL _isObservingPlayer;
+    BOOL _awaitingFrame;
     BOOL _isDisposed;
 }
 @end
@@ -29,13 +38,19 @@
         _registry = registry;
         _isDisposed = NO;
         _latestPixelBuffer = nil;
+        _pixelBufferLock = OS_UNFAIR_LOCK_INIT;
+        _lastAnchorSyncTime = 0.0;
+        _awaitingFrame = YES;
+        _isObservingPlayer = NO;
 
         // 1. C++ 共有メモリの作成
         _playbackState = zero_create_playback_state();
 
-        // 2. AVPlayer & AVPlayerItemVideoOutput (Metal ゼロコピーテクスチャ出力)
+        // 2. AVPlayer & AVPlayerItemVideoOutput (NV12 Metal ゼロコピーテクスチャ出力)
+        // kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange (NV12) により CPU/GPU での BGRA 変換を排除し、
+        // メモリ帯域を ~62% 削減したまま Flutter Engine (Impeller Metal) のシェーダーで直接 YUV->RGB 変換する。
         NSDictionary *pixBuffAttributes = @{
-            (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
+            (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange),
             (id)kCVPixelBufferMetalCompatibilityKey : @YES,
             (id)kCVPixelBufferIOSurfacePropertiesKey : @{}
         };
@@ -69,93 +84,186 @@
         // 3. Flutter Texture 登録
         _textureId = [_registry registerTexture:self];
 
-        // 4. CADisplayLink による 120Hz/60Hz VSync 駆動
+        // 4. CADisplayLink による VSync 駆動（初回フレーム取得後は再生中のみ稼働）
         _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink:)];
         [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 
-        // Duration 監視
+        // Duration / Track フレームレート / 再生状態監視
         [self setupObservers];
     }
     return self;
 }
 
 - (void)setupObservers {
+    [_player addObserver:self
+              forKeyPath:@"timeControlStatus"
+                 options:NSKeyValueObservingOptionNew
+                 context:kZeroPlayerStatusKVOContext];
+    _isObservingPlayer = YES;
+
     __weak typeof(self) weakSelf = self;
-    [_playerItem.asset loadValuesAsynchronouslyForKeys:@[@"duration"] completionHandler:^{
+    _endObserver = [[NSNotificationCenter defaultCenter]
+        addObserverForName:AVPlayerItemDidPlayToEndTimeNotification
+                    object:_playerItem
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification * _Nonnull note) {
+                    typeof(weakSelf) strongSelf = weakSelf;
+                    if (!strongSelf || strongSelf->_isDisposed) return;
+                    [strongSelf syncPositionAnchorNow];
+                    zero_set_status(strongSelf->_playbackState, ZERO_STATUS_COMPLETED);
+                    strongSelf->_displayLink.paused = YES;
+                }];
+
+    [_playerItem.asset loadValuesAsynchronouslyForKeys:@[@"duration", @"tracks"] completionHandler:^{
         dispatch_async(dispatch_get_main_queue(), ^{
             typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf || strongSelf->_isDisposed) return;
-
-            CMTime duration = strongSelf->_playerItem.asset.duration;
-            int64_t durMs = (int64_t)(CMTimeGetSeconds(duration) * 1000);
-            zero_set_duration(strongSelf->_playbackState, durMs);
+            [strongSelf applyLoadedAssetMetadata];
         });
     }];
+}
+
+- (void)applyLoadedAssetMetadata {
+    CMTime duration = _playerItem.asset.duration;
+    double durSec = CMTimeGetSeconds(duration);
+    if (isfinite(durSec) && durSec > 0.0) {
+        zero_set_duration(_playbackState, (int64_t)(durSec * 1000.0));
+    }
+
+    if (@available(iOS 15.0, *)) {
+        NSArray<AVAssetTrack *> *videoTracks = [_playerItem.asset tracksWithMediaType:AVMediaTypeVideo];
+        AVAssetTrack *track = videoTracks.firstObject;
+        float fps = track ? track.nominalFrameRate : 0.0f;
+        if (fps >= 15.0f && fps <= 120.0f) {
+            _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
+        }
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey,id> *)change
+                       context:(void *)context {
+    if (context != kZeroPlayerStatusKVOContext) {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+        return;
+    }
+    if (_isDisposed) return;
+
+    [self syncPositionAnchorNow];
+    AVPlayerTimeControlStatus status = _player.timeControlStatus;
+    if (status == AVPlayerTimeControlStatusPlaying) {
+        zero_set_status(_playbackState, ZERO_STATUS_PLAYING);
+        _displayLink.paused = NO;
+    } else if (status == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate) {
+        zero_set_status(_playbackState, ZERO_STATUS_BUFFERING);
+        _displayLink.paused = NO;
+    } else {
+        zero_set_status(_playbackState, ZERO_STATUS_PAUSED);
+        if (!_awaitingFrame) {
+            _displayLink.paused = YES;
+        }
+    }
+}
+
+- (void)syncPositionAnchorNow {
+    if (_isDisposed || !_playbackState) return;
+    CMTime currentTime = _player.currentTime;
+    double sec = CMTimeGetSeconds(currentTime);
+    int64_t currentMs = (isfinite(sec) && sec > 0.0) ? (int64_t)(sec * 1000.0) : 0;
+    float rate = _player.rate;
+    zero_set_position_anchor(_playbackState, currentMs, rate > 0.0f ? rate : 1.0f);
+    _lastAnchorSyncTime = CACurrentMediaTime();
 }
 
 - (void)onDisplayLink:(CADisplayLink *)link {
     if (_isDisposed) return;
 
-    CMTime itemTime = [_videoOutput itemTimeForHostTime:CACurrentMediaTime()];
+    CFTimeInterval now = CACurrentMediaTime();
+    CMTime itemTime = [_videoOutput itemTimeForHostTime:now];
     if ([_videoOutput hasNewPixelBufferForItemTime:itemTime]) {
         CVPixelBufferRef pixelBuffer = [_videoOutput copyPixelBufferForItemTime:itemTime itemTimeForDisplay:nil];
         if (pixelBuffer) {
-            @synchronized (self) {
-                if (_latestPixelBuffer) {
-                    CVBufferRelease(_latestPixelBuffer);
-                }
-                _latestPixelBuffer = pixelBuffer;
+            os_unfair_lock_lock(&_pixelBufferLock);
+            CVPixelBufferRef oldBuffer = _latestPixelBuffer;
+            _latestPixelBuffer = pixelBuffer;
+            os_unfair_lock_unlock(&_pixelBufferLock);
+            if (oldBuffer) {
+                CVBufferRelease(oldBuffer);
             }
 
-            // 動画サイズを取得して共有メモリに反映
             size_t width = CVPixelBufferGetWidth(pixelBuffer);
             size_t height = CVPixelBufferGetHeight(pixelBuffer);
             zero_set_video_size(_playbackState, (int32_t)width, (int32_t)height);
             zero_increment_frame(_playbackState);
 
-            // Flutter Engine (Impeller) に新しいフレームの描画を通知
             [_registry textureFrameAvailable:_textureId];
+
+            if (_awaitingFrame) {
+                _awaitingFrame = NO;
+                if (_player.timeControlStatus == AVPlayerTimeControlStatusPaused) {
+                    _displayLink.paused = YES;
+                }
+            }
         }
     }
 
-    // 【重要】再生位置を C++ 共有メモリに直接書き込み
-    // Dart 側は通信なしでこの数値を 0 ナノ秒で読み取れる
-    CMTime currentTime = _player.currentTime;
-    int64_t currentMs = (int64_t)(CMTimeGetSeconds(currentTime) * 1000);
-    zero_set_position(_playbackState, currentMs);
+    // 再生中は ~250ms ごとにのみアンカーを補正書き込み（毎フレーム位置は Dart 側で外挿）
+    if ((now - _lastAnchorSyncTime) >= kZeroDriftSyncIntervalSec) {
+        [self syncPositionAnchorNow];
+    }
 }
 
 #pragma mark - FlutterTexture Protocol (Zero-Copy)
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
-    @synchronized (self) {
-        if (_latestPixelBuffer) {
-            CVBufferRetain(_latestPixelBuffer);
-            return _latestPixelBuffer;
-        }
+    os_unfair_lock_lock(&_pixelBufferLock);
+    CVPixelBufferRef buffer = _latestPixelBuffer;
+    if (buffer) {
+        CVBufferRetain(buffer);
     }
-    return nil;
+    os_unfair_lock_unlock(&_pixelBufferLock);
+    return buffer;
 }
 
 #pragma mark - Playback Controls
 
 - (void)play {
     if (_isDisposed) return;
+    _displayLink.paused = NO;
     [_player play];
+    [self syncPositionAnchorNow];
     zero_set_status(_playbackState, ZERO_STATUS_PLAYING);
 }
 
 - (void)pause {
     if (_isDisposed) return;
     [_player pause];
+    [self syncPositionAnchorNow];
     zero_set_status(_playbackState, ZERO_STATUS_PAUSED);
+    if (!_awaitingFrame) {
+        _displayLink.paused = YES;
+    }
 }
 
 - (void)seekTo:(int64_t)positionMs {
     if (_isDisposed) return;
+    _awaitingFrame = YES;
+    _displayLink.paused = NO;
     CMTime targetTime = CMTimeMake(positionMs, 1000);
-    [_player seekToTime:targetTime toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero];
-    zero_set_position(_playbackState, positionMs);
+    float rate = _player.rate > 0.0f ? _player.rate : 1.0f;
+    zero_set_position_anchor(_playbackState, positionMs, rate);
+    _lastAnchorSyncTime = CACurrentMediaTime();
+
+    __weak typeof(self) weakSelf = self;
+    [_player seekToTime:targetTime
+        toleranceBefore:kCMTimeZero
+         toleranceAfter:kCMTimeZero
+      completionHandler:^(BOOL finished) {
+          typeof(weakSelf) strongSelf = weakSelf;
+          if (!strongSelf || strongSelf->_isDisposed || !finished) return;
+          [strongSelf syncPositionAnchorNow];
+      }];
 }
 
 - (void)dispose {
@@ -165,14 +273,26 @@
     [_displayLink invalidate];
     _displayLink = nil;
 
+    if (_isObservingPlayer && _player) {
+        [_player removeObserver:self forKeyPath:@"timeControlStatus" context:kZeroPlayerStatusKVOContext];
+        _isObservingPlayer = NO;
+    }
+    if (_endObserver) {
+        [[NSNotificationCenter defaultCenter] removeObserver:_endObserver];
+        _endObserver = nil;
+    }
+
     [_player pause];
     _player = nil;
     _playerItem = nil;
     _videoOutput = nil;
 
-    if (_latestPixelBuffer) {
-        CVBufferRelease(_latestPixelBuffer);
-        _latestPixelBuffer = nil;
+    os_unfair_lock_lock(&_pixelBufferLock);
+    CVPixelBufferRef bufferToRelease = _latestPixelBuffer;
+    _latestPixelBuffer = nil;
+    os_unfair_lock_unlock(&_pixelBufferLock);
+    if (bufferToRelease) {
+        CVBufferRelease(bufferToRelease);
     }
 
     [_registry unregisterTexture:_textureId];

@@ -31,6 +31,8 @@ class ZeroParticleConfig {
 /// - Double dispose is safe and ignored.
 /// - Accessing methods post-dispose is safe and does not throw or crash.
 class ZeroParticleController with ChangeNotifier {
+  static final ZeroParticleBuffer _emptyBuffer = ZeroParticleBuffer(0);
+
   final int capacity;
   final ZeroParticleConfig config;
   ZeroParticleBuffer? _buffer;
@@ -51,10 +53,10 @@ class ZeroParticleController with ChangeNotifier {
   /// Whether particles have been initialized.
   bool get isInitialized => _isInitialized;
 
-  /// The underlying [ZeroParticleBuffer]. Returns an empty safe buffer if disposed.
+  /// The underlying [ZeroParticleBuffer]. Returns a shared empty buffer if disposed (zero allocation).
   ZeroParticleBuffer get buffer {
     if (_isDisposed || _buffer == null) {
-      return ZeroParticleBuffer(0);
+      return _emptyBuffer;
     }
     return _buffer!;
   }

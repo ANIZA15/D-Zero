@@ -1,6 +1,4 @@
 import 'dart:ffi' as ffi;
-import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:zero_core/zero_core.dart';
 import '../controller.dart';
@@ -50,25 +48,31 @@ typedef DirectTimeLabel = ZDirectTimeLabel;
 /// Shorthand alias for [ZDirectTimeLabel].
 typedef ZTimeLabel = ZDirectTimeLabel;
 
-class RenderDirectTimeLabel extends RenderBox {
+class RenderDirectTimeLabel extends ZeroRenderBox {
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
+  ZeroPlaybackStateView _view;
   TextStyle _style;
   late ZeroNumberPainter _numberPainter;
-  Ticker? _ticker;
   int _lastSec = -1;
+  int _lastDurSec = -1;
 
   RenderDirectTimeLabel({
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
     required TextStyle style,
   })  : _statePointer = statePointer,
-        _style = style {
+        _view = ZeroPlaybackStateView(statePointer),
+        _style = style,
+        super(animatePerFrame: true) {
     _numberPainter = ZeroNumberPainter(style: _style);
   }
 
   set statePointer(ffi.Pointer<ZeroPlaybackStateNative> val) {
     if (_statePointer == val) return;
     _statePointer = val;
-    markNeedsPaint();
+    _view = ZeroPlaybackStateView(val);
+    _lastSec = -1;
+    _lastDurSec = -1;
+    markDirty();
   }
 
   set style(TextStyle val) {
@@ -80,46 +84,33 @@ class RenderDirectTimeLabel extends RenderBox {
   }
 
   @override
-  void attach(PipelineOwner owner) {
-    super.attach(owner);
-    _ticker = Ticker((_) {
-      if (attached) {
-        // 秒数が変わったときのみ再描画をリクエストして、さらなる省電力を実現
-        final posSec = _statePointer.ref.positionMs ~/ 1000;
-        if (posSec != _lastSec) {
-          _lastSec = posSec;
-          markNeedsPaint();
-        }
-      }
-    })
-      ..start();
+  bool onFrameTick(Duration elapsed) {
+    final int posSec = _view.displayPositionMs ~/ 1000;
+    final int durSec = _view.durationMs ~/ 1000;
+    if (posSec == _lastSec && durSec == _lastDurSec) {
+      return false;
+    }
+    _lastSec = posSec;
+    _lastDurSec = durSec;
+    return true;
   }
-
-  @override
-  void detach() {
-    _ticker?.stop();
-    _ticker?.dispose();
-    _ticker = null;
-    super.detach();
-  }
-
-  @override
-  bool get isRepaintBoundary => true;
 
   @override
   void performLayout() {
     // 最大幅でサイズを計算・固定（レイアウトの揺れを防止）
-    final width = _numberPainter.estimateTimeProgressWidth();
-    final height = _numberPainter.height;
+    final double width = _numberPainter.estimateTimeProgressWidth();
+    final double height = _numberPainter.height;
     size = constraints.constrain(Size(width, height));
   }
 
   @override
-  void paint(PaintingContext context, Offset offset) {
-    final posMs = _statePointer.ref.positionMs;
-    final durMs = _statePointer.ref.durationMs;
+  void paintZero(PaintingContext context, Offset offset) {
+    final int posMs = _view.displayPositionMs;
+    final int durMs = _view.durationMs;
+    _lastSec = posMs ~/ 1000;
+    _lastDurSec = durMs ~/ 1000;
 
-    // ゼロStringアロケーションで Canvas に直接描画
+    // ゼロStringアロケーション & 単一 drawRawAtlas コールで Canvas に直接描画
     _numberPainter.paintTimeProgress(
       context.canvas,
       offset,

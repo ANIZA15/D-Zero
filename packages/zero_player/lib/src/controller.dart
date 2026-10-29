@@ -31,13 +31,14 @@ class ZeroPlayerController {
   static const MethodChannel _channel = MethodChannel('com.fexcy.zero_player');
 
   final ffi.Pointer<ZeroPlaybackStateNative> statePointer;
+  final ZeroPlaybackStateView _view;
   final int textureId;
   bool _isDisposed = false;
 
   ZeroPlayerController._({
     required this.statePointer,
     required this.textureId,
-  });
+  }) : _view = ZeroPlaybackStateView(statePointer);
 
   /// ネットワーク URL からプレイヤーを作成する（Phase 1: Headers & Phase 2: 多プロトコル対応）
   /// ネイティブ側（iOS: AVPlayer, Android: ExoPlayer）でデコーダを立ち上げ、
@@ -146,40 +147,47 @@ class ZeroPlayerController {
   }
 
   /// 現在の再生位置（ミリ秒）
-  /// 【重要】MethodChannel等の通信を一切介さず、ネイティブのメモリを直接参照します（0ナノ秒）
+  /// 【重要】MethodChannel等の通信を一切介さず、ネイティブのメモリを直接参照・外挿します（0ナノ秒）
+  @pragma('vm:prefer-inline')
   int get positionMs {
     if (_isDisposed) return 0;
-    return statePointer.ref.positionMs;
+    return _view.displayPositionMs;
   }
 
   /// 総再生時間（ミリ秒）
+  @pragma('vm:prefer-inline')
   int get durationMs {
     if (_isDisposed) return 0;
-    return statePointer.ref.durationMs;
+    return _view.durationMs;
   }
 
   /// バッファ済み時間（ミリ秒）
+  @pragma('vm:prefer-inline')
   int get bufferedMs {
     if (_isDisposed) return 0;
-    return statePointer.ref.bufferedMs;
+    return _view.bufferedMs;
   }
 
   /// 再生ステータス
+  @pragma('vm:prefer-inline')
   ZeroPlaybackStatus get status {
     if (_isDisposed) return ZeroPlaybackStatus.idle;
-    final val = statePointer.ref.status;
+    final int val = _view.statusRaw;
     if (val >= 0 && val < ZeroPlaybackStatus.values.length) {
       return ZeroPlaybackStatus.values[val];
     }
     return ZeroPlaybackStatus.idle;
   }
 
-  /// 再生進捗率 (0.0 〜 1.0)
+  /// 再生進捗率 (0.0 〜 1.0) — num.clamp() を使わずアンボックス double 比較でゼロアロケーション
+  @pragma('vm:prefer-inline')
   double get progress {
-    final dur = durationMs;
+    final int dur = durationMs;
     if (dur <= 0) return 0.0;
-    final pos = positionMs;
-    return (pos / dur).clamp(0.0, 1.0);
+    final double ratio = positionMs / dur;
+    if (ratio <= 0.0) return 0.0;
+    if (ratio >= 1.0) return 1.0;
+    return ratio;
   }
 
   /// 手動シミュレーション更新（テスト用）
@@ -192,6 +200,12 @@ class ZeroPlayerController {
   void setDurationSimulated(int ms) {
     if (_isDisposed) return;
     ZeroPlayerNativeBindings.instance.setDuration(statePointer, ms);
+  }
+
+  /// 手動シミュレーション更新（ステータス設定用）
+  void setStatusSimulated(ZeroPlaybackStatus newStatus) {
+    if (_isDisposed) return;
+    ZeroPlayerNativeBindings.instance.setStatus(statePointer, newStatus.index);
   }
 
   /// リソースの破棄
