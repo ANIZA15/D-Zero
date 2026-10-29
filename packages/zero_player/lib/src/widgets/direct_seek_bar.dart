@@ -3,12 +3,13 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:zero_core/zero_core.dart';
 import '../controller.dart';
 import '../playback_state_ffi.dart';
 
-/// A high-performance seek bar [LeafRenderObjectWidget] that paints directly to the
+/// A high-performance seek bar [ZLeafWidget] that paints directly to the
 /// Canvas at 120fps by reading current playback position directly from atomic shared memory.
-class ZDirectSeekBar extends LeafRenderObjectWidget {
+class ZDirectSeekBar extends ZLeafWidget<RenderDirectSeekBar> {
   /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
 

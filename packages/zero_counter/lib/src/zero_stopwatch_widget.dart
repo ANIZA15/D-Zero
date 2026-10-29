@@ -3,7 +3,7 @@ import 'package:zero_core/zero_core.dart';
 
 /// A zero-allocation, zero-rebuild stopwatch widget that renders elapsed time
 /// directly onto the Canvas using Impeller/Flutter rendering pipeline.
-class ZStopwatch extends LeafRenderObjectWidget {
+class ZStopwatch extends ZLeafWidget<RenderZeroStopwatch> {
   /// Whether the stopwatch is currently running.
   final bool isRunning;
 

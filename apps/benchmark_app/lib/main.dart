@@ -371,14 +371,14 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E2235)),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('⚡️ 120fps V-Sync 高精度ストップウォッチ (ZStopwatch)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 4),
-          const Text('毎フレームの経過時間を Canvas へ直接描画。String を一切生成しないゼロアロケーション時間表示。', style: TextStyle(color: Colors.grey, fontSize: 11)),
-          const SizedBox(height: 20),
-          const Center(
+          Text('⚡️ 120fps V-Sync 高精度ストップウォッチ (ZStopwatch)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          SizedBox(height: 4),
+          Text('毎フレームの経過時間を Canvas へ直接描画。String を一切生成しないゼロアロケーション時間表示。', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          SizedBox(height: 20),
+          Center(
             child: ZStopwatch(
               isRunning: true,
               includeHours: true,

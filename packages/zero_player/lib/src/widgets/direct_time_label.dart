@@ -8,7 +8,7 @@ import '../playback_state_ffi.dart';
 
 /// A timecode display [LeafRenderObjectWidget] that paints elapsed/total time directly
 /// on the Canvas with zero widget rebuilds and zero String allocations.
-class ZDirectTimeLabel extends LeafRenderObjectWidget {
+class ZDirectTimeLabel extends ZLeafWidget<RenderDirectTimeLabel> {
   /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
 

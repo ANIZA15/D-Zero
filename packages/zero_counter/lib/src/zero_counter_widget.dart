@@ -7,7 +7,7 @@ import 'package:zero_core/zero_core.dart';
 /// 
 /// Listens to a [ValueListenable<int>] and repaints the latest value directly
 /// to the Canvas without rebuilding the widget tree or allocating [String]s.
-class ZCounter extends LeafRenderObjectWidget {
+class ZCounter extends ZLeafWidget<RenderZeroCounter> {
   /// The integer source to display.
   final ValueListenable<int> valueListenable;
 

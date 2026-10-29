@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zero_core/zero_core.dart';
@@ -185,6 +186,88 @@ void main() {
       box.dispose();
     });
   });
+
+  group('【5. ZWidget / ZLeafWidget / ZSingleChildWidget ゼロアロケーション基盤テスト】', () {
+    test('ZWidget marker interface contracts', () {
+      const leaf = _DummyZLeafWidget();
+      expect(leaf.isZeroAllocation, isTrue);
+
+      const singleChild = _DummyZSingleChildWidget();
+      expect(singleChild.isZeroAllocation, isTrue);
+    });
+
+    testWidgets('ZLeafWidget は親の頻繁な rebuild においてもインスタンス同一性を維持し RenderObject を再生成しないこと', (tester) async {
+      int buildCount = 0;
+      late StateSetter triggerRebuild;
+
+      final widget = StatefulBuilder(
+        builder: (context, setState) {
+          triggerRebuild = setState;
+          buildCount++;
+          return const Directionality(
+            textDirection: TextDirection.ltr,
+            child: _DummyZLeafWidget(),
+          );
+        },
+      );
+
+      await tester.pumpWidget(widget);
+      expect(buildCount, equals(1));
+      expect(_DummyZLeafWidget.createCount, equals(1));
+
+      // 親を 100 回連続 rebuild
+      for (int i = 0; i < 100; i++) {
+        triggerRebuild(() {});
+        await tester.pump();
+      }
+
+      expect(buildCount, equals(101));
+      // const ZLeafWidget により、RenderObject は再生成されず 1 回のみの生成
+      expect(_DummyZLeafWidget.createCount, equals(1));
+    });
+
+    testWidgets('ZSingleChildWidget は子ウィジェットを適切に配置しライフサイクルを維持すること', (tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: _DummyZSingleChildWidget(
+            child: SizedBox(width: 50, height: 50),
+          ),
+        ),
+      );
+
+      expect(find.byType(_DummyZSingleChildWidget), findsOneWidget);
+      expect(find.byType(SizedBox), findsOneWidget);
+
+      // Unmount
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(find.byType(_DummyZSingleChildWidget), findsNothing);
+    });
+  });
+}
+
+class _DummyZLeafWidget extends ZLeafWidget<_TestZeroRenderBox> {
+  static int createCount = 0;
+  const _DummyZLeafWidget();
+
+  @override
+  _TestZeroRenderBox createRenderObject(BuildContext context) {
+    createCount++;
+    return _TestZeroRenderBox(animatePerFrame: false);
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, _TestZeroRenderBox renderObject) {}
+}
+
+class _DummyZSingleChildWidget extends ZSingleChildWidget<RenderProxyBox> {
+  const _DummyZSingleChildWidget({super.child});
+
+  @override
+  RenderProxyBox createRenderObject(BuildContext context) => RenderProxyBox();
+
+  @override
+  void updateRenderObject(BuildContext context, RenderProxyBox renderObject) {}
 }
 
 class _TestZeroRenderBox extends ZeroRenderBox {
