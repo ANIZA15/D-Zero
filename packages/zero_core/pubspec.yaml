@@ -1,0 +1,27 @@
+name: zero_core
+description: "Core foundation library for zero-allocation Flutter widgets and high-performance Impeller rendering."
+version: 0.1.0
+homepage: https://github.com/ANIZA15/d-zero
+repository: https://github.com/ANIZA15/d-zero/tree/main/packages/zero_core
+issue_tracker: https://github.com/ANIZA15/d-zero/issues
+topics:
+  - performance
+  - zero-allocation
+  - impeller
+  - widgets
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0

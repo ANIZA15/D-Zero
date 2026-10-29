@@ -1,38 +1,15 @@
-name: zero_player
-description: "A next-generation, zero-jank Flutter video player optimized for Impeller, utilizing FFI shared-memory and custom RenderBoxes."
-version: 0.0.2
-homepage: https://github.com/ANIZA15/zero_player
-repository: https://github.com/ANIZA15/zero_player
-issue_tracker: https://github.com/ANIZA15/zero_player/issues
-topics:
-  - video
-  - player
-  - impeller
-  - ffi
-  - streaming
+name: d_zero_workspace
+publish_to: 'none'
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
-  flutter: ">=3.19.0"
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
 
-dependencies:
-  flutter:
-    sdk: flutter
-  ffi: ^2.1.2
+workspace:
+  - packages/zero_core
+  - packages/zero_player
+  - packages/zero_counter
+  - packages/zero_player/example
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  plugin:
-    platforms:
-      android:
-        package: com.fexcy.zero_player
-        pluginClass: ZeroPlayerPlugin
-      ios:
-        pluginClass: ZeroPlayerPlugin
-
-  shaders:
-    - shaders/zero_blur.frag
+  melos: ^6.3.3

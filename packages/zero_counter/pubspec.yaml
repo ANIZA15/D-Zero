@@ -1,0 +1,28 @@
+name: zero_counter
+description: "A zero-allocation, zero-rebuild high-frequency counter and stopwatch widget for Flutter / Impeller."
+version: 0.1.0
+homepage: https://github.com/ANIZA15/d-zero
+repository: https://github.com/ANIZA15/d-zero/tree/main/packages/zero_counter
+issue_tracker: https://github.com/ANIZA15/d-zero/issues
+topics:
+  - counter
+  - stopwatch
+  - zero-allocation
+  - impeller
+  - performance
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  zero_core:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0

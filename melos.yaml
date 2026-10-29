@@ -1,0 +1,27 @@
+name: d_zero
+repository: https://github.com/ANIZA15/d-zero
+
+packages:
+  - packages/*
+  - packages/*/example
+  - apps/*
+
+command:
+  version:
+    linkToCommits: true
+    workspaceChangelog: true
+
+scripts:
+  analyze:
+    exec: flutter analyze .
+    description: Run flutter analyze across all packages.
+
+  test:
+    exec: flutter test
+    packageFilters:
+      dirExists: test
+    description: Run flutter test in all packages with tests.
+
+  clean:
+    exec: flutter clean
+    description: Clean build artifacts in all packages.

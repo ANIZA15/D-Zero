@@ -97,7 +97,9 @@ class ZeroPlayerNativeBindings {
       // テスト環境およびローカル開発環境の dylib フォールバック
       final candidates = [
         'test/libzero_player_test.dylib',
+        'packages/zero_player/test/libzero_player_test.dylib',
         'src/libzero_player_native.dylib',
+        'packages/zero_player/src/libzero_player_native.dylib',
         'libzero_player_native.dylib',
       ];
       for (final path in candidates) {

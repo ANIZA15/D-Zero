@@ -1,170 +1,60 @@
-# ⚡️ zero_player
+# ⚡️ d-zero (Dart Zero)
 
-**A zero-jank, zero-allocation video player engineered from the ground up for the Flutter and Impeller era.**
+**Flutter / Impeller 時代のために設計された、原理的にジャンク（コマ落ち）が発生しないゼロアロケーション Widget スイート。**
 
-[🇯🇵 日本語のドキュメントはこちら (Japanese Documentation)](README_JA.md)
-
-[![Pub Version](https://img.shields.io/pub/v/zero_player.svg?style=flat-square)](https://pub.dev/packages/zero_player)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
-[![Code Complexity](https://img.shields.io/badge/Cyclomatic%20Complexity-1.83%20(A%2B)-brightgreen.svg?style=flat-square)](https://github.com/ANIZA15/zero_player)
 
 ---
 
-## 💡 Design Philosophy: Pursuit of Zero Allocation in Flutter
+## 💡 コンセプト：Flutter における「ゼロアロケーション」
 
-In game development and high-performance systems programming, eliminating heap allocation during runtime frames to avoid garbage collection (GC) stalls is an industry-standard best practice.
+ゲーム開発やハイパフォーマンスシステムプログラミング（例：Cysharp 製 C# ライブラリ群）では、**「GC（ガベージコレクション）によるフレーム落ちを防ぐため、毎フレームのヒープアロケーションを極限まで 0 にする」** という設計が常識です。
 
-Conventional Flutter video players (`video_player`), however, incur significant CPU and memory overhead across three critical boundaries during playback:
-
-1. **Heap Allocation via Widget Rebuilds**: Each time playback advances (`00:10` → `00:11`), UI widgets and elements are repeatedly instantiated dozens of times per second on the UI thread.
-2. **MethodChannel Serialization Overhead**: Sharing playback position and buffering status across threads generates continuous JSON/binary conversions and message object allocations.
-3. **GPU RenderPass Multiplications**: Heavy glassmorphism effects like `BackdropFilter` allocate costly offscreen render targets (`saveLayer`), consuming vital GPU bandwidth.
-
-**`zero_player` solves these fundamental bottlenecks with three foundational architectural pillars:**
-
-* **Zero Rebuild**: Powered by `LeafRenderObjectWidget` and custom `RenderBox` instances, UI controls paint directly to the Canvas at 120fps V-Sync without ever calling `build()`.
-* **Zero Channel**: Direct bindings between C++ atomic shared memory and **Dart FFI pointers** deliver instantaneous state reads with **0 nanoseconds latency and zero message object allocations**.
-* **Zero Copy**: Hardware-decoded video streams from Apple Metal (`CVPixelBuffer`) and Android Vulkan (`AHardwareBuffer` / `SurfaceTexture`) bind directly into Impeller with zero CPU-GPU memory copying.
-
----
-
-## 🏗 Architecture
+`d-zero` は、従来の Flutter UI 開発で当たり前とされてきた **「毎フレームの Widget リビルド」** や **「描画用 String / オブジェクトのヒープアロケーション」** を排除し、120fps / Impeller の極限性能を引き出すモジュラーモノレポです。
 
 ```
-[ Native Video Decoders (ExoPlayer Media3 / AVPlayer) ]
-     │
-     ├─ [ Video Frame ] ─── (Zero-Copy GPU Buffer) ──► [ Impeller Texture ]
-     │                                                         │ (1-Pass Direct Sampling)
-     │                                                         ▼
-     │                                                 [ zero_blur.frag ]
-     │                                                         │
-     └─ [ Playback Ms ] ─── (C++ Atomic Shared Memory)         │
-                                    │                           ▼
-                         (Dart FFI Direct Pointer)     [ DirectSeekBar / DirectTimeLabel ]
-                                    │                           │ (RenderBox.paint)
-                                    └──────► Canvas.draw ───────┘ (120fps Synchronized)
+[ Traditional Flutter Widget ]
+  State Change ──> setState() ──> Rebuild Widget Tree (Heap Allocations) ──> GC Spikes & Jank
+
+[ d-zero Widget ]
+  State Change ──> Pointer / Direct Notifier ──> ZeroRenderBox (0 Allocations) ──> Pure 120fps
 ```
 
 ---
 
-## 📊 Performance Comparison
+## 📦 パッケージ一覧
 
-| Metric | Traditional `video_player` | `zero_player` |
+| パッケージ | バージョン | 概要 |
 | :--- | :--- | :--- |
-| **Widget Rebuilds during Playback** | 10–30+ rebuilds / sec (continuous CPU draw) | **0 / sec (True zero rebuild)** |
-| **State Notification Latency** | MethodChannel overhead (several ms delay) | **0 ns (Direct memory pointer read)** |
-| **Per-frame Heap Allocations** | Constant Map/Message/Widget allocations | **0 Heap allocations (GC-pause-free)** |
-| **Impeller Optimization** | GPU render pass multiplication via `saveLayer` | **Single-pass custom Kawase blur shader** |
-| **Heavy UI & Live Chat Resilience** | High frame-drops during active chats & animations | **0% UI thread CPU overhead for video HUD** |
+| **[`zero_core`](packages/zero_core)** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox、数値・タイムコード直接描画エンジン、固定長リングバッファ、オブジェクトプール |
+| **[`zero_player`](packages/zero_player)** | `0.0.2` | **【ビデオ】** C++ 共有メモリ & FFI ダイレクトマッピングによる完全ゼロジャンク動画プレイヤー |
+| **[`zero_counter`](packages/zero_counter)** | `0.1.0` | **【カウンター・計器】** 秒間数百回の高速カウント・ストップウォッチをリビルド 0・String アロケーション 0 で描画 |
+| *(Planned)* `zero_waveform` | - | **【オーディオ】** SoA リングバッファを用いた音声波形・スペクトラムアナライザー |
+| *(Planned)* `zero_chart` | - | **【チャート】** 金融・IoT 向けの超高頻度リアルタイム時系列チャート |
 
 ---
 
-## 📦 Widgets & Components
+## 🛠️ モノレポの開発コマンド (Melos & Pub Workspaces)
 
-* **`ZeroPlayerView`**:
-  Integrates zero-copy hardware textures with high-performance, zero-rebuild controls.
-* **`DirectSeekBar`**:
-  An ultra-efficient seek bar widget without a `build()` method. Reads position directly from atomic memory and draws via `Canvas.drawLine`. Fully interactive with drag and tap support.
-* **`DirectTimeLabel`**:
-  A zero-rebuild timecode widget that updates time text locally only when seconds transition.
-* **`shaders/zero_blur.frag`**:
-  Impeller-optimized single-pass Kawase blur shader preventing expensive off-screen buffer flushes.
+本プロジェクトは **Dart Pub Workspaces** および **Melos** で管理されています。
 
----
+```bash
+# 依存関係の解決
+flutter pub get
 
-## 🚀 Getting Started
+# 全パッケージの静的解析
+melos run analyze
 
-### 1. Installation
+# 全パッケージのテスト実行
+melos run test
 
-Add `zero_player` to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  zero_player: ^0.0.1
-```
-
-### 2. Basic Playback
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:zero_player/zero_player.dart';
-
-class VideoScreen extends StatefulWidget {
-  const VideoScreen({super.key});
-
-  @override
-  State<VideoScreen> createState() => _VideoScreenState();
-}
-
-class _VideoScreenState extends State<VideoScreen> {
-  ZeroPlayerController? _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _initPlayer();
-  }
-
-  Future<void> _initPlayer() async {
-    // Load a network MP4 or HLS (.m3u8) video
-    final controller = await ZeroPlayerController.network(
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
-    );
-    setState(() => _controller = controller);
-    await controller.play();
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_controller == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Scaffold(
-      body: Center(
-        child: ZeroPlayerView(
-          controller: _controller!,
-          showControls: true, // Automatically embeds zero-rebuild seek controls
-        ),
-      ),
-    );
-  }
-}
-```
-
-### 3. HLS Live Streaming
-
-```dart
-// Stream Apple HLS (.m3u8) live broadcasts effortlessly
-final controller = await ZeroPlayerController.network(
-  'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
-);
+# キャッシュ・ビルド成果物のクリーン
+melos run clean
 ```
 
 ---
 
-## 🛡 Quality Assurance & Test Suite
+## 📜 ライセンス
 
-Engineered with enterprise-grade automated testing for native C++ shared memory and Dart FFI:
-
-* **Native Concurrency Stress Tests (`native_stress_test.cpp`)**:
-  * Concurrent decoder thread and 4 Dart reader threads verified **0 torn reads** via memory barriers.
-  * Verified `nullptr` defense and 10,000 rapid allocations/deallocations with zero memory leaks.
-* **Dart Boundary & Use-After-Free Defenses (`zero_player_test.dart`)**:
-  * Prevents divide-by-zero crashes, handles maximum value overflows, and enforces double-free protection.
-* **Cyclomatic Complexity**:
-  * 100% of methods (48/48) maintain cyclomatic complexity ≤ 10 (average 1.83).
-  * Run verification anytime via `dart run tool/check_complexity.dart`.
-
----
-
-## 📄 License
-
-MIT License © 2026 fexcy
+MIT License © 2026 Kotaro Fujimoto (ANIZA15 / fexcy)

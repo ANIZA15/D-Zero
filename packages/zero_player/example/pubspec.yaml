@@ -4,14 +4,15 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
-  flutter: ">=3.19.0"
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
 
 dependencies:
   flutter:
     sdk: flutter
   zero_player:
-    path: ../
   video_player: ^2.8.2
 
 dev_dependencies:
