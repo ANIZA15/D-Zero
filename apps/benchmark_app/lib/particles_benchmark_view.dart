@@ -24,10 +24,10 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   int _particleCount = 5000;
   bool _isRunning = true;
 
-  // d-zero controller & metrics
+  // d-zero controller & metrics (ValueNotifier avoids parent setState on ZParticles FPS updates)
   late ZeroParticleController _zController;
-  double _dZeroFps = 60.0;
-  double _dZeroFrameTimeMs = 16.6;
+  final ValueNotifier<String> _dZeroFpsText = ValueNotifier<String>('60.0 FPS (16.6ms)');
+  final ValueNotifier<Color> _dZeroFpsColor = ValueNotifier<Color>(const Color(0xFF00FF88));
 
   // Traditional simulation state & metrics
   late List<TraditionalParticle> _traditionalParticles;
@@ -36,6 +36,8 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   int _traditionalRebuildCount = 0;
   double _traditionalFps = 60.0;
   double _traditionalFrameTimeMs = 16.6;
+  double _traditionalCanvasWidth = 160.0;
+  double _traditionalCanvasHeight = 320.0;
 
   @override
   void initState() {
@@ -47,7 +49,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
 
   void _initDZero() {
     _zController = ZeroParticleController(capacity: _particleCount);
-    _zController.ensureInitialized(width: 400.0, height: 400.0);
+    _zController.ensureInitialized(width: 160.0, height: 320.0);
   }
 
   void _initTraditional() {
@@ -56,8 +58,8 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       final angle = rng.nextDouble() * 2.0 * pi;
       final speed = (rng.nextDouble() * 0.8 + 0.2) * 150.0;
       return TraditionalParticle(
-        x: rng.nextDouble() * 400.0,
-        y: rng.nextDouble() * 400.0,
+        x: rng.nextDouble() * _traditionalCanvasWidth,
+        y: rng.nextDouble() * _traditionalCanvasHeight,
         vx: cos(angle) * speed,
         vy: sin(angle) * speed,
       );
@@ -102,8 +104,8 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
     const double gravity = 98.0;
     const double bounce = 0.85;
     const double friction = 0.999;
-    const double safeW = 400.0;
-    const double safeH = 400.0;
+    final double safeW = _traditionalCanvasWidth > 0 ? _traditionalCanvasWidth : 160.0;
+    final double safeH = _traditionalCanvasHeight > 0 ? _traditionalCanvasHeight : 320.0;
 
     for (int i = 0; i < _traditionalParticles.length; i++) {
       final p = _traditionalParticles[i];
@@ -145,6 +147,8 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   void dispose() {
     _traditionalTicker?.dispose();
     _zController.dispose();
+    _dZeroFpsText.dispose();
+    _dZeroFpsColor.dispose();
     super.dispose();
   }
 
@@ -267,13 +271,23 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
               border: Border.all(color: const Color(0xFF1E2235)),
             ),
             clipBehavior: Clip.antiAlias,
-            child: SizedBox.expand(
-              child: CustomPaint(
-                painter: TraditionalParticlePainter(
-                  particles: _traditionalParticles,
-                  color: Colors.redAccent,
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth.isFinite && constraints.maxWidth > 0) {
+                  _traditionalCanvasWidth = constraints.maxWidth;
+                }
+                if (constraints.maxHeight.isFinite && constraints.maxHeight > 0) {
+                  _traditionalCanvasHeight = constraints.maxHeight;
+                }
+                return SizedBox.expand(
+                  child: CustomPaint(
+                    painter: TraditionalParticlePainter(
+                      particles: _traditionalParticles,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
@@ -287,7 +301,6 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   }
 
   Widget _buildDZeroCard({required double height}) {
-    final fpsColor = _calcFpsColor(_dZeroFps);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -318,17 +331,20 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
                 pointSize: 3.5,
                 onFpsUpdate: (fps, ms) {
                   if (mounted) {
-                    setState(() {
-                      _dZeroFps = fps;
-                      _dZeroFrameTimeMs = ms;
-                    });
+                    _dZeroFpsText.value = '${fps.toStringAsFixed(1)} FPS (${ms.toStringAsFixed(1)}ms)';
+                    _dZeroFpsColor.value = _calcFpsColor(fps);
                   }
                 },
               ),
             ),
           ),
           const SizedBox(height: 8),
-          _buildMetricRow('描画 FPS', '${_dZeroFps.toStringAsFixed(1)} FPS (${_dZeroFrameTimeMs.toStringAsFixed(1)}ms)', fpsColor),
+          ValueListenableBuilder<String>(
+            valueListenable: _dZeroFpsText,
+            builder: (context, text, _) {
+              return _buildMetricRow('描画 FPS', text, _dZeroFpsColor.value);
+            },
+          ),
           _buildMetricRow('Widget Rebuilds', '0 回 (Zero Rebuild)', Colors.green),
           _buildMetricRow('Heap Allocations', '0 Heap Allocations', Colors.green),
           _buildMetricRow('Draw Calls', 'GPU バッチ一括 1 回', Colors.green),
@@ -349,7 +365,13 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ),
           const SizedBox(width: 4),
           Flexible(
             child: Text(

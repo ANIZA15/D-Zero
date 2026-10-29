@@ -57,7 +57,7 @@ abstract class ZeroRenderBox extends RenderBox implements ZeroFrameListener {
 
   @override
   void onZeroFrame(Duration elapsed) {
-    if (!attached) return;
+    if (!attached || !hasSize) return;
     if (onFrameTick(elapsed)) {
       markNeedsPaint();
     }

@@ -246,9 +246,12 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
                   rebuildCount: _traditionalRebuildCount,
                   allocationEstimate: '${(_traditionalCount * 3)} Strings created',
                   child: Center(
-                    child: Text(
-                      _traditionalCount.toString().padLeft(6, '0'),
-                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Colors.redAccent),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _traditionalCount.toString().padLeft(6, '0'),
+                        style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Colors.redAccent),
+                      ),
                     ),
                   ),
                 ),
@@ -262,10 +265,13 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
                   rebuildCount: 0,
                   allocationEstimate: '0 Heap allocations',
                   child: Center(
-                    child: ZCounter(
-                      valueListenable: _dZeroCounter,
-                      minDigits: 6,
-                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF00FF88)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: ZCounter(
+                        valueListenable: _dZeroCounter,
+                        minDigits: 6,
+                        style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF00FF88)),
+                      ),
                     ),
                   ),
                 ),
@@ -291,10 +297,17 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('更新レート制御 (Update Frequency)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const Spacer(),
-              Text('${_frequencyHz.toInt()} Hz (${(1000 / _frequencyHz).toStringAsFixed(1)}ms)', style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+              const Flexible(
+                child: Text(
+                  '更新レート制御 (Update Frequency)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('${_frequencyHz.toInt()} Hz (${(1000 / _frequencyHz).toStringAsFixed(1)}ms)', style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold, fontSize: 12)),
             ],
           ),
           Slider(
@@ -363,8 +376,22 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+            ),
+          ),
         ],
       ),
     );

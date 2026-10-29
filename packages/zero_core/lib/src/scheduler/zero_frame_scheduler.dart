@@ -66,8 +66,18 @@ class ZeroFrameScheduler {
   }
 
   void _ensureTicking() {
-    if (_ticker != null) return;
-    _ticker = Ticker(_onTick, debugLabel: 'ZeroFrameScheduler')..start();
+    if (_ticker == null) {
+      _ticker = Ticker(_onTick, debugLabel: 'ZeroFrameScheduler')..start();
+    }
+    if (!_ticker!.isTicking) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_activeCount > 0 && _ticker != null && !_ticker!.isTicking) {
+          _ticker!
+            ..stop()
+            ..start();
+        }
+      });
+    }
   }
 
   void _stopTicking() {
