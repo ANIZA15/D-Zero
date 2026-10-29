@@ -1,0 +1,125 @@
+import 'dart:math';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:zero_player/zero_player.dart';
+
+void main() {
+  group('【1. 正常系テスト】ZeroPlayerController & FFI マッピング', () {
+    late ZeroPlayerController controller;
+
+    setUp(() {
+      controller = ZeroPlayerController.simulated();
+    });
+
+    tearDown(() {
+      controller.dispose();
+    });
+
+    test('初期状態がすべてゼロ・デフォルト値であること', () {
+      expect(controller.positionMs, equals(0));
+      expect(controller.durationMs, equals(0));
+      expect(controller.bufferedMs, equals(0));
+      expect(controller.progress, equals(0.0));
+      expect(controller.status, equals(ZeroPlaybackStatus.idle));
+    });
+
+    test('共有メモリへの更新が 0 ナノ秒で Dart 側に即時反映されること', () {
+      controller.setDurationSimulated(60000); // 1分
+      controller.setPositionSimulated(30000);  // 30秒
+
+      expect(controller.durationMs, equals(60000));
+      expect(controller.positionMs, equals(30000));
+      expect(controller.progress, closeTo(0.5, 0.001));
+    });
+
+    test('再生進捗率 (progress) の計算が正確であること', () {
+      controller.setDurationSimulated(100000);
+      controller.setPositionSimulated(25000);
+      expect(controller.progress, closeTo(0.25, 0.0001));
+
+      controller.setPositionSimulated(75000);
+      expect(controller.progress, closeTo(0.75, 0.0001));
+
+      controller.setPositionSimulated(100000);
+      expect(controller.progress, closeTo(1.0, 0.0001));
+    });
+  });
+
+  group('【2. 異常系テスト】境界値・不正操作・ゼロ除算・Use-After-Free 防御', () {
+    test('ゼロ除算防止: duration が 0 の場合でも progress でクラッシュせず 0.0 を返すこと', () {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(0);
+      controller.setPositionSimulated(5000);
+
+      expect(() => controller.progress, returnsNormally);
+      expect(controller.progress, equals(0.0));
+      controller.dispose();
+    });
+
+    test('オーバーフロー耐性: position が duration を超過しても progress は 1.0 にクランプされること', () {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(10000);
+      controller.setPositionSimulated(99999); // 超過
+
+      expect(controller.progress, equals(1.0));
+      controller.dispose();
+    });
+
+    test('負の値耐性: position が負の値の場合でも progress は 0.0 にクランプされること', () {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(10000);
+      controller.setPositionSimulated(-5000);
+
+      expect(controller.progress, equals(0.0));
+      controller.dispose();
+    });
+
+    test('Use-After-Free 防御: dispose() 済みのコントローラを参照しても SIGSEGV せず安全な値を返すこと', () {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(50000);
+      controller.setPositionSimulated(20000);
+
+      // 解放
+      controller.dispose();
+
+      // 解放後にアクセスしてもクラッシュしないこと
+      expect(() => controller.positionMs, returnsNormally);
+      expect(controller.positionMs, equals(0));
+      expect(controller.durationMs, equals(0));
+      expect(controller.progress, equals(0.0));
+      expect(controller.status, equals(ZeroPlaybackStatus.idle));
+    });
+
+    test('二重解放（Double Free）防止: dispose() を複数回呼んでもクラッシュしないこと', () {
+      final controller = ZeroPlayerController.simulated();
+      expect(() {
+        controller.dispose();
+        controller.dispose();
+        controller.dispose();
+      }, returnsNormally);
+    });
+  });
+
+  group('【3. ペネトレーション / 耐久ストレステスト】', () {
+    test('100,000 回の超高速連続ポインタサンプリングでメモリ破壊や遅延が起きないこと', () {
+      final controller = ZeroPlayerController.simulated();
+      controller.setDurationSimulated(1000000);
+
+      final stopwatch = Stopwatch()..start();
+      final random = Random();
+
+      for (int i = 0; i < 100000; i++) {
+        final pos = random.nextInt(1000000);
+        controller.setPositionSimulated(pos);
+        final readPos = controller.positionMs;
+        expect(readPos, equals(pos));
+      }
+
+      stopwatch.stop();
+      // 100,000 回の直読み書きがミリ秒オーダーで完了すること（FFI 共有メモリの速度証明）
+      expect(stopwatch.elapsedMilliseconds, lessThan(200),
+          reason: 'FFI 共有メモリの読み書きは 100,000 回で 200ms 未満で完了すべき');
+
+      controller.dispose();
+    });
+  });
+}

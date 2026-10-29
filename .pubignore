@@ -1,0 +1,18 @@
+# Build and test artifacts
+.dart_tool/
+build/
+*.dylib
+*.so
+*.dll
+*.exe
+test/native_stress_test
+src/libzero_player_native.dylib
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
