@@ -78,22 +78,60 @@ Cysharp 製の C# ライブラリ群（`UniTask`, `ZString`, `MemoryPack` など
 
 ```
 d-zero/
-├── packages/
-│   ├── zero_core/       # ゼロアロケーション共通基盤ライブラリ
-│   ├── zero_player/     # ゼロジャンク動画プレイヤー
-│   └── zero_counter/    # 高速カウンター & ストップウォッチ
-└── apps/                # サンプル・検証用アプリケーション
+├── apps/
+│   └── benchmark_app/   # ⚡️ 従来 Flutter vs d-zero 統合比較ベンチマークアプリ
+├── benchmarks/          # ⚡️ CLI マイクロベンチマーク (アロケーション/スループット定量計測)
+└── packages/
+    ├── zero_core/       # ゼロアロケーション共通基盤ライブラリ
+    │   └── example/     # zero_core サンプル (RingBuffer / ObjectPool)
+    ├── zero_player/     # ゼロジャンク動画プレイヤー
+    │   └── example/     # zero_player vs standard video_player 比較アプリ
+    └── zero_counter/    # 高速カウンター & ストップウォッチ
+        └── example/     # zero_counter サンプル (高速カウント / ストップウォッチ)
 ```
 
 ### 🔗 各パッケージへのリンク
 
-| パッケージ | バージョン | 説明 | リンク |
-| :--- | :---: | :--- | :---: |
-| **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、文字列を生成しない数値・タイムコード描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) |
-| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ハードウェアゼロコピーテクスチャ、ゼロリビルド UI（`DirectSeekBar`, `DirectTimeLabel`）、Impeller 最適化 Kawase Blur シェーダーを備えた完全ゼロジャンク動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) |
-| **`zero_counter`** | `0.1.0` | **【超高速計器・カウンター】** 秒間数百回〜数千回のインクリメントやストップウォッチを、Widget リビルド 0・String アロケーション 0 で滑らかに描画する Widget 群。 | [📦 パッケージ詳細](packages/zero_counter) |
-| *(Planned)* **`zero_waveform`** | - | **【リアルタイムオーディオ】** SoA（Structure of Arrays）リングバッファを用いた、音声波形およびスペクトラムアナライザー描画 Widget。 | 企画中 |
-| *(Planned)* **`zero_chart`** | - | **【高頻度時系列チャート】** 金融ティックデータ・IoT センサー向けの超高頻度リアルタイム折れ線・オシロスコープ Widget。 | 企画中 |
+| パッケージ | バージョン | 説明 | リンク | サンプル App |
+| :--- | :---: | :--- | :---: | :---: |
+| **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、文字列を生成しない数値・タイムコード描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) | [📱 サンプル](packages/zero_core/example) |
+| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ハードウェアゼロコピーテクスチャ、ゼロリビルド UI（`DirectSeekBar`, `DirectTimeLabel`）、Impeller 最適化 Kawase Blur シェーダーを備えた完全ゼロジャンク動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
+| **`zero_counter`** | `0.1.0` | **【超高速計器・カウンター】** 秒間数百回〜数千回のインクリメントやストップウォッチを、Widget リビルド 0・String アロケーション 0 で滑らかに描画する Widget 群。 | [📦 パッケージ詳細](packages/zero_counter) | [📱 サンプル](packages/zero_counter/example) |
+| *(Planned)* **`zero_waveform`** | - | **【リアルタイムオーディオ】** SoA（Structure of Arrays）リングバッファを用いた、音声波形およびスペクトラムアナライザー描画 Widget。 | 企画中 | - |
+| *(Planned)* **`zero_chart`** | - | **【高頻度時系列チャート】** 金融ティックデータ・IoT センサー向けの超高頻度リアルタイム折れ線・オシロスコープ Widget。 | 企画中 | - |
+
+---
+
+## ⚡️ ベンチマーク & サンプルアプリケーション
+
+### 1. 統合比較ベンチマークアプリ (Flutter UI)
+従来の `setState` + `Text` 等による実装と `d-zero` スイートを Side-by-side で並べ、**リアルタイム FPS、フレームタイム (ms)、コマ落ち（Janks）、Widget リビルド回数** を可視化して比較できる Flutter アプリケーションです。
+
+```bash
+# 統合比較ベンチマークアプリの起動
+cd apps/benchmark_app
+flutter run
+```
+
+### 2. ターミナル・マイクロベンチマーク (Raw Performance)
+純粋な Dart レベルでのアロケーションレート、GC 負荷、スループット（ops/sec）をターミナルで定量計測します。
+
+```bash
+# 全マイクロベンチマークの実行
+dart run benchmarks/run_benchmarks.dart
+```
+
+### 3. 各プロジェクトの単体サンプル
+```bash
+# zero_core サンプル (FloatRingBuffer & ZeroPool)
+cd packages/zero_core/example && flutter run
+
+# zero_counter サンプル (高速カウンター & ストップウォッチ)
+cd packages/zero_counter/example && flutter run
+
+# zero_player サンプル (標準 video_player との動画再生比較)
+cd packages/zero_player/example && flutter run
+```
 
 ---
 
@@ -104,13 +142,13 @@ d-zero/
 flutter pub get
 
 # 全パッケージの静的コード解析
-melos run analyze
+flutter analyze
 
 # 全パッケージのユニットテスト実行
-melos run test
+flutter test packages/zero_core/test packages/zero_counter/test packages/zero_player/test
 
-# キャッシュおよびビルド成果物のクリーンアップ
-melos run clean
+# マイクロベンチマークの実行
+dart run benchmarks/run_benchmarks.dart
 ```
 
 ---

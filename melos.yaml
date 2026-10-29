@@ -5,6 +5,7 @@ packages:
   - packages/*
   - packages/*/example
   - apps/*
+  - benchmarks
 
 command:
   version:
@@ -21,6 +22,10 @@ scripts:
     packageFilters:
       dirExists: test
     description: Run flutter test in all packages with tests.
+
+  benchmark:
+    run: dart run benchmarks/run_benchmarks.dart
+    description: Run all terminal microbenchmarks.
 
   clean:
     exec: flutter clean

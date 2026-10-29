@@ -1,0 +1,26 @@
+name: benchmark_app
+description: "Interactive visual benchmark comparing traditional Flutter implementations vs d-zero zero-allocation suite."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  zero_core:
+  zero_counter:
+  zero_player:
+  video_player: ^2.8.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
