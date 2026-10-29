@@ -44,17 +44,24 @@ final class ZeroPlaybackStateNative extends ffi.Struct {
 typedef _NativeCreateState = ffi.Pointer<ZeroPlaybackStateNative> Function();
 typedef _DartCreateState = ffi.Pointer<ZeroPlaybackStateNative> Function();
 
-typedef _NativeDestroyState = ffi.Void Function(ffi.Pointer<ZeroPlaybackStateNative>);
+typedef _NativeDestroyState = ffi.Void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>);
 typedef _DartDestroyState = void Function(ffi.Pointer<ZeroPlaybackStateNative>);
 
-typedef _NativeSetPosition = ffi.Void Function(ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
-typedef _DartSetPosition = void Function(ffi.Pointer<ZeroPlaybackStateNative>, int);
+typedef _NativeSetPosition = ffi.Void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
+typedef _DartSetPosition = void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, int);
 
-typedef _NativeSetDuration = ffi.Void Function(ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
-typedef _DartSetDuration = void Function(ffi.Pointer<ZeroPlaybackStateNative>, int);
+typedef _NativeSetDuration = ffi.Void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
+typedef _DartSetDuration = void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, int);
 
-typedef _NativeSetStatus = ffi.Void Function(ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int32);
-typedef _DartSetStatus = void Function(ffi.Pointer<ZeroPlaybackStateNative>, int);
+typedef _NativeSetStatus = ffi.Void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int32);
+typedef _DartSetStatus = void Function(
+    ffi.Pointer<ZeroPlaybackStateNative>, int);
 
 /// ネイティブライブラリのバインディング
 class ZeroPlayerNativeBindings {
@@ -69,11 +76,17 @@ class ZeroPlayerNativeBindings {
 
   ZeroPlayerNativeBindings._() {
     _dylib = _loadLibrary();
-    createState = _dylib.lookupFunction<_NativeCreateState, _DartCreateState>('zero_create_playback_state');
-    destroyState = _dylib.lookupFunction<_NativeDestroyState, _DartDestroyState>('zero_destroy_playback_state');
-    setPosition = _dylib.lookupFunction<_NativeSetPosition, _DartSetPosition>('zero_set_position');
-    setDuration = _dylib.lookupFunction<_NativeSetDuration, _DartSetDuration>('zero_set_duration');
-    setStatus = _dylib.lookupFunction<_NativeSetStatus, _DartSetStatus>('zero_set_status');
+    createState = _dylib.lookupFunction<_NativeCreateState, _DartCreateState>(
+        'zero_create_playback_state');
+    destroyState =
+        _dylib.lookupFunction<_NativeDestroyState, _DartDestroyState>(
+            'zero_destroy_playback_state');
+    setPosition = _dylib.lookupFunction<_NativeSetPosition, _DartSetPosition>(
+        'zero_set_position');
+    setDuration = _dylib.lookupFunction<_NativeSetDuration, _DartSetDuration>(
+        'zero_set_duration');
+    setStatus = _dylib
+        .lookupFunction<_NativeSetStatus, _DartSetStatus>('zero_set_status');
   }
 
   static ffi.DynamicLibrary _loadLibrary() {

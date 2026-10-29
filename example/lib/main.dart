@@ -39,17 +39,22 @@ class ComparisonScreen extends StatefulWidget {
 
 enum PlayerMode { zeroPlayer, standardPlayer, sideBySide }
 
-class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerProviderStateMixin {
+class _ComparisonScreenState extends State<ComparisonScreen>
+    with SingleTickerProviderStateMixin {
   PlayerMode _currentMode = PlayerMode.zeroPlayer;
 
   // デフォルト動画 URL
-  String _videoUrl = 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4';
+  String _videoUrl =
+      'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4';
 
   // 確実に稼働している高信頼 HLS / MP4 プリセット
   static const Map<String, String> _presets = {
-    '🦋 Flutter公式 MP4': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
-    '🎬 HLS ストリーミング (Mux/BigBuckBunny)': 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-    '🍎 Apple 公式 HLS テスト配信 (BipBop)': 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+    '🦋 Flutter公式 MP4':
+        'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
+    '🎬 HLS ストリーミング (Mux/BigBuckBunny)':
+        'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    '🍎 Apple 公式 HLS テスト配信 (BipBop)':
+        'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
   };
 
   // zero_player 関連
@@ -143,7 +148,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
   Future<void> _initStandardPlayer(String url) async {
     try {
       debugPrint('[standard_player] Loading: $url');
-      final controller = standard.VideoPlayerController.networkUrl(Uri.parse(url));
+      final controller =
+          standard.VideoPlayerController.networkUrl(Uri.parse(url));
       _standardController = controller;
       await controller.initialize();
       controller.setLooping(true);
@@ -195,11 +201,13 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
                   Icon(Icons.link, color: Color(0xFFFF0055)),
                   SizedBox(width: 8),
                   Text('再生 URL の変更 / HLS ストリーミング',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('信頼できるプリセットから選ぶ:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text('信頼できるプリセットから選ぶ:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 8),
               ..._presets.entries.map((entry) {
                 final isSelected = entry.value == _videoUrl;
@@ -209,20 +217,25 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
                     style: OutlinedButton.styleFrom(
                       alignment: Alignment.centerLeft,
                       side: BorderSide(
-                        color: isSelected ? const Color(0xFFFF0055) : const Color(0x33FFFFFF),
+                        color: isSelected
+                            ? const Color(0xFFFF0055)
+                            : const Color(0x33FFFFFF),
                       ),
-                      backgroundColor: isSelected ? const Color(0x22FF0055) : null,
+                      backgroundColor:
+                          isSelected ? const Color(0x22FF0055) : null,
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
                       _loadAllPlayers(entry.value);
                     },
-                    child: Text(entry.key, style: const TextStyle(fontSize: 13)),
+                    child:
+                        Text(entry.key, style: const TextStyle(fontSize: 13)),
                   ),
                 );
               }),
               const SizedBox(height: 12),
-              const Text('自由な URL を入力:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text('自由な URL を入力:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 6),
               TextField(
                 controller: textController,
@@ -230,14 +243,17 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
                   hintText: 'https://.../stream.m3u8',
                   filled: true,
                   fillColor: const Color(0xFF0F0F14),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF0055)),
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF0055)),
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('この URL で再生'),
                 onPressed: () {
@@ -267,7 +283,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ プレイヤー性能対決', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('⚡️ プレイヤー性能対決',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.link),
@@ -276,7 +293,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
           ),
           Row(
             children: [
-              const Text('負荷', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text('負荷',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
               Switch(
                 value: _heavyLoadEnabled,
                 activeTrackColor: const Color(0xFFFF0055),
@@ -290,7 +308,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
               child: SegmentedButton<PlayerMode>(
                 segments: const [
                   ButtonSegment(
@@ -310,7 +329,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
                   ),
                 ],
                 selected: {_currentMode},
-                onSelectionChanged: (set) => setState(() => _currentMode = set.first),
+                onSelectionChanged: (set) =>
+                    setState(() => _currentMode = set.first),
               ),
             ),
             Expanded(
@@ -355,14 +375,16 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
         fit: StackFit.expand,
         children: [
           if (_isZeroLoading)
-            const Center(child: CircularProgressIndicator(color: Color(0xFFFF0055)))
+            const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFF0055)))
           else if (_zeroError != null)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Text('❌ 読み込み失敗 (404/配信停止):\n$_zeroError',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 10, color: Colors.redAccent)),
+                    style:
+                        const TextStyle(fontSize: 10, color: Colors.redAccent)),
               ),
             )
           else if (_zeroController != null)
@@ -372,7 +394,6 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
             )
           else
             const Center(child: Text('動画がありません')),
-
           if (_heavyLoadEnabled) _buildHeavyOverlay(),
         ],
       ),
@@ -429,11 +450,14 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('📊 リアルタイム性能比較', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              const Text('📊 リアルタイム性能比較',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _fps > 55 ? const Color(0x334CAF50) : const Color(0x33F44336),
+                  color: _fps > 55
+                      ? const Color(0x334CAF50)
+                      : const Color(0x33F44336),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -461,7 +485,10 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
                     renderType: 'RenderBox 120fps 直描画',
                   ),
                 ),
-                Container(width: 1, color: const Color(0x22FFFFFF), margin: const EdgeInsets.symmetric(horizontal: 12)),
+                Container(
+                    width: 1,
+                    color: const Color(0x22FFFFFF),
+                    margin: const EdgeInsets.symmetric(horizontal: 12)),
                 Expanded(
                   child: _buildMetricColumn(
                     title: '従来の video_player',
@@ -492,27 +519,40 @@ class _ComparisonScreenState extends State<ComparisonScreen> with SingleTickerPr
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: accentColor)),
+        Text(title,
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.bold, color: accentColor)),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Widget Rebuild 回数', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text(buildCount, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: accentColor)),
-            Text(buildSub, style: const TextStyle(fontSize: 9, color: Color(0x88FFFFFF))),
+            const Text('Widget Rebuild 回数',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+            Text(buildCount,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: accentColor)),
+            Text(buildSub,
+                style: const TextStyle(fontSize: 9, color: Color(0x88FFFFFF))),
           ],
         ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('MethodChannel 通信負荷', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text(channelCalls, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const Text('MethodChannel 通信負荷',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+            Text(channelCalls,
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('描画方式', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text(renderType, style: const TextStyle(fontSize: 10, color: Colors.white70)),
+            const Text('描画方式',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+            Text(renderType,
+                style: const TextStyle(fontSize: 10, color: Colors.white70)),
           ],
         ),
       ],
@@ -546,7 +586,11 @@ class _PlayerCardContainer extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             color: const Color(0xFF1B1B22),
             width: double.infinity,
-            child: Text(title, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: borderColor)),
+            child: Text(title,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: borderColor)),
           ),
           Expanded(child: child),
         ],
@@ -596,7 +640,9 @@ class _StandardPlayerWidgetState extends State<_StandardPlayerWidget> {
       );
     }
 
-    if (widget.isLoading || controller == null || !controller.value.isInitialized) {
+    if (widget.isLoading ||
+        controller == null ||
+        !controller.value.isInitialized) {
       return const _PlayerCardContainer(
         title: '🐢 従来の video_player (setState Rebuild 型)',
         borderColor: Colors.grey,
@@ -606,7 +652,8 @@ class _StandardPlayerWidgetState extends State<_StandardPlayerWidget> {
 
     final pos = controller.value.position;
     final dur = controller.value.duration;
-    final progress = dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0;
+    final progress =
+        dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0;
 
     return _PlayerCardContainer(
       title: '🐢 従来の video_player (setState Rebuild 型)',
@@ -627,9 +674,11 @@ class _StandardPlayerWidgetState extends State<_StandardPlayerWidget> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     color: const Color(0x1AFFFFFF),
-                    child: const Text('BackdropFilter 負荷中', style: TextStyle(fontSize: 10)),
+                    child: const Text('BackdropFilter 負荷中',
+                        style: TextStyle(fontSize: 10)),
                   ),
                 ),
               ),
@@ -646,14 +695,16 @@ class _StandardPlayerWidgetState extends State<_StandardPlayerWidget> {
                   children: [
                     Text(
                       '${_formatDuration(pos)} / ${_formatDuration(dur)}',
-                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                      style: const TextStyle(
+                          fontSize: 12, fontFamily: 'monospace'),
                     ),
                   ],
                 ),
                 Slider(
                   value: progress.clamp(0.0, 1.0),
                   onChanged: (val) {
-                    final target = Duration(milliseconds: (val * dur.inMilliseconds).toInt());
+                    final target = Duration(
+                        milliseconds: (val * dur.inMilliseconds).toInt());
                     controller.seekTo(target);
                   },
                 ),

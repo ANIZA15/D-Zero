@@ -16,3 +16,6 @@ src/libzero_player_native.dylib
 # OS
 .DS_Store
 Thumbs.db
+
+# Mock apps
+moc/

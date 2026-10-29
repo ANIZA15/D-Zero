@@ -1,3 +1,10 @@
+## 0.0.2
+
+* Add full Swift Package Manager (SPM) support for iOS (`Package.swift`).
+* Update documentation, library-level comments, and API dartdocs.
+* Add English primary documentation with Japanese mirror (`README_JA.md`).
+* Refactor platform declarations and optimize package bundle size.
+
 ## 0.0.1
 
 * Initial release of `zero_player`.

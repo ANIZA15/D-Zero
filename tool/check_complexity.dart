@@ -7,9 +7,11 @@ import 'dart:io';
 void main(List<String> args) {
   final targetDirs = [Directory('lib'), Directory('src')];
 
-  stdout.writeln('===============================================================');
+  stdout.writeln(
+      '===============================================================');
   stdout.writeln('📊 zero_player 循環的複雑度（Cyclomatic Complexity）計測');
-  stdout.writeln('===============================================================');
+  stdout.writeln(
+      '===============================================================');
 
   final results = <_FunctionMetric>[];
 
@@ -58,16 +60,19 @@ void main(List<String> args) {
     );
   }
 
-  final avg = results.map((e) => e.complexity).reduce((a, b) => a + b) / results.length;
+  final avg =
+      results.map((e) => e.complexity).reduce((a, b) => a + b) / results.length;
 
-  stdout.writeln('---------------------------------------------------------------');
+  stdout.writeln(
+      '---------------------------------------------------------------');
   stdout.writeln('📈 サマリー:');
   stdout.writeln('  総関数・メソッド数 : ${results.length}');
   stdout.writeln('  平均複雑度 (Avg CC) : ${avg.toStringAsFixed(2)}');
   stdout.writeln('  🟢 良好 (CC <= 10) : $okCount 件');
   stdout.writeln('  🟡 注意 (11-20)    : $warnCount 件');
   stdout.writeln('  🔴 警告 (CC > 20)  : $dangerCount 件');
-  stdout.writeln('===============================================================');
+  stdout.writeln(
+      '===============================================================');
 
   if (dangerCount > 0) {
     stderr.writeln('⚠️ 循環的複雑度が 20 を超える高リスクな関数が存在します。リファクタリングを推奨します。');
@@ -106,7 +111,8 @@ List<_FunctionMetric> _analyzeFile(File file) {
     if (match != null) {
       final funcName = match.group(1)!;
       // 制御構文やキーワードを除外
-      if (['if', 'for', 'while', 'switch', 'catch'].contains(funcName)) continue;
+      if (['if', 'for', 'while', 'switch', 'catch'].contains(funcName))
+        continue;
 
       // 関数本体の行を収集
       final bodyLines = <String>[];
@@ -155,8 +161,8 @@ int _calculateComplexity(String code) {
     RegExp(r'\bcatch\b'),
     RegExp(r'\&\&'),
     RegExp(r'\|\|'),
-    RegExp(r'\?[^.:?]'),     // 三項演算子
-    RegExp(r'\?\?'),         // null-coalescing
+    RegExp(r'\?[^.:?]'), // 三項演算子
+    RegExp(r'\?\?'), // null-coalescing
   ];
 
   for (final p in patterns) {

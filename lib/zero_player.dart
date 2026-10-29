@@ -1,3 +1,5 @@
+/// A next-generation, zero-jank Flutter video player optimized for Impeller,
+/// utilizing FFI shared-memory and custom RenderBoxes for zero rebuilds.
 library zero_player;
 
 export 'src/controller.dart';

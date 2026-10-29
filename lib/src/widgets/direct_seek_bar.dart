@@ -6,17 +6,31 @@ import 'package:flutter/widgets.dart';
 import '../controller.dart';
 import '../playback_state_ffi.dart';
 
-/// Widgetツリーの再構築（build）を一切行わず、
-/// 共有メモリから直接数値を読み取って 120fps でシークバーを描画する RenderObjectWidget
+/// A high-performance seek bar [LeafRenderObjectWidget] that paints directly to the
+/// Canvas at 120fps by reading current playback position directly from atomic shared memory.
 class DirectSeekBar extends LeafRenderObjectWidget {
+  /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
+
+  /// The active track color representing elapsed playback time.
   final Color activeTrackColor;
+
+  /// The background track color representing total duration.
   final Color inactiveTrackColor;
+
+  /// The scrubber thumb color.
   final Color thumbColor;
+
+  /// The height of the progress track.
   final double trackHeight;
+
+  /// The radius of the scrubber thumb.
   final double thumbRadius;
+
+  /// Optional callback invoked when the user drags or taps to seek.
   final ValueChanged<Duration>? onSeek;
 
+  /// Creates a zero-rebuild [DirectSeekBar].
   const DirectSeekBar({
     super.key,
     required this.controller,
@@ -42,7 +56,8 @@ class DirectSeekBar extends LeafRenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(BuildContext context, RenderDirectSeekBar renderObject) {
+  void updateRenderObject(
+      BuildContext context, RenderDirectSeekBar renderObject) {
     renderObject
       ..statePointer = controller.statePointer
       ..activeTrackColor = activeTrackColor
@@ -134,7 +149,8 @@ class RenderDirectSeekBar extends RenderBox {
       if (attached) {
         markNeedsPaint();
       }
-    })..start();
+    })
+      ..start();
   }
 
   @override
@@ -198,7 +214,8 @@ class RenderDirectSeekBar extends RenderBox {
     // FFI 共有メモリから 0 ナノ秒で最新の再生位置を取得
     final positionMs = _statePointer.ref.positionMs;
     final durationMs = _statePointer.ref.durationMs;
-    final progress = durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final progress =
+        durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
 
     final centerY = offset.dy + height / 2;
     final trackLeft = offset.dx;
@@ -210,7 +227,8 @@ class RenderDirectSeekBar extends RenderBox {
       ..color = _inactiveTrackColor
       ..strokeCap = StrokeCap.round
       ..strokeWidth = _trackHeight;
-    canvas.drawLine(Offset(trackLeft, centerY), Offset(trackRight, centerY), bgPaint);
+    canvas.drawLine(
+        Offset(trackLeft, centerY), Offset(trackRight, centerY), bgPaint);
 
     // アクティブトラック（進捗）
     if (progress > 0) {
@@ -218,7 +236,8 @@ class RenderDirectSeekBar extends RenderBox {
         ..color = _activeTrackColor
         ..strokeCap = StrokeCap.round
         ..strokeWidth = _trackHeight;
-      canvas.drawLine(Offset(trackLeft, centerY), Offset(activeRight, centerY), activePaint);
+      canvas.drawLine(Offset(trackLeft, centerY), Offset(activeRight, centerY),
+          activePaint);
     }
 
     // つまみ（Thumb）

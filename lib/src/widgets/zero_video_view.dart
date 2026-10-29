@@ -3,12 +3,18 @@ import '../controller.dart';
 import 'direct_seek_bar.dart';
 import 'direct_time_label.dart';
 
-/// ゼロジャンク・次世代動画プレイヤー Widget
+/// A zero-jank, high-performance Flutter video player view widget.
 class ZeroPlayerView extends StatelessWidget {
+  /// The [ZeroPlayerController] managing the active video session.
   final ZeroPlayerController controller;
+
+  /// An optional custom overlay widget placed above the video frame.
   final Widget? overlay;
+
+  /// Whether to display the built-in zero-rebuild controls HUD.
   final bool showControls;
 
+  /// Creates a [ZeroPlayerView].
   const ZeroPlayerView({
     super.key,
     required this.controller,

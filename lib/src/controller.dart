@@ -19,14 +19,16 @@ class ZeroPlayerController {
   /// ネイティブ側（iOS: AVPlayer, Android: ExoPlayer）でデコーダを立ち上げ、
   /// C++ 共有メモリのアドレス（stateAddress）を Dart FFI ポインタとして受け取ります。
   static Future<ZeroPlayerController> network(String url) async {
-    final result = await _channel.invokeMapMethod<String, dynamic>('create', {'url': url});
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('create', {'url': url});
     if (result == null) {
       throw StateError('Failed to initialize zero_player');
     }
 
     final textureId = result['textureId'] as int;
     final stateAddress = result['stateAddress'] as int;
-    final pointer = ffi.Pointer<ZeroPlaybackStateNative>.fromAddress(stateAddress);
+    final pointer =
+        ffi.Pointer<ZeroPlaybackStateNative>.fromAddress(stateAddress);
 
     return ZeroPlayerController._(
       statePointer: pointer,

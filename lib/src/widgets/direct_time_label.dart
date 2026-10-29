@@ -5,12 +5,16 @@ import 'package:flutter/widgets.dart';
 import '../controller.dart';
 import '../playback_state_ffi.dart';
 
-/// 再生時間ラベル（00:11 / 02:30 など）を、
-/// Widget の再ビルドを行わずに RenderBox レベルで直接描画する Widget
+/// A timecode display [LeafRenderObjectWidget] that paints elapsed/total time directly
+/// on the Canvas without triggering widget rebuilds.
 class DirectTimeLabel extends LeafRenderObjectWidget {
+  /// The [ZeroPlayerController] managing the playback session.
   final ZeroPlayerController controller;
+
+  /// The text style applied to the timecode label.
   final TextStyle style;
 
+  /// Creates a zero-rebuild [DirectTimeLabel].
   const DirectTimeLabel({
     super.key,
     required this.controller,
@@ -30,7 +34,8 @@ class DirectTimeLabel extends LeafRenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(BuildContext context, RenderDirectTimeLabel renderObject) {
+  void updateRenderObject(
+      BuildContext context, RenderDirectTimeLabel renderObject) {
     renderObject
       ..statePointer = controller.statePointer
       ..style = style;
@@ -40,7 +45,8 @@ class DirectTimeLabel extends LeafRenderObjectWidget {
 class RenderDirectTimeLabel extends RenderBox {
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
   TextStyle _style;
-  final TextPainter _textPainter = TextPainter(textDirection: TextDirection.ltr);
+  final TextPainter _textPainter =
+      TextPainter(textDirection: TextDirection.ltr);
   Ticker? _ticker;
   int _lastSec = -1;
 
@@ -74,7 +80,8 @@ class RenderDirectTimeLabel extends RenderBox {
           markNeedsPaint();
         }
       }
-    })..start();
+    })
+      ..start();
   }
 
   @override

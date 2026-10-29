@@ -24,7 +24,7 @@ void main() {
 
     test('共有メモリへの更新が 0 ナノ秒で Dart 側に即時反映されること', () {
       controller.setDurationSimulated(60000); // 1分
-      controller.setPositionSimulated(30000);  // 30秒
+      controller.setPositionSimulated(30000); // 30秒
 
       expect(controller.durationMs, equals(60000));
       expect(controller.positionMs, equals(30000));
@@ -73,7 +73,8 @@ void main() {
       controller.dispose();
     });
 
-    test('Use-After-Free 防御: dispose() 済みのコントローラを参照しても SIGSEGV せず安全な値を返すこと', () {
+    test('Use-After-Free 防御: dispose() 済みのコントローラを参照しても SIGSEGV せず安全な値を返すこと',
+        () {
       final controller = ZeroPlayerController.simulated();
       controller.setDurationSimulated(50000);
       controller.setPositionSimulated(20000);
