@@ -1,9 +1,9 @@
 name: zero_player
 description: "A next-generation, zero-jank Flutter video player optimized for Impeller, utilizing FFI shared-memory and custom RenderBoxes."
 version: 0.0.1
-homepage: https://github.com/fexcy/zero_player
-repository: https://github.com/fexcy/zero_player
-issue_tracker: https://github.com/fexcy/zero_player/issues
+homepage: https://github.com/ANIZA15/zero_player
+repository: https://github.com/ANIZA15/zero_player
+issue_tracker: https://github.com/ANIZA15/zero_player/issues
 topics:
   - video
   - player

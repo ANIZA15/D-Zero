@@ -5,7 +5,7 @@
 [![Pub Version](https://img.shields.io/pub/v/zero_player.svg?style=flat-square)](https://pub.dev/packages/zero_player)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
-[![Code Complexity](https://img.shields.io/badge/Cyclomatic%20Complexity-1.83%20(A%2B)-brightgreen.svg?style=flat-square)](https://github.com/fexcy/zero_player)
+[![Code Complexity](https://img.shields.io/badge/Cyclomatic%20Complexity-1.83%20(A%2B)-brightgreen.svg?style=flat-square)](https://github.com/ANIZA15/zero_player)
 
 ---
 
