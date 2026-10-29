@@ -1,0 +1,46 @@
+name: Quality & Complexity CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze code (Lint)
+        run: flutter analyze
+
+      - name: Compile native test library
+        run: |
+          cd test
+          clang++ -O3 -shared -fPIC -std=c++17 ../src/zero_playback_state.cpp -o libzero_player_test.dylib
+
+      - name: Run unit & edge case tests
+        run: flutter test
+
+      - name: Run C++ native stress test
+        run: |
+          cd test
+          clang++ -O3 -std=c++17 native_stress_test.cpp ../src/zero_playback_state.cpp -o native_stress_test
+          ./native_stress_test
+
+      - name: Check Cyclomatic Complexity
+        run: dart run tool/check_complexity.dart
+
+      - name: Validate pub.dev package readiness
+        run: flutter pub publish --dry-run
