@@ -28,6 +28,12 @@ Java_com_fexcy_zero_1player_ZeroNativeBridge_setDuration(JNIEnv *env, jclass cla
 }
 
 JNIEXPORT void JNICALL
+Java_com_fexcy_zero_1player_ZeroNativeBridge_setBuffered(JNIEnv *env, jclass clazz, jlong statePtr, jlong bufferedMs) {
+    auto* state = reinterpret_cast<ZeroPlaybackState*>(statePtr);
+    zero_set_buffered(state, bufferedMs);
+}
+
+JNIEXPORT void JNICALL
 Java_com_fexcy_zero_1player_ZeroNativeBridge_setStatus(JNIEnv *env, jclass clazz, jlong statePtr, jint status) {
     auto* state = reinterpret_cast<ZeroPlaybackState*>(statePtr);
     zero_set_status(state, status);

@@ -9,6 +9,7 @@ object ZeroNativeBridge {
     external fun destroyState(statePtr: Long)
     external fun setPosition(statePtr: Long, positionMs: Long)
     external fun setDuration(statePtr: Long, durationMs: Long)
+    external fun setBuffered(statePtr: Long, bufferedMs: Long)
     external fun setStatus(statePtr: Long, status: Int)
     external fun setVideoSize(statePtr: Long, width: Int, height: Int)
 }
