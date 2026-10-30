@@ -8,11 +8,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:d_zero_particles/d_zero_particles.dart';
+import 'package:d_zero_counter/d_zero_counter.dart';
+import 'package:d_zero_chart/d_zero_chart.dart';
+import 'package:d_zero_ui/d_zero_ui.dart';
 
 import 'package:benchmark_app/main.dart';
 import 'package:benchmark_app/particles_benchmark_view.dart';
+import 'package:benchmark_app/suite_switch_demo_view.dart';
 
 void main() {
+  testWidgets('Suite comparison demo switches between d-zero and traditional widgets with FPS & memory HUD', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const DZeroBenchmarkApp());
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    // Verify FPS & Memory HUD and pure d-zero mode default
+    expect(find.byType(ZFPSMonitor), findsWidgets);
+    expect(find.textContaining('Live FPS & Memory Diagnostics HUD'), findsOneWidget);
+    expect(find.textContaining('ZWidget Verification'), findsOneWidget);
+    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsOneWidget);
+    expect(find.text('❌ Traditional Flutter Widgets'), findsNothing);
+    expect(find.byType(ZSparkline), findsOneWidget);
+    expect(find.byType(ZCandlestickChart), findsOneWidget);
+    expect(find.byType(ZOrderBook), findsOneWidget);
+    expect(find.byType(ZHeatmap), findsOneWidget);
+    expect(find.byType(ZGauge), findsOneWidget);
+
+    // Switch to Traditional Widgets mode
+    await tester.tap(find.descendant(
+      of: find.byType(SegmentedButton<SuiteRenderMode>),
+      matching: find.text('❌ 通常の Widget (高負荷)'),
+    ));
+    await tester.pump(const Duration(milliseconds: 32));
+
+    expect(find.text('❌ Traditional Flutter Widgets'), findsOneWidget);
+    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsNothing);
+
+    // Switch to Side-by-Side mode
+    await tester.tap(find.descendant(
+      of: find.byType(SegmentedButton<SuiteRenderMode>),
+      matching: find.text('⚖️ 2画面同時比較'),
+    ));
+    await tester.pump(const Duration(milliseconds: 32));
+
+    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsOneWidget);
+    expect(find.text('❌ Traditional Flutter Widgets'), findsOneWidget);
+
+    // Unmount and verify clean disposal (no leaked tickers or listeners)
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('Benchmark app smoke test and narrow screen particle motion test', (WidgetTester tester) async {
     // Use realistic mobile screen dimensions (360x780 logical = 1080x2340 @ 3x)
     tester.view.physicalSize = const Size(1080, 2340);
@@ -20,7 +71,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    // Build our app and trigger frames on Tab 0 while Tab 1 ZParticles is offstage in IndexedStack
+    // Build our app and trigger frames on Tab 0 while Tab 2 ZParticles is offstage in IndexedStack
     await tester.pumpWidget(const DZeroBenchmarkApp());
     await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 16));

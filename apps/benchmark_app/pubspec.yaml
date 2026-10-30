@@ -16,6 +16,12 @@ dependencies:
   d_zero_counter:
   d_zero_particles:
   d_zero_player:
+  d_zero_ui:
+  d_zero_chart:
+  d_zero_waveform:
+  d_zero_fx:
+  d_zero_canvas:
+  d_zero_sensor:
   video_player: ^2.8.2
 
 dev_dependencies:

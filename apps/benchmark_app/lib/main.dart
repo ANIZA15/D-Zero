@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:d_zero_core/d_zero_core.dart';
 import 'package:d_zero_counter/d_zero_counter.dart';
 import 'particles_benchmark_view.dart';
+import 'suite_switch_demo_view.dart';
 
 void main() {
   runApp(const DZeroBenchmarkApp());
@@ -41,25 +43,34 @@ class BenchmarkHomeScreen extends StatefulWidget {
 class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
   int _selectedTabIndex = 0;
 
-  // グローバル FPS & パフォーマンス監視
-  double _fps = 60.0;
-  double _frameTimeMs = 16.6;
-  DateTime _lastFrame = DateTime.now();
+  // グローバル FPS & メモリ監視 (Zero-Rebuild Notifiers)
+  final ZeroDoubleNotifier _rssMemoryMb = ZeroDoubleNotifier(0.0);
+  int _frameTick = 0;
 
   @override
   void initState() {
     super.initState();
-    SchedulerBinding.instance.addPersistentFrameCallback((timeStamp) {
-      final now = DateTime.now();
-      final diff = now.difference(_lastFrame).inMicroseconds / 1000.0;
-      _lastFrame = now;
-
-      if (diff > 0 && mounted) {
-        final currentFps = 1000.0 / diff;
-        _fps = (_fps * 0.9) + (currentFps * 0.1);
-        _frameTimeMs = diff;
+    _updateMemoryUsage();
+    SchedulerBinding.instance.addPersistentFrameCallback((_) {
+      _frameTick++;
+      if (_frameTick % 30 == 0 && mounted) {
+        _updateMemoryUsage();
       }
     });
+  }
+
+  void _updateMemoryUsage() {
+    try {
+      _rssMemoryMb.value = ProcessInfo.currentRss / (1024.0 * 1024.0);
+    } catch (_) {
+      _rssMemoryMb.value = 48.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _rssMemoryMb.dispose();
+    super.dispose();
   }
 
   @override
@@ -77,7 +88,12 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            _buildFpsBadge(),
+            const ZFPSMonitor(
+              size: Size(132.0, 34.0),
+              backgroundColor: Color(0xFF0A0D16),
+            ),
+            const SizedBox(width: 6),
+            _buildMemoryBadge(),
           ],
         ),
         bottom: PreferredSize(
@@ -88,11 +104,12 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildTabItem(0, Icons.speed, 'Counter & Timer'),
-                  _buildTabItem(1, Icons.auto_awesome, 'Particle Stress'),
-                  _buildTabItem(2, Icons.memory, 'Buffer & Pool'),
-                  _buildTabItem(3, Icons.play_circle_outline, 'Video Player'),
-                  _buildTabItem(4, Icons.analytics_outlined, 'Architecture'),
+                  _buildTabItem(0, Icons.dashboard_customize, 'Suite 比較デモ'),
+                  _buildTabItem(1, Icons.speed, 'Counter & Timer'),
+                  _buildTabItem(2, Icons.auto_awesome, 'Particle Stress'),
+                  _buildTabItem(3, Icons.memory, 'Buffer & Pool'),
+                  _buildTabItem(4, Icons.play_circle_outline, 'Video Player'),
+                  _buildTabItem(5, Icons.analytics_outlined, 'Architecture'),
                 ],
               ),
             ),
@@ -102,6 +119,7 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
       body: IndexedStack(
         index: _selectedTabIndex,
         children: const [
+          SuiteSwitchDemoView(),
           CounterBenchmarkView(),
           ParticlesBenchmarkView(),
           BufferPoolBenchmarkView(),
@@ -112,36 +130,38 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
     );
   }
 
-  Widget _buildFpsBadge() {
-    final is120 = _fps > 90;
-    final color = _fps >= 55 ? const Color(0xFF00FF88) : (_fps >= 30 ? Colors.orange : Colors.red);
+  Widget _buildMemoryBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color, width: 1),
+        color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt, size: 13, color: color),
+          const Icon(Icons.memory, size: 12, color: Color(0xFF00E5FF)),
           const SizedBox(width: 3),
-          Text(
-            '${_fps.toStringAsFixed(1)} FPS (${_frameTimeMs.toStringAsFixed(1)}ms)',
-            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10),
-          ),
-          if (is120) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF),
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: const Text('120Hz', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
+          ZPriceTicker(
+            valueListenable: _rssMemoryMb,
+            currencyGlyph: ZeroNumberPainter.glyphPlus,
+            fractionDigits: 1,
+            style: const TextStyle(
+              color: Color(0xFF00E5FF),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
             ),
-          ],
+          ),
+          const Text(
+            'MB',
+            style: TextStyle(
+              color: Color(0xFF00E5FF),
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );

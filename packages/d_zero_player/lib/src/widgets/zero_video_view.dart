@@ -1,10 +1,11 @@
 import 'package:flutter/widgets.dart';
+import 'package:d_zero_core/d_zero_core.dart';
 import '../controller.dart';
 import 'direct_seek_bar.dart';
 import 'direct_time_label.dart';
 
 /// A zero-jank, high-performance Flutter video player widget with Impeller zero-copy texture support.
-class ZPlayer extends StatelessWidget {
+class ZPlayer extends StatelessWidget implements ZWidget {
   /// The [ZeroPlayerController] managing the active video session.
   final ZeroPlayerController controller;
 
@@ -21,6 +22,9 @@ class ZPlayer extends StatelessWidget {
     this.overlay,
     this.showControls = true,
   });
+
+  @override
+  bool get isZeroAllocation => true;
 
   @override
   Widget build(BuildContext context) {
