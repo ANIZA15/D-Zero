@@ -263,4 +263,52 @@ void main() {
       expect(controller.hasListeners, isFalse);
     });
   });
+
+  group('Z3DSurface & Zero3DSurfaceController', () {
+    test('Zero3DSurfaceController streams waterfall rows and survives double-dispose', () {
+      final controller = Zero3DSurfaceController(rows: 8, cols: 6);
+      controller.setHeight(2, 3, 0.8);
+      expect(controller.heightAt(2, 3), closeTo(0.8, 1e-4));
+
+      controller.pushRow(const [0.1, 0.3, 0.5, 0.7, 0.9, 1.2]);
+      expect(controller.heightAt(7, 5), equals(1.0));
+
+      controller.clear();
+      expect(controller.heightAt(7, 5), equals(0.0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.setHeight(0, 0, 0.5);
+      expect(controller.heightAt(0, 0), equals(0.0));
+    });
+
+    testWidgets('Z3DSurface projects 3D heightfield and unsubscribes on unmount', (tester) async {
+      final controller = Zero3DSurfaceController(rows: 12, cols: 12);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZWaterfallChart(
+              controller: controller,
+              size: const Size(280.0, 180.0),
+            ),
+          ),
+        ),
+      );
+      expect(controller.hasListeners, isTrue);
+
+      for (int i = 0; i < 16; i++) {
+        controller.pushRow(List<double>.generate(12, (c) => ((i + c) % 10) / 9.0));
+        await tester.pump(const Duration(milliseconds: 8));
+      }
+      await tester.drag(find.byType(Z3DSurface), const Offset(30.0, -20.0));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
 }

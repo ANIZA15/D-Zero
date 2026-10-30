@@ -26,3 +26,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+
+flutter:
+  shaders:
+    - shaders/zero_metaballs_3d.frag
+    - shaders/zero_holo_grid.frag

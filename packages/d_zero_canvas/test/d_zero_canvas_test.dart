@@ -175,4 +175,56 @@ void main() {
       expect(() => controller.addSample(50.0, 50.0), returnsNormally);
     });
   });
+
+  group('Zero3DMeshController & Z3DMesh', () {
+    test('Zero3DMeshController builds sphere/torus/cube, culls backfaces, and survives double-dispose', () {
+      final sphere = Zero3DMeshController.sphere(latSegments: 8, lonSegments: 12);
+      final torus = Zero3DMeshController.torus(majorSegments: 10, minorSegments: 6);
+      final cube = Zero3DMeshController.cube();
+      expect(sphere.vertexCount, equals(9 * 13));
+      expect(sphere.triangleCount, equals(8 * 12 * 2));
+      expect(torus.triangleCount, equals(120));
+      expect(cube.triangleCount, equals(12));
+
+      sphere.rotateBy(0.25, 0.5);
+      expect(sphere.rotationX, greaterThan(0.35));
+
+      torus.dispose();
+      cube.dispose();
+      sphere.dispose();
+      sphere.dispose();
+      expect(sphere.isDisposed, isTrue);
+      expect(sphere.vertexCount, equals(0));
+      expect(sphere.triangleCount, equals(0));
+    });
+
+    testWidgets('Z3DMesh depth-sorts and renders 3D globe via Vertices.raw and detaches on unmount', (tester) async {
+      final controller = Zero3DMeshController.sphere(latSegments: 10, lonSegments: 14);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: Z3DGlobe(
+              controller: controller,
+              size: const Size(240.0, 240.0),
+            ),
+          ),
+        ),
+      );
+
+      final renderMesh = tester.renderObject<RenderZ3DMesh>(find.byType(Z3DMesh));
+      expect(renderMesh.isRepaintBoundary, isTrue);
+      expect(renderMesh.lastVisibleTriangles, greaterThan(0));
+      expect(renderMesh.lastVisibleTriangles, lessThan(controller.triangleCount));
+
+      await tester.drag(find.byType(Z3DMesh), const Offset(45.0, -30.0));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
 }

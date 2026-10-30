@@ -103,4 +103,55 @@ void main() {
       controller.dispose();
     });
   });
+
+  group('ZeroPointCloudController & Z3DPointCloud', () {
+    test('ZeroPointCloudController unprojects camera depth frames, measures metric distances, and survives double-dispose', () {
+      final controller = ZeroPointCloudController(maxPoints: 512);
+      // Simulate a 4x4 depth frame at 2.25m distance
+      final depthFrame = List<double>.filled(16, 2.25);
+      controller.ingestDepthFrame(depthFrame, width: 4, height: 4);
+
+      expect(controller.pointCount, equals(16));
+      expect(controller.centerDistanceMeters, closeTo(2.25, 1e-4));
+      expect(controller.distanceAtPoint(0), greaterThan(2.25));
+
+      controller.clear();
+      controller.addPoint(0.0, 0.0, 1.0);
+      controller.addPoint(3.0, 4.0, 1.0);
+      expect(controller.measureDistanceBetween(0, 1), closeTo(5.0, 1e-4));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      expect(controller.pointCount, equals(0));
+      expect(controller.centerDistanceMeters, equals(0.0));
+      expect(controller.measureDistanceBetween(0, 1), equals(0.0));
+    });
+
+    testWidgets('Z3DPointCloud renders depth-bucketed LiDAR cloud and rangefinder HUD', (tester) async {
+      final controller = ZeroPointCloudController(maxPoints: 256);
+      addTearDown(controller.dispose);
+      final depthFrame = List<double>.generate(64, (i) => 1.2 + (i % 8) * 0.35);
+      controller.ingestDepthFrame(depthFrame, width: 8, height: 8);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZLidarView(
+              controller: controller,
+              size: const Size(280.0, 200.0),
+            ),
+          ),
+        ),
+      );
+      expect(controller.hasListeners, isTrue);
+
+      await tester.drag(find.byType(Z3DPointCloud), const Offset(40.0, -25.0));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
 }

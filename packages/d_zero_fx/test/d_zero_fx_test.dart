@@ -182,4 +182,53 @@ void main() {
       expect(() => tilt.value = const Offset(0.9, 0.9), returnsNormally);
     });
   });
+
+  group('ZShaderSurface & ZMetaballs3D', () {
+    test('ZeroShaderController manages uniform slots and survives double-dispose', () {
+      final controller = ZeroShaderController(uniformCount: 8);
+      controller.setUniform(0, 1.25);
+      controller.setUniformColor(1, const Color(0xFF00FF88));
+      expect(controller.uniformAt(0), closeTo(1.25, 1e-4));
+      expect(controller.uniformAt(2), closeTo(1.0, 1e-3));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.setUniform(0, 9.0);
+      expect(controller.uniformAt(0), equals(0.0));
+    });
+
+    testWidgets('ZShaderSurface & ZMetaballs3D render 3D surfaces and clean up on unmount', (tester) async {
+      final shaderCtrl = ZeroShaderController(uniformCount: 6);
+      addTearDown(shaderCtrl.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              ZRuntimeShader(
+                controller: shaderCtrl,
+                size: const Size(240.0, 120.0),
+              ),
+              const ZRaymarchSurface(
+                size: Size(240.0, 140.0),
+                smoothness: 0.4,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(shaderCtrl.hasListeners, isTrue);
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.drag(find.byType(ZShaderSurface), const Offset(20.0, 15.0));
+      await tester.drag(find.byType(ZMetaballs3D), const Offset(-20.0, 10.0));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(shaderCtrl.hasListeners, isFalse);
+    });
+  });
 }
