@@ -21,6 +21,8 @@ scripts:
     exec: flutter test
     packageFilters:
       dirExists: test
+      ignore:
+        - "*_example"
     description: Run flutter test in all packages with tests.
 
   complexity:

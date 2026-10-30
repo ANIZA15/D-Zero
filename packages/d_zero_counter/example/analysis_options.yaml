@@ -7,6 +7,13 @@ analyzer:
     - "**/build/**"
     - "**/.dart_tool/**"
     - build/**
+    - android/**
+    - ios/**
+    - macos/**
+    - linux/**
+    - windows/**
+    - web/**
+    - test/**
 
 linter:
   rules:

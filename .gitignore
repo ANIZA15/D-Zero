@@ -208,6 +208,5 @@ dist/
 !apps/benchmark_app/macos/Flutter/Flutter-Release.xcconfig
 !apps/benchmark_app/macos/Flutter/GeneratedPluginRegistrant.swift
 !packages/d_zero_player/example/.gitignore
-!packages/d_zero_player/example/.metadata
 !packages/d_zero_player/example/android/**
 !packages/d_zero_player/example/ios/**
