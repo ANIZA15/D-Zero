@@ -220,6 +220,7 @@ void main() {
       final controller = ZeroPlayerController.externalStream(
         textureId: 99,
         stateAddress: dummyPtr.address,
+        ownsState: true,
       );
 
       expect(controller.textureId, equals(99));
@@ -229,6 +230,7 @@ void main() {
       expect(controller.positionMs, equals(1234));
 
       controller.dispose();
+      expect(controller.isDisposed, isTrue);
     });
   });
 
@@ -284,7 +286,41 @@ void main() {
       // コントローラを先に破棄（Use-After-Free 境界テスト）
       controller.dispose();
 
+      // 破棄後にフレーム進行・再描画・タップシークが発生しても解放済みポインタを参照しないこと
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byType(ZDirectSeekBar));
+      await tester.pump(const Duration(milliseconds: 16));
+
       // ウィジェットのアンマウント
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+        'Dangling Pointer 防御: 無効アドレスを持つ破棄済みコントローラでも ZPlayer 描画時に SIGSEGV しないこと',
+        (tester) async {
+      // デリファレンスされたら即座に SIGSEGV する不正アドレス (0xDEADBEEF)
+      final controller = ZeroPlayerController.externalStream(
+        textureId: -1,
+        stateAddress: 0xDEADBEEF,
+        ownsState: false,
+      );
+      await controller.dispose();
+      expect(controller.isDisposed, isTrue);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZPlayer(
+              controller: controller,
+              showControls: true,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byType(ZDirectSeekBar));
       await tester.pumpWidget(const SizedBox.shrink());
     });
 

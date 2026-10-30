@@ -65,15 +65,20 @@ class ZeroPlayerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
                 // Impeller (Vulkan / OpenGLES) ゼロコピー対応の SurfaceProducer を使用
                 val surfaceProducer = textureRegistry.createSurfaceProducer()
-                val playerWrapper = ZeroExoPlayerWrapper(
-                    context = context,
-                    surfaceProducer = surfaceProducer,
-                    url = url,
-                    headers = headers,
-                    isLive = isLive,
-                    protocol = protocol,
-                    customMimeType = mimeType
-                )
+                val playerWrapper = try {
+                    ZeroExoPlayerWrapper(
+                        context = context,
+                        surfaceProducer = surfaceProducer,
+                        url = url,
+                        headers = headers,
+                        isLive = isLive,
+                        protocol = protocol,
+                        customMimeType = mimeType
+                    )
+                } catch (e: Throwable) {
+                    result.error("INIT_FAILED", e.message ?: "Failed to initialize player", null)
+                    return
+                }
                 players[surfaceProducer.id()] = playerWrapper
 
                 result.success(
@@ -134,6 +139,27 @@ class ZeroExoPlayerWrapper(
 ) {
     companion object {
         private const val DRIFT_SYNC_INTERVAL_MS = 250L
+
+        // 全プレイヤーインスタンス間で ConnectionPool / Dispatcher スレッドプールを共有しリソース肥大化を防止
+        private val sharedOkHttpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .addInterceptor { chain ->
+                    val originalRequest = chain.request()
+                    val requestBuilder = originalRequest.newBuilder()
+                    if (originalRequest.header("User-Agent") == null) {
+                        requestBuilder.header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                        )
+                    }
+                    chain.proceed(requestBuilder.build())
+                }
+                .build()
+        }
     }
 
     val statePtr: Long = ZeroNativeBridge.createState()
@@ -175,39 +201,23 @@ class ZeroExoPlayerWrapper(
     }
 
     init {
-        exoPlayer.setVideoSurface(surfaceProducer.surface)
-        surfaceProducer.setCallback(object : TextureRegistry.SurfaceProducer.Callback {
-            override fun onSurfaceAvailable() {
-                if (isDisposed) return
-                exoPlayer.setVideoSurface(surfaceProducer.surface)
-            }
-
-            override fun onSurfaceCleanup() {
-                if (isDisposed) return
-                exoPlayer.clearVideoSurface()
-            }
-        })
-
-        // OkHttp クライアント（HTTP/2, HTTP/3, 高速キープアライブ, リダイレクト追跡）
-        val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .addInterceptor { chain ->
-                val originalRequest = chain.request()
-                val requestBuilder = originalRequest.newBuilder()
-                if (originalRequest.header("User-Agent") == null) {
-                    requestBuilder.header(
-                        "User-Agent",
-                        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                    )
+        try {
+            exoPlayer.setVideoSurface(surfaceProducer.surface)
+            surfaceProducer.setCallback(object : TextureRegistry.SurfaceProducer.Callback {
+                override fun onSurfaceAvailable() {
+                    if (isDisposed) return
+                    exoPlayer.setVideoSurface(surfaceProducer.surface)
                 }
-                chain.proceed(requestBuilder.build())
-            }
-            .build()
 
-        val isWs = url.startsWith("ws://", ignoreCase = true) || url.startsWith("wss://", ignoreCase = true)
+                override fun onSurfaceCleanup() {
+                    if (isDisposed) return
+                    exoPlayer.clearVideoSurface()
+                }
+            })
+
+            val okHttpClient = sharedOkHttpClient
+
+            val isWs = url.startsWith("ws://", ignoreCase = true) || url.startsWith("wss://", ignoreCase = true)
 
         if (isWs) {
             // =========================================================================
@@ -357,6 +367,10 @@ class ZeroExoPlayerWrapper(
                 ZeroNativeBridge.setStatus(statePtr, 5) // Error
             }
         })
+        } catch (t: Throwable) {
+            dispose()
+            throw t
+        }
     }
 
     fun play() {

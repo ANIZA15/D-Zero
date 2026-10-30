@@ -37,6 +37,10 @@
         BOOL isLive = [call.arguments[@"isLive"] boolValue];
 
         NSURL *url = [NSURL URLWithString:urlStr];
+        if (!url) {
+            result([FlutterError errorWithCode:@"INVALID_ARGUMENT" message:@"Invalid URL format" details:urlStr]);
+            return;
+        }
         ZeroPlayerTexture *player = [[ZeroPlayerTexture alloc] initWithURL:url
                                                                    headers:headers
                                                                     isLive:isLive
@@ -76,6 +80,13 @@
     } else {
         result(FlutterMethodNotImplemented);
     }
+}
+
+- (void)detachFromEngineForRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
+    for (ZeroPlayerTexture *player in _players.allValues) {
+        [player dispose];
+    }
+    [_players removeAllObjects];
 }
 
 @end

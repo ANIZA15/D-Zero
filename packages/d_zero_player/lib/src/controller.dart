@@ -33,12 +33,19 @@ class ZeroPlayerController {
   final ffi.Pointer<ZeroPlaybackStateNative> statePointer;
   final ZeroPlaybackStateView _view;
   final int textureId;
+  final bool _ownsState;
   bool _isDisposed = false;
 
   ZeroPlayerController._({
     required this.statePointer,
     required this.textureId,
-  }) : _view = ZeroPlaybackStateView(statePointer);
+    required bool ownsState,
+  })  : _ownsState = ownsState,
+        _view = ZeroPlaybackStateView(statePointer);
+
+  /// このコントローラが既に破棄されているかどうか
+  @pragma('vm:prefer-inline')
+  bool get isDisposed => _isDisposed;
 
   /// ネットワーク URL からプレイヤーを作成する（Phase 1: Headers & Phase 2: 多プロトコル対応）
   /// ネイティブ側（iOS: AVPlayer, Android: ExoPlayer）でデコーダを立ち上げ、
@@ -69,6 +76,7 @@ class ZeroPlayerController {
     return ZeroPlayerController._(
       statePointer: pointer,
       textureId: textureId,
+      ownsState: false,
     );
   }
 
@@ -107,12 +115,14 @@ class ZeroPlayerController {
   factory ZeroPlayerController.externalStream({
     required int textureId,
     required int stateAddress,
+    bool ownsState = false,
   }) {
     final pointer =
         ffi.Pointer<ZeroPlaybackStateNative>.fromAddress(stateAddress);
     return ZeroPlayerController._(
       statePointer: pointer,
       textureId: textureId,
+      ownsState: ownsState,
     );
   }
 
@@ -122,6 +132,7 @@ class ZeroPlayerController {
     return ZeroPlayerController._(
       statePointer: ptr,
       textureId: -1,
+      ownsState: true,
     );
   }
 
@@ -210,13 +221,13 @@ class ZeroPlayerController {
 
   /// リソースの破棄
   Future<void> dispose() async {
-    if (!_isDisposed) {
-      _isDisposed = true;
-      if (textureId != -1) {
-        await _channel.invokeMethod('dispose', {'textureId': textureId});
-      } else {
-        ZeroPlayerNativeBindings.instance.destroyState(statePointer);
-      }
+    if (_isDisposed) return;
+    _isDisposed = true;
+    if (_ownsState && statePointer.address != 0) {
+      ZeroPlayerNativeBindings.instance.destroyState(statePointer);
+    }
+    if (textureId != -1) {
+      await _channel.invokeMethod('dispose', {'textureId': textureId});
     }
   }
 }

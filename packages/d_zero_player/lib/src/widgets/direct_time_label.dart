@@ -27,6 +27,7 @@ class ZDirectTimeLabel extends ZLeafWidget<RenderDirectTimeLabel> {
   @override
   RenderDirectTimeLabel createRenderObject(BuildContext context) {
     return RenderDirectTimeLabel(
+      controller: controller,
       statePointer: controller.statePointer,
       style: style,
     );
@@ -36,6 +37,7 @@ class ZDirectTimeLabel extends ZLeafWidget<RenderDirectTimeLabel> {
   void updateRenderObject(
       BuildContext context, RenderDirectTimeLabel renderObject) {
     renderObject
+      ..controller = controller
       ..statePointer = controller.statePointer
       ..style = style;
   }
@@ -49,6 +51,7 @@ typedef DirectTimeLabel = ZDirectTimeLabel;
 typedef ZTimeLabel = ZDirectTimeLabel;
 
 class RenderDirectTimeLabel extends ZeroRenderBox {
+  ZeroPlayerController? _controller;
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
   ZeroPlaybackStateView _view;
   TextStyle _style;
@@ -57,13 +60,23 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
   int _lastDurSec = -1;
 
   RenderDirectTimeLabel({
+    ZeroPlayerController? controller,
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
     required TextStyle style,
-  })  : _statePointer = statePointer,
+  })  : _controller = controller,
+        _statePointer = statePointer,
         _view = ZeroPlaybackStateView(statePointer),
         _style = style,
         super(animatePerFrame: true) {
     _numberPainter = ZeroNumberPainter(style: _style);
+  }
+
+  set controller(ZeroPlayerController? val) {
+    if (identical(_controller, val)) return;
+    _controller = val;
+    _lastSec = -1;
+    _lastDurSec = -1;
+    markDirty();
   }
 
   set statePointer(ffi.Pointer<ZeroPlaybackStateNative> val) {
@@ -75,6 +88,19 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
     markDirty();
   }
 
+  @pragma('vm:prefer-inline')
+  bool get _canReadState {
+    final ZeroPlayerController? ctrl = _controller;
+    if (ctrl != null && ctrl.isDisposed) return false;
+    return _view.isValid;
+  }
+
+  @pragma('vm:prefer-inline')
+  int get _safePositionMs => _canReadState ? _view.displayPositionMs : 0;
+
+  @pragma('vm:prefer-inline')
+  int get _safeDurationMs => _canReadState ? _view.durationMs : 0;
+
   set style(TextStyle val) {
     if (_style == val) return;
     _style = val;
@@ -85,8 +111,9 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
 
   @override
   bool onFrameTick(Duration elapsed) {
-    final int posSec = _view.displayPositionMs ~/ 1000;
-    final int durSec = _view.durationMs ~/ 1000;
+    if (!_canReadState) return false;
+    final int posSec = _safePositionMs ~/ 1000;
+    final int durSec = _safeDurationMs ~/ 1000;
     if (posSec == _lastSec && durSec == _lastDurSec) {
       return false;
     }
@@ -105,8 +132,8 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
 
   @override
   void paintZero(PaintingContext context, Offset offset) {
-    final int posMs = _view.displayPositionMs;
-    final int durMs = _view.durationMs;
+    final int posMs = _safePositionMs;
+    final int durMs = _safeDurationMs;
     _lastSec = posMs ~/ 1000;
     _lastDurSec = durMs ~/ 1000;
 

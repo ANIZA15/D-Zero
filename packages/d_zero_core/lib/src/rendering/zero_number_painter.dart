@@ -321,19 +321,33 @@ class ZeroNumberPainter {
   }
 
   @pragma('vm:prefer-inline')
+  int _clampGlyphId(int glyphId) {
+    if (glyphId < 0 || glyphId >= _activeGlyphCount) return 0;
+    return glyphId;
+  }
+
+  @pragma('vm:prefer-inline')
+  static int _safeAbsInt(int value) {
+    final int neg = -value;
+    return neg < 0 ? 0x7FFFFFFFFFFFFFFF : neg;
+  }
+
+  @pragma('vm:prefer-inline')
   double _emitGlyph(int batchIdx, int glyphId, double x, double y, bool monospaceDigit) {
+    if (batchIdx < 0 || batchIdx >= _maxBatchGlyphs) return 0.0;
+    final int safeGlyph = _clampGlyphId(glyphId);
     final int b = batchIdx << 2;
     _rstBuffer[b] = _atlasScale;
     _rstBuffer[b + 1] = 0.0;
     _rstBuffer[b + 2] = x;
     _rstBuffer[b + 3] = y;
     // 128-bit single-instruction SIMD copy of the 4 atlas rect floats (left, top, right, bottom)
-    _rectBuffer4[batchIdx] = _atlasRects4[glyphId];
+    _rectBuffer4[batchIdx] = _atlasRects4[safeGlyph];
 
-    if (monospaceDigit && glyphId < 10) {
+    if (monospaceDigit && safeGlyph < 10) {
       return _maxDigitWidth;
     }
-    return _glyphWidths[glyphId];
+    return _glyphWidths[safeGlyph];
   }
 
   /// Fast-path emitter for 2-digit numbers (`00`..`99`, such as hours/minutes/seconds).
@@ -380,7 +394,7 @@ class ZeroNumberPainter {
     double currentX = startX;
     int absVal = value;
     if (value < 0) {
-      absVal = -value;
+      absVal = _safeAbsInt(value);
       final double w = _emitGlyph(batchIdx++, _glyphDash, currentX, y, false);
       currentX += monospaceAlignment ? _maxDigitWidth : w;
     }
@@ -397,12 +411,13 @@ class ZeroNumberPainter {
 
   void _flushBatch(Canvas canvas, int glyphCount) {
     if (glyphCount <= 0) return;
+    final int safeCount = glyphCount <= _maxBatchGlyphs ? glyphCount : _maxBatchGlyphs;
     final ui.Image? atlas = _shared.atlasImage;
     if (atlas != null) {
       canvas.drawRawAtlas(
         atlas,
-        _rstViews[glyphCount],
-        _rectViews[glyphCount],
+        _rstViews[safeCount],
+        _rectViews[safeCount],
         null,
         null,
         null,
@@ -411,7 +426,7 @@ class ZeroNumberPainter {
       return;
     }
     final List<TextPainter> painters = _shared.glyphPainters;
-    for (int i = 0; i < glyphCount; i++) {
+    for (int i = 0; i < safeCount; i++) {
       final int b = i << 2;
       final double x = _rstBuffer[b + 2];
       final double y = _rstBuffer[b + 3];
@@ -508,7 +523,8 @@ class ZeroNumberPainter {
 
   double _computeBatchSpan(double startX, int count, bool monospaceAlignment) {
     if (count <= 0) return 0.0;
-    final int lastB = (count - 1) << 2;
+    final int safeCount = count <= _maxBatchGlyphs ? count : _maxBatchGlyphs;
+    final int lastB = (safeCount - 1) << 2;
     final double lastX = _rstBuffer[lastB + 2];
     final double lastW = monospaceAlignment
         ? _maxDigitWidth
@@ -560,7 +576,8 @@ class ZeroNumberPainter {
   @pragma('vm:prefer-inline')
   double _nextCursorX(int batchIdx, double fallbackX) {
     if (batchIdx <= 0) return fallbackX;
-    final int prev = (batchIdx - 1) << 2;
+    final int safeIdx = batchIdx <= _maxBatchGlyphs ? batchIdx : _maxBatchGlyphs;
+    final int prev = (safeIdx - 1) << 2;
     return _rstBuffer[prev + 2] + _maxDigitWidth;
   }
 

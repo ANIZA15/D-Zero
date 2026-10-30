@@ -22,6 +22,32 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
     BOOL _awaitingFrame;
     BOOL _isDisposed;
 }
+- (void)onDisplayLink:(CADisplayLink *)link;
+@end
+
+@interface _ZeroDisplayLinkProxy : NSObject {
+    __weak ZeroPlayerTexture *_target;
+}
+- (instancetype)initWithTarget:(ZeroPlayerTexture *)target;
+- (void)onDisplayLink:(CADisplayLink *)link;
+@end
+
+@implementation _ZeroDisplayLinkProxy
+- (instancetype)initWithTarget:(ZeroPlayerTexture *)target {
+    self = [super init];
+    if (self) {
+        _target = target;
+    }
+    return self;
+}
+- (void)onDisplayLink:(CADisplayLink *)link {
+    ZeroPlayerTexture *strongTarget = _target;
+    if (strongTarget) {
+        [strongTarget onDisplayLink:link];
+    } else {
+        [link invalidate];
+    }
+}
 @end
 
 @implementation ZeroPlayerTexture
@@ -84,8 +110,9 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
         // 3. Flutter Texture 登録
         _textureId = [_registry registerTexture:self];
 
-        // 4. CADisplayLink による VSync 駆動（初回フレーム取得後は再生中のみ稼働）
-        _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onDisplayLink:)];
+        // 4. CADisplayLink による VSync 駆動（Weak Proxy で Retain Cycle を防止）
+        _ZeroDisplayLinkProxy *proxy = [[_ZeroDisplayLinkProxy alloc] initWithTarget:self];
+        _displayLink = [CADisplayLink displayLinkWithTarget:proxy selector:@selector(onDisplayLink:)];
         [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 
         // Duration / Track フレームレート / 再生状態監視

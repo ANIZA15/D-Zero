@@ -47,6 +47,7 @@ class ZDirectSeekBar extends ZLeafWidget<RenderDirectSeekBar> {
   @override
   RenderDirectSeekBar createRenderObject(BuildContext context) {
     return RenderDirectSeekBar(
+      controller: controller,
       statePointer: controller.statePointer,
       activeTrackColor: activeTrackColor,
       inactiveTrackColor: inactiveTrackColor,
@@ -61,6 +62,7 @@ class ZDirectSeekBar extends ZLeafWidget<RenderDirectSeekBar> {
   void updateRenderObject(
       BuildContext context, RenderDirectSeekBar renderObject) {
     renderObject
+      ..controller = controller
       ..statePointer = controller.statePointer
       ..activeTrackColor = activeTrackColor
       ..inactiveTrackColor = inactiveTrackColor
@@ -79,6 +81,7 @@ typedef DirectSeekBar = ZDirectSeekBar;
 typedef ZSeekBar = ZDirectSeekBar;
 
 class RenderDirectSeekBar extends ZeroRenderBox {
+  ZeroPlayerController? _controller;
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
   ZeroPlaybackStateView _view;
   Color _activeTrackColor;
@@ -104,6 +107,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   int _lastDurationMs = -1;
 
   RenderDirectSeekBar({
+    ZeroPlayerController? controller,
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
     required Color activeTrackColor,
     required Color inactiveTrackColor,
@@ -111,7 +115,8 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     required double trackHeight,
     required double thumbRadius,
     this.onSeek,
-  })  : _statePointer = statePointer,
+  })  : _controller = controller,
+        _statePointer = statePointer,
         _view = ZeroPlaybackStateView(statePointer),
         _activeTrackColor = activeTrackColor,
         _inactiveTrackColor = inactiveTrackColor,
@@ -137,6 +142,14 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     _tapRecognizer = TapGestureRecognizer()..onTapDown = _handleTapDown;
   }
 
+  set controller(ZeroPlayerController? val) {
+    if (identical(_controller, val)) return;
+    _controller = val;
+    _lastQuantizedStep = -1;
+    _lastDurationMs = -1;
+    markDirty();
+  }
+
   set statePointer(ffi.Pointer<ZeroPlaybackStateNative> val) {
     if (_statePointer == val) return;
     _statePointer = val;
@@ -145,6 +158,19 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     _lastDurationMs = -1;
     markDirty();
   }
+
+  @pragma('vm:prefer-inline')
+  bool get _canReadState {
+    final ZeroPlayerController? ctrl = _controller;
+    if (ctrl != null && ctrl.isDisposed) return false;
+    return _view.isValid;
+  }
+
+  @pragma('vm:prefer-inline')
+  int get _safePositionMs => _canReadState ? _view.displayPositionMs : 0;
+
+  @pragma('vm:prefer-inline')
+  int get _safeDurationMs => _canReadState ? _view.durationMs : 0;
 
   set activeTrackColor(Color val) {
     if (_activeTrackColor == val) return;
@@ -191,8 +217,9 @@ class RenderDirectSeekBar extends ZeroRenderBox {
 
   @override
   bool onFrameTick(Duration elapsed) {
-    final int posMs = _view.displayPositionMs;
-    final int durMs = _view.durationMs;
+    if (!_canReadState) return false;
+    final int posMs = _safePositionMs;
+    final int durMs = _safeDurationMs;
     final int step = _quantizePositionStep(posMs, durMs);
     if (step == _lastQuantizedStep && durMs == _lastDurationMs) {
       return false;
@@ -228,7 +255,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   void _handleDragEnd(DragEndDetails details) {}
 
   void _seekByLocalOffset(double dx) {
-    final int dur = _view.durationMs;
+    final int dur = _safeDurationMs;
     final double w = size.width;
     if (dur <= 0 || w <= 0.0) return;
     double ratio = dx / w;
@@ -254,8 +281,8 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     final double width = size.width;
     final double height = size.height;
 
-    final int positionMs = _view.displayPositionMs;
-    final int durationMs = _view.durationMs;
+    final int positionMs = _safePositionMs;
+    final int durationMs = _safeDurationMs;
     _lastQuantizedStep = _quantizePositionStep(positionMs, durationMs);
     _lastDurationMs = durationMs;
 

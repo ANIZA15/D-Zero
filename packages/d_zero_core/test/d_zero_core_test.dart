@@ -371,6 +371,62 @@ void main() {
 
       recorder.endRecording().dispose();
     });
+
+    test('boundary safety: 64-bit min int (-2^63), batch overflow (>64 glyphs), and out-of-range glyph IDs do not throw', () {
+      final painter = ZeroNumberPainter();
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // 64-bit minimum integer (-9223372036854775808) with minDigits=2 fast-path candidate
+      const int minInt64 = -0x8000000000000000;
+      expect(
+        () => painter.paintInt(canvas, Offset.zero, minInt64, minDigits: 2),
+        returnsNormally,
+      );
+      expect(
+        () => painter.paintInt(canvas, Offset.zero, minInt64, minDigits: 120),
+        returnsNormally,
+      );
+
+      // Batch overflow (>64 glyphs) across paintDouble, paintCurrency, paintWithSuffix, paintOdometer
+      expect(
+        () => painter.paintDouble(
+          canvas,
+          Offset.zero,
+          -123456.789,
+          minIntegerDigits: 70,
+          fractionDigits: 6,
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => painter.paintCurrency(
+          canvas,
+          Offset.zero,
+          -999999999999999.99,
+          currencyGlyph: 999, // out-of-bounds glyph ID
+          fractionDigits: 6,
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => painter.paintWithSuffix(
+          canvas,
+          Offset.zero,
+          12345.67,
+          suffixGlyph: -5, // negative out-of-bounds glyph ID
+          fractionDigits: 6,
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => painter.paintOdometer(canvas, Offset.zero, 999999.9, minDigits: 50),
+        returnsNormally,
+      );
+
+      recorder.endRecording().dispose();
+      painter.dispose();
+    });
   });
 
   group('【4. ZeroRenderBox ライフサイクル & ZeroFrameScheduler 共有 Ticker テスト】', () {
