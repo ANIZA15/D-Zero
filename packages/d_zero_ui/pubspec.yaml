@@ -1,5 +1,5 @@
 name: d_zero_ui
-description: "Zero-allocation, zero-rebuild high-frequency UI controls (sliders, gauges, progress, marquee, typewriter, joystick, knob) for Flutter and Impeller."
+description: "Zero-allocation GPU glyph-atlas terminal and high-frequency UI controls (sliders, gauges, progress, marquee, joystick, knob) for Flutter."
 version: 0.1.2
 homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_ui

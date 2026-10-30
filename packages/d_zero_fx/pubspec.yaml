@@ -1,5 +1,5 @@
 name: d_zero_fx
-description: "Zero-allocation, zero-saveLayer visual effects (shimmer, glass blur, multi-touch ripple, liquid wave progress) for Flutter and Impeller."
+description: "Zero-allocation Impeller GLSL 460 shaders, 3D metaballs, 3D tilt, fluid mesh gradients, and zero-saveLayer visual effects for Flutter."
 version: 0.1.2
 homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_fx

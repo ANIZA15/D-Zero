@@ -82,9 +82,16 @@ test('Controller survives double dispose and post-dispose access', () {
 
 ---
 
-## 4. Pre-Commit Verification Checklist
+## 4. Pre-Commit Verification & Documentation Sync Checklist
+
+Whenever adding or renaming any public `Z` widget, you **must** update in the same commit:
+1. `packages/<pkg>/README.md` (Widget table & usage snippet — rendered directly on `pub.dev`).
+2. `packages/<pkg>/pubspec.yaml` (`description` metadata shown on `pub.dev`).
+3. Root `README.md` and `README_EN.md` package summary tables.
+4. `CHANGELOG.md` and `packages/<pkg>/CHANGELOG.md`.
 
 Before opening a PR or completing a task, execute:
 1. `melos run analyze` -> Zero issues.
 2. `melos run complexity` -> 0 warnings (no function with CC > 15).
-3. `melos run test` -> All unit, memory, and widget lifecycle tests pass.
+3. `melos run distribute:sync` -> Verifies Z-Prefix compliance and confirms every exported `Z` widget is documented in package and root `README.md` files.
+4. `melos run test` -> All unit, memory, and widget lifecycle tests pass.

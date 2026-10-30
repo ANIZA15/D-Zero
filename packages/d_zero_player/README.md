@@ -62,7 +62,7 @@ Conventional Flutter video players (`video_player`), however, incur significant 
 
 ## 📦 Widgets & Components
 
-* **`ZPlayer`** (legacy alias: `ZeroPlayerView`):
+* **`ZPlayer`** (or `ZPlayerView`, legacy alias: `ZeroPlayerView`):
   Integrates zero-copy hardware textures with high-performance, zero-rebuild controls.
 * **`ZDirectSeekBar`** (or `ZSeekBar`, legacy: `DirectSeekBar`):
   An ultra-efficient seek bar widget without a `build()` method. Reads position directly from atomic memory and draws via `Canvas.drawLine`. Fully interactive with drag and tap support.

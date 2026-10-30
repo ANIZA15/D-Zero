@@ -551,8 +551,46 @@ void _printPackageTable(List<_PackageInfo> packages) {
       );
       exit(1);
     }
+    _verifyPackageReadmeContainsWidgets(p);
   }
   stdout.writeln('---------------------------------------------------------------');
+}
+
+void _verifyPackageReadmeContainsWidgets(_PackageInfo pkg) {
+  final pkgReadme = File('${pkg.directory.path}/README.md');
+  if (!pkgReadme.existsSync()) {
+    stderr.writeln('     ❌ ${pkg.name}/README.md が存在しません。');
+    exit(1);
+  }
+  final pkgReadmeText = pkgReadme.readAsStringSync();
+  final missingInPkg = pkg.exportedZWidgets
+      .where((w) => !pkgReadmeText.contains(w))
+      .toList();
+  if (missingInPkg.isNotEmpty) {
+    stderr.writeln(
+      '     ❌ ${pkg.name}/README.md に未記載の公開 Z-Widget があります '
+      '(pub.dev 表示漏れ防止): ${missingInPkg.join(', ')}',
+    );
+    exit(1);
+  }
+  _verifyRootReadmesContainWidgets(pkg);
+}
+
+void _verifyRootReadmesContainWidgets(_PackageInfo pkg) {
+  for (final rootDoc in const ['README.md', 'README_EN.md']) {
+    final docFile = File(rootDoc);
+    if (!docFile.existsSync()) continue;
+    final text = docFile.readAsStringSync();
+    final missing =
+        pkg.exportedZWidgets.where((w) => !text.contains(w)).toList();
+    if (missing.isNotEmpty) {
+      stderr.writeln(
+        '     ❌ ルート $rootDoc に未記載の公開 Z-Widget (${pkg.name}) があります: '
+        '${missing.join(', ')}',
+      );
+      exit(1);
+    }
+  }
 }
 
 Future<void> _runQualityGates({

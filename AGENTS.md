@@ -70,7 +70,15 @@
 * `Canvas.draw...` で使用する `Paint`、フォント描画用のキャッシュ（`ZeroNumberPainter` 等）はフレーム毎に再生成せず、メンバ変数に保持して再利用する。
 * 数値・タイムコード描画時は `.toString()` や文字列補間を行わず、ASCII / UTF-16 グリフテーブルから直接描画する。
 
-### 4.3 ワークスペース品質ゲート
+### 4.3 ドキュメント（README / pubspec / CHANGELOG）の同期ルール
+* 公開 `Z` Widget またはコントローラを新規追加・名称変更した際は、**同一コミット内で必ず以下のドキュメントを更新**すること（`pub.dev` のパッケージページ表示と完全一致させるため）：
+  1. 対象パッケージの `packages/<pkg>/README.md`（Widget 一覧テーブルおよび使用例）
+  2. 対象パッケージの `packages/<pkg>/pubspec.yaml` の `description`
+  3. ルートの `README.md` および `README_EN.md` のパッケージ一覧テーブル
+  4. ルートの `CHANGELOG.md` および対象パッケージの `packages/<pkg>/CHANGELOG.md`
+* この同期状態は `dart run tool/distribute_widgets.dart --sync-only` によって自動監査され、公開 `Z` Widget が `README.md` に記載されていない場合は CI およびリリーススクリプトでエラーとなる。
+
+### 4.4 ワークスペース品質ゲート
 すべての変更はコミット前に以下の全検証をパスしなければならない：
 ```bash
 # 1. 解析
@@ -79,6 +87,8 @@ melos run analyze
 melos run complexity
 # 3. テスト（メモリ・異常系含む）
 melos run test
-# 4. ベンチマーク（任意だが重要変更時は必須）
+# 4. Z-Prefix & README ドキュメント同期監査
+melos run distribute:sync
+# 5. ベンチマーク（任意だが重要変更時は必須）
 melos run benchmark
 ```
