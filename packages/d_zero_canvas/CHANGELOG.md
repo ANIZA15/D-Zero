@@ -1,3 +1,7 @@
+## 0.1.1
+
+* Synchronized release of `d_zero_canvas` v0.1.1.
+
 ## 0.1.0
 
 * Initial release of `d_zero_canvas`.

@@ -1,3 +1,7 @@
+## 0.1.1
+
+* Synchronized release of `d_zero_player` v0.1.1.
+
 ## 0.1.0
 
 * Unified `0.1.0` release across the `D-Zero` monorepo.

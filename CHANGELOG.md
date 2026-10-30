@@ -2,6 +2,21 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.1 - 2026-10-30
+
+### 🔒 Security & Memory Safety Hardening
+
+* **`d_zero_core` (`v0.1.1`)**:
+  * `FloatRingBuffer` / `Float32RingBuffer`: Added `maxCapacity` (`1,048,576`) bounds check (CWE-789), lazy slice allocation for large capacities (`> 1024`), cached partial `contiguousView`, and strict `copyInto` range validation.
+  * `ZeroNumberPainter`: Added `_safeScaledInt` and `_safeRoundToInt` guards to prevent float-to-int overflow on extreme `double` inputs (`double.maxFinite`).
+* **`d_zero_player` (`v0.1.1`)**:
+  * C++ `zero_playback_state.cpp`: Added saturating 64-bit integer addition and `NaN` / `Infinity` speed sanitization in `zero_get_display_position` and `zero_set_position_anchor`.
+  * `ZeroPlayerNativeBindings`: Restricted relative `.dylib` fallback loading on macOS to debug/test environments (CWE-426).
+  * `RenderDirectSeekBar` / `RenderDirectTimeLabel`: Enforced non-nullable `ZeroPlayerController` and render-object disposal checks before reading FFI state pointers.
+  * Android `ZeroWebSocketStreamHandler`: Added 1MB pipe backpressure guard to prevent OkHttp callback thread stalls and OOM.
+* **`d_zero_waveform` & `d_zero_sensor` (`v0.1.1`)**:
+  * Added capacity upper bounds (`4096`) and post-disposal buffer zeroing to `ZeroSpectrumController` and `ZeroDetectionController`.
+
 ## 0.1.0 - 2026-10-30
 
 ### 🚀 Initial Unified Monorepo Release
