@@ -320,11 +320,33 @@ void _ensureRootChangelogVersion(String version) {
   final header = '## $version';
   if (existing.contains(header)) return;
   final dateStr = DateTime.now().toIso8601String().split('T').first;
-  final updated = existing.replaceFirst(
-    '# Changelog\n',
-    '# Changelog\n\n$header - $dateStr\n\n* Synchronized release of D-Zero workspace packages v$version.\n',
-  );
+  final commitBullets = _collectRecentCommitBullets();
+  final section = '$header - $dateStr\n\n$commitBullets\n\n';
+  final firstSectionMatch =
+      RegExp(r'^##\s+', multiLine: true).firstMatch(existing);
+  final updated = firstSectionMatch != null
+      ? existing.replaceRange(
+          firstSectionMatch.start,
+          firstSectionMatch.start,
+          section,
+        )
+      : '$existing\n$section';
   rootChangelog.writeAsStringSync(updated);
+}
+
+String _collectRecentCommitBullets() {
+  final tagRes = Process.runSync('git', ['describe', '--tags', '--abbrev=0']);
+  final lastTag =
+      tagRes.exitCode == 0 ? (tagRes.stdout as String).trim() : '';
+  final rangeArgs = lastTag.isNotEmpty
+      ? ['log', '$lastTag..HEAD', '--no-merges', '--pretty=format:* %s (%h)']
+      : ['log', '-n', '15', '--no-merges', '--pretty=format:* %s (%h)'];
+  final logRes = Process.runSync('git', rangeArgs);
+  final raw = logRes.exitCode == 0 ? (logRes.stdout as String).trim() : '';
+  if (raw.isEmpty) {
+    return '* Synchronized release of D-Zero workspace packages.';
+  }
+  return raw;
 }
 
 void _applyGitTagIfRequested(

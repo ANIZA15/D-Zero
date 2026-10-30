@@ -1,6 +1,6 @@
 # ⚡️ d_zero_sensor
 
-**Zero-allocation camera bounding-box scanner overlay (`ZBarcodeScanner`), gyroscope compass (`ZCompass`), and 2D spirit leveler (`ZLeveler`) widgets for Flutter and Impeller.**
+**Zero-allocation 3D LiDAR point cloud (`Z3DPointCloud`), camera bounding-box scanner overlay (`ZBarcodeScanner`), gyroscope compass (`ZCompass`), and 2D spirit leveler (`ZLeveler`) widgets for Flutter and Impeller.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](../../LICENSE)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
@@ -11,6 +11,7 @@
 
 | Widget | Active Alias | Controller / Listenable | Zero-Allocation Architecture |
 | :--- | :--- | :--- | :--- |
+| **`Z3DPointCloud`** | `ZLidarView` | `ZeroPointCloudController` | 3D spatial depth / LiDAR point cloud viewer storing `(x, y, z, intensity)` in SoA `Float32List` arrays and flushing depth-bucketed 3D projections via `Canvas.drawRawPoints(PointMode.points)`. |
 | **`ZBarcodeScanner`** | `ZCameraPreview` | `ZeroDetectionController` | Stores up to `capacity` ML/barcode bounding boxes in a flat `Float32List` (`[left, top, right, bottom, confidence]`) and renders corner reticles, animated laser scan line, and `ZeroNumberPainter.paintPercent` confidence tags with `0` per-box widgets or strings. |
 | **`ZCompass`** | - | `ValueListenable<double>` | Pre-records 72 compass dial ticks into a GPU `ui.Picture` once on layout, rotates the canvas directly on heading updates, and renders center degrees (`°`) via `ZeroNumberPainter.paintWithSuffix`. |
 | **`ZLeveler`** | - | `ZeroTiltController` | 2D spirit bubble leveler storing `(pitch, roll)` in a `Float32List(2)`, caching crosshair rings in a `ui.Picture`, and drawing pitch/roll degrees via `ZeroNumberPainter`. |

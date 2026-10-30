@@ -7,10 +7,11 @@
 
 ---
 
-## 📦 Distributed `Z` Widgets (13 Widgets + 8 Active Aliases)
+## 📦 Distributed `Z` Widgets (14 Widgets + 9 Active Aliases)
 
 | Widget | Active `Z` Alias | Key Zero-Allocation Mechanism |
 | :--- | :--- | :--- |
+| **`ZTerminal`** | `ZLogStream` | Single-pass GPU glyph atlas (`Canvas.drawRawAtlas`) monospace terminal / log viewer backed by a circular `Uint16List` ring buffer (`0` `String` / `TextPainter` allocations per frame). |
 | **`ZCard`** | `ZSurfaceCard` | Single-`RenderBox` surface container with pre-baked elevation bands, border, and pointer highlight (`0` `saveLayer`). |
 | **`ZBadge`** | `ZNotificationBadge` | Renders `1..99` and `99+` notification counts via `ZeroNumberPainter` with `0` `String` allocations. |
 | **`ZButton`** | `ZActionButton` | Direct pointer hit-testing and `ZeroFrameScheduler` splash animation with reactive `enabledListenable`. |

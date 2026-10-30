@@ -82,6 +82,18 @@ jobs:
           if [ ! -s /tmp/release_notes.md ]; then
             echo "Synchronized release of D-Zero workspace packages v$VERSION." > /tmp/release_notes.md
           fi
+
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${VERSION}$" | head -n 1 || true)
+          if [ -n "$PREV_TAG" ]; then
+            {
+              echo ""
+              echo "### 📝 Commits since \`$PREV_TAG\`"
+              git log "${PREV_TAG}..HEAD" --no-merges --pretty=format:"* %s (%h)"
+              echo ""
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}"
+            } >> /tmp/release_notes.md
+          fi
           cat /tmp/release_notes.md
 
       - name: Create or update Git tag

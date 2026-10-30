@@ -1,6 +1,6 @@
 # ⚡️ d_zero_chart
 
-**Zero-allocation high-frequency financial and IoT telemetry charts (`ZSparkline`, `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook`) for Flutter and Impeller.**
+**Zero-allocation high-frequency financial, 3D surface, virtual grid, and IoT telemetry charts (`Z3DSurface`, `ZVirtualGrid`, `ZSparkline`, `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook`) for Flutter and Impeller.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](../../LICENSE)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
@@ -11,6 +11,8 @@
 
 | Widget | Active Alias | Controller / Buffer | Zero-Allocation Architecture |
 | :--- | :--- | :--- | :--- |
+| **`Z3DSurface`** | `ZWaterfallChart` | `Zero3DSurfaceController` | 3D surface plot & waterfall spectrogram (`rows × cols` `Float32List` height map) rendered with perspective projection via a single `Canvas.drawVertices` + wireframe `drawRawPoints` pass. |
+| **`ZVirtualGrid`** | `ZTimeSeriesTable` | `ZeroGridDataController` | Million-cell capable 2D virtualized numeric data grid backed by a contiguous `Float64List`, rendering only visible viewport cells via `ZeroNumberPainter` (`0` `String` / `Row` / `TableCell` allocations). |
 | **`ZSparkline`** | `ZRealtimeChart` | `ZeroChartController` | Circular `FloatRingBuffer` + pre-allocated `Float32List` coordinate buffer flushed via `Canvas.drawRawPoints(PointMode.polygon)` + `ZeroNumberPainter` min/max/latest labels. |
 | **`ZCandlestickChart`** | - | `ZeroCandlestickBuffer` | Structure-of-Arrays (SoA) `Float32List` ring buffer storing `open, high, low, close` (`4` floats/candle) with zero `Candle` object allocations. |
 | **`ZHeatmap`** | - | `ZeroHeatmapBuffer` | Contiguous `rows × cols` `Float32List` matrix rendered with a pre-baked 32-bucket quantized `Paint` palette (`0` `Color.lerp` or `Paint` allocations in `paintZero`). |

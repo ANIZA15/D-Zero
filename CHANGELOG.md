@@ -1,10 +1,28 @@
 # Changelog
 
+All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
+
 ## 0.1.2 - 2026-10-30
 
-* Synchronized release of D-Zero workspace packages v0.1.2.
+### 🚀 3D Graphics, Impeller GLSL 460 Shaders & Low-Level Widgets
 
-All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
+* **`d_zero_fx` (`v0.1.2`)**:
+  * `ZShaderSurface` (`ZRuntimeShader`) & `ZeroShaderController`: Direct Impeller GLSL 460 fragment shader (`shaders/z_plasma.frag`) surface driven by a fixed `Float32List(16)` uniform buffer with automatic software fallback.
+  * `ZMetaballs3D` (`ZRaymarchSurface`) & `ZeroMetaballsController`: 3D implicit isosurface / metaball field (`shaders/z_metaballs.frag`) backed by a contiguous SoA `Float32List`.
+  * `ZMeshGradient` (`ZFluidGradient`) & `ZeroMeshGradientController`: Interactive vertex-interpolated fluid mesh gradient via `Canvas.drawVertices(VertexMode.triangles)`.
+  * `Z3DTilt` (`ZParallaxContainer`) & `Zero3DTiltController`: 3D perspective tilt container with zero-`saveLayer` specular light sheen.
+* **`d_zero_canvas` (`v0.1.2`)**:
+  * `Z3DMesh` (`Z3DGlobe`) & `Zero3DMeshController`: Real-time 3D wireframe and flat-shaded sphere/torus mesh renderer using SoA vertex buffers, in-place painter's Z-sort, and single-pass `Canvas.drawVertices` / `drawRawPoints`.
+  * `ZRibbon` (`ZLowLatencyInk`) & `ZeroRibbonController`: 120Hz/240Hz triangle-strip ribbon trail rendered via `Canvas.drawVertices(VertexMode.triangleStrip)`.
+* **`d_zero_chart` (`v0.1.2`)**:
+  * `Z3DSurface` (`ZWaterfallChart`) & `Zero3DSurfaceController`: 3D surface plot and waterfall spectrogram (`rows × cols` `Float32List` height map) with perspective projection.
+  * `ZVirtualGrid` (`ZTimeSeriesTable`) & `ZeroGridDataController`: Million-cell capable 2D virtualized numeric data grid backed by `Float64List` and rendered via `ZeroNumberPainter`.
+* **`d_zero_sensor` (`v0.1.2`)**:
+  * `Z3DPointCloud` (`ZLidarView`) & `ZeroPointCloudController`: 3D spatial depth / LiDAR point cloud viewer with SoA `Float32List` storage and depth-bucketed `Canvas.drawRawPoints`.
+* **`d_zero_ui` (`v0.1.2`)**:
+  * `ZTerminal` (`ZLogStream`) & `ZeroTerminalController`: Single-pass GPU glyph atlas (`Canvas.drawRawAtlas`) monospace terminal / high-frequency log stream backed by a circular `Uint16List` buffer.
+* **CI / Release Automation & FFI Testing**:
+  * Automatic macOS test `.dylib` compilation fallback in `ZeroPlayerNativeBindings` and CI quality gate integration (`tool/release.sh`, `.github/workflows/ci.yml`, `.github/workflows/release_tag.yml`).
 
 ## 0.1.1 - 2026-10-30
 

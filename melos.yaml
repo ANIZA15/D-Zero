@@ -56,3 +56,15 @@ scripts:
   distribute:bundle:
     run: dart run tool/distribute_widgets.dart --bundle --skip-checks
     description: Generate local release archives (.tar.gz), manifest.json, and unified barrel file in dist/.
+
+  release:
+    run: ./tool/release.sh patch --yes
+    description: Bump patch version, run quality gates, commit & push (triggers GitHub tag/release), and publish to pub.dev.
+
+  release:minor:
+    run: ./tool/release.sh minor --yes
+    description: Bump minor version, run quality gates, commit & push, and publish to pub.dev.
+
+  release:major:
+    run: ./tool/release.sh major --yes
+    description: Bump major version, run quality gates, commit & push, and publish to pub.dev.

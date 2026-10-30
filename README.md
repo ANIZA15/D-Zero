@@ -84,35 +84,37 @@ D-Zero/
 │   └── benchmark_app/          # ⚡️ 全パッケージ統合比較ベンチマークアプリ (FPS / CPU % / Memory HUD)
 ├── benchmarks/                 # ⚡️ CLI マイクロベンチマーク (アロケーション/スループット定量計測)
 ├── tool/
+│   ├── README.md               # 📖 リリース・配布・品質管理ツールの使い方ガイド
+│   ├── release.sh              # 🚀 ワンコマンド一括リリース (Bump -> Test -> Push/Tag -> pub.dev)
 │   ├── check_complexity.dart   # 🛡️ 循環的複雑度 (McCabe CC <= 15) 自動検証ツール
-│   └── distribute_widgets.dart # 🚀 トポロジカル順一括 검증・pub.dev 公開・バンドル生成パイプライン
+│   └── distribute_widgets.dart # 📦 トポロジカル順一括検証・pub.dev 公開・バンドル生成パイプライン
 └── packages/
     ├── d_zero_core/            # ゼロアロケーション共通基盤ライブラリ (+ example ベンチマーク App)
     ├── d_zero_player/          # ゼロジャンク FFI 動画プレイヤー (+ example 比較ベンチマーク App)
     ├── d_zero_counter/         # 高速カウンター・タイマー・価格ティッカー・FPS計 (+ example ベンチマーク App)
-    ├── d_zero_ui/              # 高頻度 UI コントロール群 (+ example ベンチマーク App)
+    ├── d_zero_ui/              # 高頻度 UI コントロール・高速ターミナル (+ example ベンチマーク App)
     ├── d_zero_waveform/        # リアルタイム音声波形・FFT・メーター (+ example ベンチマーク App)
-    ├── d_zero_chart/           # 高頻度金融チャート・気配値板・ヒートマップ (+ example ベンチマーク App)
+    ├── d_zero_chart/           # 高頻度金融チャート・3Dサーフェス・仮想グリッド (+ example ベンチマーク App)
     ├── d_zero_particles/       # SIMD SoA パーティクル & 紙吹雪シミュレーション (+ example ベンチマーク App)
-    ├── d_zero_fx/              # saveLayer フリー視覚エフェクト (+ example ベンチマーク App)
-    ├── d_zero_canvas/          # 大量要素キャンバス・弾幕・無限グリッド (+ example ベンチマーク App)
-    └── d_zero_sensor/          # カメラ枠オーバーレイ・コンパス・水準器 (+ example ベンチマーク App)
+    ├── d_zero_fx/              # saveLayerフリー視覚効果・GLSL 460 シェーダー・3Dメタボール・3D傾き (+ example)
+    ├── d_zero_canvas/          # 大量要素キャンバス・3Dメッシュ球体・弾幕・リボン (+ example ベンチマーク App)
+    └── d_zero_sensor/          # 3D LiDAR点群・カメラ枠オーバーレイ・コンパス・水準器 (+ example ベンチマーク App)
 ```
 
-### 🔗 各パッケージと個別ベンチマークアプリへのリンク
+### 🔗 各パッケージと公開 `Z` Widget 一覧（3D / GLSL 460 シェーダー対応）
 
 | パッケージ | バージョン | 公開 `Z` Widget & 主要コンポーネント | パッケージ詳細 | 高負荷ベンチマーク App |
 | :--- | :---: | :--- | :---: | :---: |
-| **`d_zero_core`** | `0.1.0` | **【共通基盤】** `ZWidget`, `ZLeafWidget`, `ZSingleChildWidget`, `ZeroRenderBox`, `ZeroNumberPainter`, `FloatRingBuffer`, `ZeroPool<T>`, `ZeroFrameScheduler`, `ZeroIntNotifier`, `ZeroDoubleNotifier` | [📦 README](packages/d_zero_core/README.md) | [📱 Benchmark](packages/d_zero_core/example) |
-| **`d_zero_player`** | `0.1.0` | **【超低遅延ビデオ】** `ZPlayer` (`ZPlayerView`), `ZDirectSeekBar` (`ZSeekBar`), `ZDirectTimeLabel` (`ZTimeLabel`), `ZeroPlayerController`, `zero_blur.frag` | [📦 README](packages/d_zero_player/README.md) ([🇯🇵 JA](packages/d_zero_player/README_JA.md)) | [📱 Benchmark](packages/d_zero_player/example) |
-| **`d_zero_counter`** | `0.1.0` | **【数値・タイマー・計器】** `ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer` (`ZAnimatedNumber`), `ZPriceTicker` (`ZCurrencyLabel`), `ZFPSMonitor` (`ZFrameOverlay`) | [📦 README](packages/d_zero_counter/README.md) | [📱 Benchmark](packages/d_zero_counter/example) |
-| **`d_zero_ui`** | `0.1.0` | **【高頻度 UI・入力コントロール】** `ZCard` (`ZSurfaceCard`), `ZBadge` (`ZNotificationBadge`), `ZButton` (`ZActionButton`), `ZSwitch` (`ZToggle`), `ZSlider`, `ZRangeSlider`, `ZLinearProgress`, `ZCircularProgress`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), `ZKnob` (`ZRotaryDial`), `ZMarquee` (`ZRollingText`), `ZTypewriterText` | [📦 README](packages/d_zero_ui/README.md) | [📱 Benchmark](packages/d_zero_ui/example) |
-| **`d_zero_waveform`** | `0.1.0` | **【リアルタイムオーディオ】** `ZWaveform` (`ZAudioVisualizer`), `ZSpectrumAnalyzer`, `ZAudioMeter` (`ZVUMeter`) | [📦 README](packages/d_zero_waveform/README.md) | [📱 Benchmark](packages/d_zero_waveform/example) |
-| **`d_zero_chart`** | `0.1.0` | **【高頻度チャート・板情報】** `ZSparkline` (`ZRealtimeChart`), `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook` (`ZDataGrid`) | [📦 README](packages/d_zero_chart/README.md) | [📱 Benchmark](packages/d_zero_chart/example) |
-| **`d_zero_particles`** | `0.1.0` | **【SIMD SoA パーティクル】** `ZParticles`, `ZConfetti`, `ZeroParticleController`, `ZeroConfettiController` | [📦 README](packages/d_zero_particles/README.md) | [📱 Benchmark](packages/d_zero_particles/example) |
-| **`d_zero_fx`** | `0.1.0` | **【ゼロ saveLayer 視覚効果】** `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`) | [📦 README](packages/d_zero_fx/README.md) | [📱 Benchmark](packages/d_zero_fx/example) |
-| **`d_zero_canvas`** | `0.1.0` | **【大量要素・高速キャンバス】** `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas` | [📦 README](packages/d_zero_canvas/README.md) | [📱 Benchmark](packages/d_zero_canvas/example) |
-| **`d_zero_sensor`** | `0.1.0` | **【カメラ・センサー直結 UI】** `ZBarcodeScanner` (`ZCameraPreview`), `ZCompass`, `ZLeveler` | [📦 README](packages/d_zero_sensor/README.md) | [📱 Benchmark](packages/d_zero_sensor/example) |
+| **`d_zero_core`** | `0.1.2` | **【共通基盤】** `ZWidget`, `ZLeafWidget`, `ZSingleChildWidget`, `ZeroRenderBox`, `ZeroNumberPainter`, `FloatRingBuffer`, `ZeroPool<T>`, `ZeroFrameScheduler`, `ZeroIntNotifier`, `ZeroDoubleNotifier` | [📦 README](packages/d_zero_core/README.md) | [📱 Benchmark](packages/d_zero_core/example) |
+| **`d_zero_player`** | `0.1.2` | **【超低遅延ビデオ】** `ZPlayer` (`ZPlayerView`), `ZDirectSeekBar` (`ZSeekBar`), `ZDirectTimeLabel` (`ZTimeLabel`), `ZeroPlayerController`, `zero_blur.frag` | [📦 README](packages/d_zero_player/README.md) ([🇯🇵 JA](packages/d_zero_player/README_JA.md)) | [📱 Benchmark](packages/d_zero_player/example) |
+| **`d_zero_counter`** | `0.1.2` | **【数値・タイマー・計器】** `ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer` (`ZAnimatedNumber`), `ZPriceTicker` (`ZCurrencyLabel`), `ZFPSMonitor` (`ZFrameOverlay`) | [📦 README](packages/d_zero_counter/README.md) | [📱 Benchmark](packages/d_zero_counter/example) |
+| **`d_zero_ui`** | `0.1.2` | **【高頻度 UI・高速ターミナル】** `ZTerminal` (`ZLogStream`), `ZCard` (`ZSurfaceCard`), `ZBadge` (`ZNotificationBadge`), `ZButton` (`ZActionButton`), `ZSwitch` (`ZToggle`), `ZSlider`, `ZRangeSlider`, `ZLinearProgress`, `ZCircularProgress`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), `ZKnob` (`ZRotaryDial`), `ZMarquee` (`ZRollingText`), `ZTypewriterText` | [📦 README](packages/d_zero_ui/README.md) | [📱 Benchmark](packages/d_zero_ui/example) |
+| **`d_zero_waveform`** | `0.1.2` | **【リアルタイムオーディオ】** `ZWaveform` (`ZAudioVisualizer`), `ZSpectrumAnalyzer`, `ZAudioMeter` (`ZVUMeter`) | [📦 README](packages/d_zero_waveform/README.md) | [📱 Benchmark](packages/d_zero_waveform/example) |
+| **`d_zero_chart`** | `0.1.2` | **【高頻度チャート・3Dサーフェス・仮想グリッド】** `Z3DSurface` (`ZWaterfallChart`), `ZVirtualGrid` (`ZTimeSeriesTable`), `ZSparkline` (`ZRealtimeChart`), `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook` (`ZDataGrid`) | [📦 README](packages/d_zero_chart/README.md) | [📱 Benchmark](packages/d_zero_chart/example) |
+| **`d_zero_particles`** | `0.1.2` | **【SIMD SoA パーティクル】** `ZParticles`, `ZConfetti`, `ZeroParticleController`, `ZeroConfettiController` | [📦 README](packages/d_zero_particles/README.md) | [📱 Benchmark](packages/d_zero_particles/example) |
+| **`d_zero_fx`** | `0.1.2` | **【3D・GLSL 460 シェーダー・視覚効果】** `ZShaderSurface` (`ZRuntimeShader`), `ZMetaballs3D` (`ZRaymarchSurface`), `ZMeshGradient` (`ZFluidGradient`), `Z3DTilt` (`ZParallaxContainer`), `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`) | [📦 README](packages/d_zero_fx/README.md) | [📱 Benchmark](packages/d_zero_fx/example) |
+| **`d_zero_canvas`** | `0.1.2` | **【3Dメッシュ球体・大量要素キャンバス】** `Z3DMesh` (`Z3DGlobe`), `ZRibbon` (`ZLowLatencyInk`), `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas` | [📦 README](packages/d_zero_canvas/README.md) | [📱 Benchmark](packages/d_zero_canvas/example) |
+| **`d_zero_sensor`** | `0.1.2` | **【3D点群 LiDAR・センサー直結 UI】** `Z3DPointCloud` (`ZLidarView`), `ZBarcodeScanner` (`ZCameraPreview`), `ZCompass`, `ZLeveler` | [📦 README](packages/d_zero_sensor/README.md) | [📱 Benchmark](packages/d_zero_sensor/example) |
 
 ---
 
@@ -168,6 +170,10 @@ flutter test packages/d_zero_core/test packages/d_zero_counter/test packages/d_z
 
 # 5. Z-Prefix 監査 & pub.dev 一括配布検証 (Dry-Run)
 dart run tool/distribute_widgets.dart --dry-run
+
+# 6. ワンコマンド一括リリース (Version Bump -> 品質検証 -> Git Commit/Push/Tag -> pub.dev 公開)
+#    詳細は tool/README.md を参照
+./tool/release.sh
 ```
 
 ---
