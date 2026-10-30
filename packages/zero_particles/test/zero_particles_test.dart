@@ -194,4 +194,91 @@ void main() {
       expect(buffer.positions[0], isNotNull);
     });
   });
+
+  group('【3. ZConfetti & ZeroConfettiController 物理・メモリ・ライフサイクル検証】', () {
+    test('ZeroConfettiController manages SoA arrays, burst, double-dispose, and post-dispose safety', () {
+      final controller = ZeroConfettiController(capacity: 120);
+      expect(controller.isDisposed, isFalse);
+      expect(controller.activeCount, equals(0));
+      expect(controller.x.length, equals(120));
+      expect(controller.y.length, equals(120));
+      expect(controller.vx.length, equals(120));
+      expect(controller.vy.length, equals(120));
+      expect(controller.angle.length, equals(120));
+      expect(controller.angularVelocity.length, equals(120));
+      expect(controller.size.length, equals(120));
+      expect(controller.life.length, equals(120));
+      expect(controller.colors.length, equals(120));
+
+      controller.burst(origin: const Offset(150, 100), count: 60);
+      expect(controller.activeCount, equals(60));
+
+      // 1,000-frame zero-allocation stress test
+      for (int frame = 0; frame < 1000; frame++) {
+        if (frame % 200 == 0) {
+          controller.burst(count: 40);
+        }
+        controller.step(dt: 0.016, width: 400, height: 300);
+      }
+
+      // Double-dispose and post-dispose safety
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      expect(() => controller.dispose(), returnsNormally);
+      expect(() => controller.burst(count: 30), returnsNormally);
+      expect(() => controller.step(dt: 0.016, width: 400, height: 300), returnsNormally);
+      expect(controller.activeCount, equals(0));
+      expect(controller.x.isEmpty, isTrue);
+      expect(controller.colors.isEmpty, isTrue);
+      expect(controller.bucketSegments(0).isEmpty, isTrue);
+    });
+
+    testWidgets('ZConfetti renders confetti bursts without widget rebuilds and cleans up on unmount', (tester) async {
+      final controller = ZeroConfettiController(capacity: 180);
+      int rebuildCount = 0;
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Builder(
+            builder: (context) {
+              rebuildCount++;
+              return SizedBox(
+                width: 300,
+                height: 240,
+                child: ZConfetti(controller: controller),
+              );
+            },
+          ),
+        ),
+      );
+
+      expect(rebuildCount, equals(1));
+      controller.burst(origin: const Offset(150, 120), count: 60);
+
+      for (int i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(rebuildCount, equals(1));
+
+      // Deprecated alias check
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            width: 300,
+            height: 240,
+            // ignore: deprecated_member_use_from_same_package
+            child: ZeroConfetti(controller: controller),
+          ),
+        ),
+      );
+      expect(find.byType(ZConfetti), findsOneWidget);
+
+      // Unmount and verify Ticker stops
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.hasRunningAnimations, isFalse);
+      controller.dispose();
+    });
+  });
 }

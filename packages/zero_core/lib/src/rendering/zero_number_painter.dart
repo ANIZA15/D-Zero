@@ -65,18 +65,44 @@ class _SharedGlyphAtlas {
 ///   glyph source rects and transforms are written into pre-allocated [Float32List] / [Float32x4List]
 ///   buffers and flushed to Impeller/Skia in **a single [Canvas.drawRawAtlas] call**.
 class ZeroNumberPainter {
-  static const int _glyphCount = 16; // padded to 16 for 64-byte alignment
-  static const int _activeGlyphCount = 15;
+  static const int _glyphCount = 24; // padded to 24 for alignment
+  static const int _activeGlyphCount = 23;
   static const int _glyphColon = 10;
   static const int _glyphDot = 11;
   static const int _glyphDash = 12;
   static const int _glyphSlash = 13;
   static const int _glyphSpaceSlashSpace = 14;
-  static const int _maxBatchGlyphs = 32;
+
+  /// Glyph ID for `'+'`.
+  static const int glyphPlus = 15;
+
+  /// Glyph ID for `','` (thousands separator).
+  static const int glyphComma = 16;
+
+  /// Glyph ID for `'%'`.
+  static const int glyphPercent = 17;
+
+  /// Glyph ID for `'\$'`.
+  static const int glyphDollar = 18;
+
+  /// Glyph ID for `'¥'`.
+  static const int glyphYen = 19;
+
+  /// Glyph ID for `' FPS'`.
+  static const int glyphFps = 20;
+
+  /// Glyph ID for `' ms'`.
+  static const int glyphMs = 21;
+
+  /// Glyph ID for `'°'`.
+  static const int glyphDegree = 22;
+
+  static const int _maxBatchGlyphs = 64;
 
   static const List<String> _glyphLiterals = <String>[
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     ':', '.', '-', '/', ' / ',
+    '+', ',', '%', '\$', '¥', ' FPS', ' ms', '°',
   ];
 
   static const List<int> _pow10Table = <int>[
@@ -272,6 +298,12 @@ class ZeroNumberPainter {
 
   /// Width of " / " delimiter.
   double get spaceSlashSpaceWidth => _glyphWidths[_glyphSpaceSlashSpace];
+
+  /// Returns the width of a specific glyph ID.
+  double glyphWidth(int glyphId) {
+    if (glyphId < 0 || glyphId >= _activeGlyphCount) return 0.0;
+    return _glyphWidths[glyphId];
+  }
 
   /// Calculates expected width for a timecode formatted as "MM:SS / MM:SS".
   double estimateTimeProgressWidth({bool includeHours = false}) {
@@ -563,6 +595,198 @@ class ZeroNumberPainter {
     batchIdx = _stageTimecode(batchIdx, currentX, y, durationMs, includeHours);
     _flushBatch(canvas, batchIdx);
     return _computeBatchSpan(offset.dx, batchIdx, true);
+  }
+
+  int _stageGroupedInt(
+    int startBatchIdx,
+    double startX,
+    double y,
+    int nonNegValue,
+    bool thousandsSeparator,
+    bool monospaceAlignment,
+  ) {
+    final int digitCount = _extractDigits(nonNegValue, 1);
+    int batchIdx = startBatchIdx;
+    double currentX = startX;
+    for (int i = digitCount - 1; i >= 0 && batchIdx < _maxBatchGlyphs; i--) {
+      currentX += _emitGlyph(batchIdx++, _digitBuffer[i], currentX, y, monospaceAlignment);
+      if (thousandsSeparator && i > 0 && (i % 3) == 0 && batchIdx < _maxBatchGlyphs) {
+        currentX += _emitGlyph(batchIdx++, glyphComma, currentX, y, false);
+      }
+    }
+    return batchIdx;
+  }
+
+  /// Paints a currency value (e.g., `+$12,345.67` or `-¥1,200`) in a single
+  /// [Canvas.drawRawAtlas] call without allocating any [String].
+  double paintCurrency(
+    Canvas canvas,
+    Offset offset,
+    double value, {
+    int currencyGlyph = glyphDollar,
+    int fractionDigits = 2,
+    bool showPlusSign = false,
+    bool thousandsSeparator = true,
+    bool monospaceAlignment = true,
+  }) {
+    if (_isDisposed || value.isNaN || value.isInfinite) return 0.0;
+    final int clampedFrac = fractionDigits.clamp(0, 6);
+    final int scale = _pow10Table[clampedFrac];
+    final double absVal = value < 0.0 ? -value : value;
+    final int scaled = (absVal * scale + 0.5).floor();
+    final int intPart = scaled ~/ scale;
+    final int fracPart = scaled - intPart * scale;
+
+    int batchIdx = 0;
+    double currentX = offset.dx;
+    final double y = offset.dy;
+
+    if (value < 0.0) {
+      currentX += _emitGlyph(batchIdx++, _glyphDash, currentX, y, false);
+    } else if (showPlusSign && value > 0.0) {
+      currentX += _emitGlyph(batchIdx++, glyphPlus, currentX, y, false);
+    }
+    currentX += _emitGlyph(batchIdx++, currencyGlyph, currentX, y, false);
+
+    batchIdx = _stageGroupedInt(
+      batchIdx,
+      currentX,
+      y,
+      intPart,
+      thousandsSeparator,
+      monospaceAlignment,
+    );
+    currentX = _computeEndCursor(offset.dx, batchIdx, monospaceAlignment);
+    if (clampedFrac > 0) {
+      currentX += _emitGlyph(batchIdx++, _glyphDot, currentX, y, false);
+      batchIdx = _stageInt(batchIdx, currentX, y, fracPart, clampedFrac, monospaceAlignment);
+    }
+    _flushBatch(canvas, batchIdx);
+    return _computeBatchSpan(offset.dx, batchIdx, monospaceAlignment);
+  }
+
+  /// Paints a percentage value (e.g., `+12.5%` or `99.9%`) in a single GPU draw call.
+  double paintPercent(
+    Canvas canvas,
+    Offset offset,
+    double value, {
+    int fractionDigits = 1,
+    bool showPlusSign = false,
+    bool monospaceAlignment = true,
+  }) {
+    if (_isDisposed || value.isNaN || value.isInfinite) return 0.0;
+    return paintWithSuffix(
+      canvas,
+      offset,
+      value,
+      suffixGlyph: glyphPercent,
+      fractionDigits: fractionDigits,
+      showPlusSign: showPlusSign,
+      monospaceAlignment: monospaceAlignment,
+    );
+  }
+
+  /// Paints a numeric [value] followed by a pre-baked [suffixGlyph]
+  /// (e.g., [glyphFps], [glyphMs], [glyphPercent], [glyphDegree]) in a single GPU draw call.
+  double paintWithSuffix(
+    Canvas canvas,
+    Offset offset,
+    double value, {
+    required int suffixGlyph,
+    int fractionDigits = 1,
+    bool showPlusSign = false,
+    bool monospaceAlignment = true,
+  }) {
+    if (_isDisposed || value.isNaN || value.isInfinite) return 0.0;
+    final int clampedFrac = fractionDigits.clamp(0, 6);
+    final int scale = _pow10Table[clampedFrac];
+    final double absVal = value < 0.0 ? -value : value;
+    final int scaled = (absVal * scale + 0.5).floor();
+    final int intPart = scaled ~/ scale;
+    final int fracPart = scaled - intPart * scale;
+
+    int batchIdx = 0;
+    double currentX = offset.dx;
+    final double y = offset.dy;
+    if (value < 0.0) {
+      currentX += _emitGlyph(batchIdx++, _glyphDash, currentX, y, false);
+    } else if (showPlusSign && value > 0.0) {
+      currentX += _emitGlyph(batchIdx++, glyphPlus, currentX, y, false);
+    }
+
+    batchIdx = _stageInt(batchIdx, currentX, y, intPart, 1, monospaceAlignment);
+    currentX = _computeEndCursor(offset.dx, batchIdx, monospaceAlignment);
+    if (clampedFrac > 0) {
+      currentX += _emitGlyph(batchIdx++, _glyphDot, currentX, y, false);
+      batchIdx = _stageInt(batchIdx, currentX, y, fracPart, clampedFrac, monospaceAlignment);
+      currentX = _computeEndCursor(offset.dx, batchIdx, monospaceAlignment);
+    }
+    final double suffixW = _emitGlyph(batchIdx++, suffixGlyph, currentX, y, false);
+    _flushBatch(canvas, batchIdx);
+    return (currentX + suffixW) - offset.dx;
+  }
+
+  /// Paints a smooth vertical-rolling odometer for a continuous [value] in a single
+  /// [Canvas.drawRawAtlas] call without any heap allocation.
+  double paintOdometer(
+    Canvas canvas,
+    Offset offset,
+    double value, {
+    int minDigits = 1,
+  }) {
+    if (_isDisposed || value.isNaN || value.isInfinite) return 0.0;
+    final double nonNeg = value < 0.0 ? -value : value;
+    final int intFloor = nonNeg.floor();
+    final double frac = nonNeg - intFloor;
+    final int digitCount = _extractDigits(intFloor, minDigits);
+    final double totalWidth = digitCount * _maxDigitWidth;
+
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(offset.dx, offset.dy, totalWidth, _digitHeight));
+    final int batchIdx = _stageOdometerLeftToRight(offset.dx, offset.dy, digitCount, frac);
+    _flushBatch(canvas, batchIdx);
+    canvas.restore();
+    return totalWidth;
+  }
+
+  int _stageOdometerLeftToRight(
+    double startX,
+    double y,
+    int digitCount,
+    double onesFraction,
+  ) {
+    int batchIdx = 0;
+    for (int i = digitCount - 1; i >= 0; i--) {
+      final double colX = startX + (digitCount - 1 - i) * _maxDigitWidth;
+      final double roll = _computeColumnRoll(i, onesFraction);
+      batchIdx = _stageOdometerColumn(batchIdx, colX, y, _digitBuffer[i], roll);
+    }
+    return batchIdx;
+  }
+
+  double _computeColumnRoll(int placeIndex, double onesFraction) {
+    for (int j = 0; j < placeIndex; j++) {
+      if (_digitBuffer[j] != 9) return 0.0;
+    }
+    return onesFraction;
+  }
+
+  int _stageOdometerColumn(
+    int batchIdx,
+    double x,
+    double y,
+    int digit,
+    double rollFraction,
+  ) {
+    if (rollFraction <= 0.001) {
+      _emitGlyph(batchIdx, digit, x, y, true);
+      return batchIdx + 1;
+    }
+    final double shiftY = rollFraction * _digitHeight;
+    _emitGlyph(batchIdx, digit, x, y - shiftY, true);
+    final int nextDigit = digit == 9 ? 0 : digit + 1;
+    _emitGlyph(batchIdx + 1, nextDigit, x, y + _digitHeight - shiftY, true);
+    return batchIdx + 2;
   }
 
   /// Decrements the shared atlas reference count and disposes GPU resources when reaching zero.

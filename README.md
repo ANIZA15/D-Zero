@@ -83,22 +83,31 @@ d-zero/
 ├── benchmarks/          # ⚡️ CLI マイクロベンチマーク (アロケーション/スループット定量計測)
 └── packages/
     ├── zero_core/       # ゼロアロケーション共通基盤ライブラリ
-    │   └── example/     # zero_core サンプル (RingBuffer / ObjectPool)
-    ├── zero_player/     # ゼロジャンク動画プレイヤー
-    │   └── example/     # zero_player vs standard video_player 比較アプリ
-    └── zero_counter/    # 高速カウンター & ストップウォッチ
-        └── example/     # zero_counter サンプル (高速カウント / ストップウォッチ)
+    ├── zero_player/     # ゼロジャンク動画プレイヤー (ZPlayer, ZSeekBar, ZTimeLabel)
+    ├── zero_counter/    # 高速カウンター・タイマー・価格ティッカー・FPS計 (ZCounter, ZStopwatch, ZCountdown, ZOdometer, ZPriceTicker, ZFPSMonitor)
+    ├── zero_ui/         # 高頻度 UI コントロール (ZSlider, ZRangeSlider, ZLinearProgress, ZCircularProgress, ZGauge, ZJoystick, ZKnob, ZMarquee, ZTypewriterText)
+    ├── zero_waveform/   # リアルタイム音声波形・FFT・メーター (ZWaveform, ZSpectrumAnalyzer, ZAudioMeter)
+    ├── zero_chart/      # 高頻度チャート・気配値板 (ZSparkline, ZCandlestickChart, ZHeatmap, ZOrderBook)
+    ├── zero_particles/  # SoA パーティクル & 紙吹雪シミュレーション (ZParticles, ZConfetti)
+    ├── zero_fx/         # saveLayer フリー視覚エフェクト (ZShimmer, ZBlur, ZRipple, ZLiquidProgress)
+    ├── zero_canvas/     # 大量要素キャンバス (ZDanmaku, ZInfiniteGrid, ZFreehandCanvas)
+    └── zero_sensor/     # カメラ枠オーバーレイ・センサー計器 (ZBarcodeScanner, ZCompass, ZLeveler)
 ```
 
 ### 🔗 各パッケージへのリンク
 
 | パッケージ | バージョン | 説明 | リンク | サンプル App |
 | :--- | :---: | :--- | :---: | :---: |
-| **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、文字列を生成しない数値・タイムコード描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) | [📱 サンプル](packages/zero_core/example) |
-| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ハードウェアゼロコピーテクスチャ、ゼロリビルド UI（`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`）、Impeller 最適化 Kawase Blur シェーダーを備えた完全ゼロジャンク動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
-| **`zero_counter`** | `0.1.0` | **【超高速計器・カウンター】** 秒間数百回〜数千回のインクリメントやストップウォッチを、Widget リビルド 0・String アロケーション 0 で滑らかに描画する Widget 群。 | [📦 パッケージ詳細](packages/zero_counter) | [📱 サンプル](packages/zero_counter/example) |
-| *(Planned)* **`zero_waveform`** | - | **【リアルタイムオーディオ】** SoA（Structure of Arrays）リングバッファを用いた、音声波形およびスペクトラムアナライザー描画 Widget。 | 企画中 | - |
-| *(Planned)* **`zero_chart`** | - | **【高頻度時系列チャート】** 金融ティックデータ・IoT センサー向けの超高頻度リアルタイム折れ線・オシロスコープ Widget。 | 企画中 | - |
+| **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、単一 GPU ドローコール数値・通貨・オドメーター描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) | [📱 サンプル](packages/zero_core/example) |
+| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ゼロリビルド UI（`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`）を備えた動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
+| **`zero_counter`** | `0.1.0` | **【数値・タイマー・計器】** `ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer` (`ZAnimatedNumber`), `ZPriceTicker` (`ZCurrencyLabel`), `ZFPSMonitor` (`ZFrameOverlay`)。 | [📦 パッケージ詳細](packages/zero_counter) | [📱 サンプル](packages/zero_counter/example) |
+| **`zero_ui`** | `0.1.0` | **【高頻度 UI・入力コントロール】** `ZSlider`, `ZRangeSlider`, `ZLinearProgress`, `ZCircularProgress`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), `ZKnob` (`ZRotaryDial`), `ZMarquee` (`ZRollingText`), `ZTypewriterText`。 | [📦 パッケージ詳細](packages/zero_ui) | - |
+| **`zero_waveform`** | `0.1.0` | **【リアルタイムオーディオ】** `ZWaveform` (`ZAudioVisualizer`), `ZSpectrumAnalyzer`, `ZAudioMeter` (`ZVUMeter`)。 | [📦 パッケージ詳細](packages/zero_waveform) | - |
+| **`zero_chart`** | `0.1.0` | **【高頻度チャート・板情報】** `ZSparkline` (`ZRealtimeChart`), `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook` (`ZDataGrid`)。 | [📦 パッケージ詳細](packages/zero_chart) | - |
+| **`zero_particles`** | `0.1.0` | **【SoA パーティクル】** `ZParticles`, `ZConfetti`。 | [📦 パッケージ詳細](packages/zero_particles) | - |
+| **`zero_fx`** | `0.1.0` | **【ゼロ saveLayer 視覚効果】** `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`)。 | [📦 パッケージ詳細](packages/zero_fx) | - |
+| **`zero_canvas`** | `0.1.0` | **【大量要素・高速キャンバス】** `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas`。 | [📦 パッケージ詳細](packages/zero_canvas) | - |
+| **`zero_sensor`** | `0.1.0` | **【カメラ・センサー直結 UI】** `ZBarcodeScanner` (`ZCameraPreview`), `ZCompass`, `ZLeveler`。 | [📦 パッケージ詳細](packages/zero_sensor) | - |
 
 ---
 

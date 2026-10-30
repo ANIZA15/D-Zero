@@ -278,6 +278,99 @@ void main() {
       p2.dispose();
       expect(ZeroNumberPainter.cachedAtlasCount, equals(countBefore - 1));
     });
+
+    test('paintCurrency, paintPercent, paintWithSuffix, and paintOdometer render with zero allocations and handle post-dispose safely', () {
+      final painter = ZeroNumberPainter();
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // paintCurrency: positive with plus sign, negative, Yen without separator
+      final wCurrPos = painter.paintCurrency(
+        canvas,
+        Offset.zero,
+        12345.67,
+        currencyGlyph: ZeroNumberPainter.glyphDollar,
+        fractionDigits: 2,
+        showPlusSign: true,
+        thousandsSeparator: true,
+      );
+      final wCurrNeg = painter.paintCurrency(
+        canvas,
+        Offset.zero,
+        -1200.0,
+        currencyGlyph: ZeroNumberPainter.glyphYen,
+        fractionDigits: 0,
+        thousandsSeparator: true,
+      );
+      expect(wCurrPos, greaterThan(0.0));
+      expect(wCurrNeg, greaterThan(0.0));
+
+      // paintPercent
+      final wPct = painter.paintPercent(
+        canvas,
+        Offset.zero,
+        99.9,
+        fractionDigits: 1,
+        showPlusSign: true,
+      );
+      expect(wPct, greaterThan(0.0));
+
+      // paintWithSuffix
+      final wFps = painter.paintWithSuffix(
+        canvas,
+        Offset.zero,
+        120.0,
+        suffixGlyph: ZeroNumberPainter.glyphFps,
+        fractionDigits: 0,
+      );
+      final wMs = painter.paintWithSuffix(
+        canvas,
+        Offset.zero,
+        8.3,
+        suffixGlyph: ZeroNumberPainter.glyphMs,
+        fractionDigits: 1,
+      );
+      expect(wFps, greaterThan(0.0));
+      expect(wMs, greaterThan(0.0));
+
+      // paintOdometer (stationary and rolling 9 -> 0)
+      final wOdo1 = painter.paintOdometer(canvas, Offset.zero, 42.0, minDigits: 4);
+      final wOdo2 = painter.paintOdometer(canvas, Offset.zero, 99.5, minDigits: 4);
+      expect(wOdo1, greaterThan(0.0));
+      expect(wOdo2, equals(wOdo1));
+
+      // NaN / Infinity safety
+      expect(painter.paintCurrency(canvas, Offset.zero, double.nan), equals(0.0));
+      expect(painter.paintPercent(canvas, Offset.zero, double.infinity), equals(0.0));
+      expect(
+        painter.paintWithSuffix(
+          canvas,
+          Offset.zero,
+          double.negativeInfinity,
+          suffixGlyph: ZeroNumberPainter.glyphDegree,
+        ),
+        equals(0.0),
+      );
+      expect(painter.paintOdometer(canvas, Offset.zero, double.nan), equals(0.0));
+
+      // Post-dispose safety returning 0.0
+      painter.dispose();
+      expect(painter.isDisposed, isTrue);
+      expect(painter.paintCurrency(canvas, Offset.zero, 100.0), equals(0.0));
+      expect(painter.paintPercent(canvas, Offset.zero, 50.0), equals(0.0));
+      expect(
+        painter.paintWithSuffix(
+          canvas,
+          Offset.zero,
+          60.0,
+          suffixGlyph: ZeroNumberPainter.glyphFps,
+        ),
+        equals(0.0),
+      );
+      expect(painter.paintOdometer(canvas, Offset.zero, 12.3), equals(0.0));
+
+      recorder.endRecording().dispose();
+    });
   });
 
   group('【4. ZeroRenderBox ライフサイクル & ZeroFrameScheduler 共有 Ticker テスト】', () {

@@ -13,6 +13,12 @@ workspace:
   - packages/zero_counter
   - packages/zero_counter/example
   - packages/zero_particles
+  - packages/zero_ui
+  - packages/zero_waveform
+  - packages/zero_chart
+  - packages/zero_fx
+  - packages/zero_canvas
+  - packages/zero_sensor
   - apps/benchmark_app
   - benchmarks
 
