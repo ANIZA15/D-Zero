@@ -20,7 +20,7 @@ We pay special attention to memory safety and resource lifecycle issues, includi
 
 Please **do not** report security vulnerabilities through public GitHub issues.
 
-Instead, please report them privately via [GitHub Private Vulnerability Reporting](https://github.com/ANIZA15/D-Zero/security/advisories/new) on the repository.
+Instead, please report them privately via [GitHub Private Vulnerability Reporting](https://github.com/ANIZA15/D-Zero/security/advisories/new) on the repository or by email to [pakukotaro0105@gmail.com](mailto:pakukotaro0105@gmail.com).
 
 Include the following details in your report:
 1. Affected package(s) and version(s).

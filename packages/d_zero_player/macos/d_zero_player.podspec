@@ -7,7 +7,7 @@ A next-generation video player utilizing FFI shared-memory and Impeller-optimize
                        DESC
   s.homepage         = 'https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_player'
   s.license          = { :type => 'MIT' }
-  s.author           = { 'fexcy' => 'contact@fexcy.com' }
+  s.author           = { 'fexcy' => 'pakukotaro0105@gmail.com' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*.{h,m,mm,swift}', '../src/**/*.{h,cpp}'
   s.public_header_files = 'Classes/**/*.h', '../src/**/*.h'
