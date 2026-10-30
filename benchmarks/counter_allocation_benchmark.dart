@@ -91,7 +91,7 @@ void runCounterAllocationBenchmark() {
   final zeroOps = (count / (zeroMedianMs / 1000.0)).toStringAsFixed(0);
 
   final speedup = (traditionalMedianMs / zeroMedianMs).toStringAsFixed(2);
-  final approxStringsCreated = count * 7;
+  const approxStringsCreated = count * 7;
 
   // --- Results Summary ---
   stdout.writeln('  📊 Results (Median of $trials runs, $count frames):');

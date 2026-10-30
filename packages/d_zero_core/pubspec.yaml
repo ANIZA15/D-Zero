@@ -19,7 +19,6 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  ffi: ^2.1.2
 
 dev_dependencies:
   flutter_test:

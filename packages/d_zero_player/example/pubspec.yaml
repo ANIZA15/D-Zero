@@ -12,6 +12,8 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  d_zero_core:
+  d_zero_counter:
   d_zero_player:
   video_player: ^2.8.2
 

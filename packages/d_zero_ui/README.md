@@ -1,25 +1,91 @@
 # ⚡️ d_zero_ui
 
-**Zero-allocation, zero-rebuild high-frequency UI controls (sliders, gauges, progress, marquee, typewriter, joystick, knob) for Flutter and Impeller.**
+**Zero-allocation, zero-rebuild high-frequency UI controls (cards, badges, buttons, switches, sliders, gauges, progress bars, marquee, typewriter, joystick, rotary knob) for Flutter and Impeller.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](../../LICENSE)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
 
 ---
 
-## 📦 Widgets
+## 📦 Distributed `Z` Widgets (13 Widgets + 8 Active Aliases)
 
-* **`ZCard` (`ZSurfaceCard`)**: Zero-`saveLayer`, single-`RenderBox` surface card with multi-band elevation shadow, border, and direct tap highlight.
-* **`ZBadge` (`ZNotificationBadge`)**: Zero-rebuild notification badge rendering `1..99` and `99+` via `ZeroNumberPainter` with 0 `String` allocations.
-* **`ZButton` (`ZActionButton`)**: Interactive button with direct pointer handling, `ZeroFrameScheduler` press splash, and reactive `enabledListenable`.
-* **`ZSwitch` (`ZToggle`)**: Zero-rebuild toggle switch with smooth thumb & track palette interpolation via `ZeroFrameScheduler`.
-* **`ZMarquee` (`ZRollingText`)**: Infinite smooth scrolling text with a single cached `TextPainter` and 0 per-frame allocations.
-* **`ZTypewriterText`**: Progressive character reveal via `Canvas.clipRect` and `getOffsetForCaret` with zero `substring()` allocations.
-* **`ZLinearProgress` & `ZCircularProgress`**: Direct-to-Canvas progress indicators with `ZeroNumberPainter.paintPercent`.
-* **`ZSlider` & `ZRangeSlider`**: Zero-rebuild pointer-driven sliders and `ZeroRangeValuesController`.
-* **`ZGauge` (`ZSpeedometer`)**: Radial speedometer with `ui.Picture`-cached dial ticks and `ZeroNumberPainter` readout.
-* **`ZJoystick` (`ZVirtualPad`)**: `Float32List`-backed virtual analog stick (`ZeroJoystickController`) with zero `Offset` allocations on hot paths.
-* **`ZKnob` (`ZRotaryDial`)**: DAW-style rotary dial with vertical drag and zero-allocation center value rendering.
+| Widget | Active `Z` Alias | Key Zero-Allocation Mechanism |
+| :--- | :--- | :--- |
+| **`ZCard`** | `ZSurfaceCard` | Single-`RenderBox` surface container with pre-baked elevation bands, border, and pointer highlight (`0` `saveLayer`). |
+| **`ZBadge`** | `ZNotificationBadge` | Renders `1..99` and `99+` notification counts via `ZeroNumberPainter` with `0` `String` allocations. |
+| **`ZButton`** | `ZActionButton` | Direct pointer hit-testing and `ZeroFrameScheduler` splash animation with reactive `enabledListenable`. |
+| **`ZSwitch`** | `ZToggle` | Pre-allocated 16-step track/thumb `Paint` palette interpolation with `0` widget rebuilds. |
+| **`ZSlider`** | - | Direct `RenderBox` pointer drag with optional `ZeroNumberPainter.paintDouble` readout. |
+| **`ZRangeSlider`** | - | Dual-thumb range slider driven by `ZeroRangeValuesController` with zero rebuilds. |
+| **`ZLinearProgress`** | - | Direct track/bar renderer with optional `ZeroNumberPainter.paintPercent` readout. |
+| **`ZCircularProgress`** | - | Radial arc progress indicator with centered `ZeroNumberPainter.paintPercent` label. |
+| **`ZGauge`** | `ZSpeedometer` | Caches dial tick marks in a GPU `ui.Picture` and draws active needle + `ZeroNumberPainter` readout. |
+| **`ZJoystick`** | `ZVirtualPad` | Virtual 2D analog stick backed by `ZeroJoystickController` (`Float32List(2)` vector, `0` `Offset` heap allocations). |
+| **`ZKnob`** | `ZRotaryDial` | DAW-style vertical drag rotary dial with `ZeroNumberPainter` center value. |
+| **`ZMarquee`** | `ZRollingText` | Infinite smooth-scrolling banner using a single cached `TextPainter` tiled horizontally (`0` allocations/frame). |
+| **`ZTypewriterText`** | - | Progressive character reveal using `TextPainter.getOffsetForCaret` + `Canvas.clipRect` (`0` `substring()` allocations). |
+
+---
+
+## 🚀 Installation & Usage
+
+```yaml
+dependencies:
+  d_zero_ui: ^0.1.0
+```
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:d_zero_core/d_zero_core.dart';
+import 'package:d_zero_ui/d_zero_ui.dart';
+
+final badgeCount = ZeroIntNotifier(5);
+final toggleState = ValueNotifier<bool>(true);
+final sliderValue = ValueNotifier<double>(0.65);
+final rangeCtrl = ZeroRangeValuesController(0.2, 0.8);
+final speedValue = ZeroDoubleNotifier(78.5);
+final joystickCtrl = ZeroJoystickController();
+
+ZCard(
+  padding: const EdgeInsets.all(16),
+  child: Column(
+    children: [
+      const SizedBox(height: 24, child: ZMarquee(text: '⚡️ Zero-Rebuild UI Controls   ')),
+      const SizedBox(height: 24, child: ZTypewriterText(text: 'Revealed without substring()!')),
+      Row(
+        children: [
+          ZBadge(
+            countListenable: badgeCount,
+            child: ZButton(label: 'Increment', onPressed: () => badgeCount.add(1)),
+          ),
+          ZSwitch(controller: toggleState),
+        ],
+      ),
+      SizedBox(height: 28, child: ZSlider(controller: sliderValue)),
+      SizedBox(height: 28, child: ZRangeSlider(controller: rangeCtrl)),
+      SizedBox(height: 16, child: ZLinearProgress(valueListenable: sliderValue, showPercentage: true)),
+      Row(
+        children: [
+          SizedBox(width: 96, height: 96, child: ZGauge(valueListenable: speedValue, min: 0, max: 100)),
+          ZKnob(controller: sliderValue, min: 0, max: 1),
+          ZJoystick(controller: joystickCtrl),
+        ],
+      ),
+    ],
+  ),
+);
+```
+
+---
+
+## 📱 High-Load Comparison Benchmark App (`example/`)
+
+The [`example/`](example) app modulates 20+ progress bars, gauges, knobs, sliders, badges, and text animations at 120Hz, comparing `d_zero_ui` against Material widgets with live **FPS, UI CPU Load (%), RSS Memory (MB), Rebuilds, and Allocations**.
+
+```bash
+cd packages/d_zero_ui/example
+flutter run
+```
 
 ## 📄 License
 

@@ -4,10 +4,10 @@
 
 [🇯🇵 日本語のドキュメントはこちら (Japanese Documentation)](README_JA.md)
 
-[![Pub Version](https://img.shields.io/pub/v/zero_player.svg?style=flat-square)](https://pub.dev/packages/d_zero_player)
+[![Pub Version](https://img.shields.io/pub/v/d_zero_player.svg?style=flat-square)](https://pub.dev/packages/d_zero_player)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
-[![Code Complexity](https://img.shields.io/badge/Cyclomatic%20Complexity-1.83%20(A%2B)-brightgreen.svg?style=flat-square)](https://github.com/ANIZA15/zero_player)
+[![Code Complexity](https://img.shields.io/badge/Cyclomatic%20Complexity-1.83%20(A%2B)-brightgreen.svg?style=flat-square)](https://github.com/ANIZA15/D-Zero)
 
 ---
 
@@ -81,7 +81,7 @@ Add `d_zero_player` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  d_zero_player: ^0.0.1
+  d_zero_player: ^0.1.0
 ```
 
 ### 2. Basic Playback

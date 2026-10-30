@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// Base listener registry using a flat array with index-based dispatch and
 /// tombstone compaction (zero iterator or closure allocations during notifications).
 abstract class _ZeroNotifierBase {
-  List<VoidCallback?> _listeners = List<VoidCallback?>.filled(4, null, growable: true);
+  final List<VoidCallback?> _listeners = List<VoidCallback?>.filled(4, null, growable: true);
   int _length = 0;
   int _activeCount = 0;
   int _notifyDepth = 0;

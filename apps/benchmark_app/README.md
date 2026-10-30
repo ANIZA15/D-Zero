@@ -88,6 +88,7 @@ flutter run --profile
 | HUD メトリクス | 表示 Widget | 計測内容と意味 |
 | :--- | :--- | :--- |
 | **FPS & Frame Bars** | `ZFPSMonitor` | 現在の FPS と直近フレームの処理時間ヒストグラム（緑: 快適 / 黄: 注意 / 赤: ジャンク）。 |
+| **UI CPU Load (%)** | `ZPriceTicker` | 120Hz (`8.33ms`) フレームバジェットに対する UI スレッド CPU 負荷率（`%`）。 |
 | **RSS Memory (Curr / Peak MB)** | `ZPriceTicker` × 2 | `ProcessInfo.currentRss` から取得したプロセス実メモリ使用量（現在値 MB / ピーク値 MB）。 |
 | **D-Zero Rebuilds** | `ZCounter` | `D-Zero` モード稼働中のフレーム毎リビルド回数（常時 **`0`**）。 |
 | **Traditional Rebuilds** | `ZCounter` | 通常 Widget モード稼働中に `setState()` によって発生した累積ツリー再構築回数。 |

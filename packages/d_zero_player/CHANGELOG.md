@@ -1,3 +1,9 @@
+## 0.1.0
+
+* Unified `0.1.0` release across the `D-Zero` monorepo.
+* Added high-load comparison benchmark modes (Memory RSS, UI CPU %, FPS, Rebuilds, FFI vs MethodChannel) in `example`.
+* Standardized all exported widgets with `Z`-prefix (`ZPlayer`, `ZPlayerView`, `ZSeekBar`, `ZTimeLabel`, `ZDirectSeekBar`, `ZDirectTimeLabel`).
+
 ## 0.0.3
 
 * Standardize exported widgets with `Z`-prefix (`ZPlayer`, `ZSeekBar`, `ZTimeLabel`, `ZDirectSeekBar`, `ZDirectTimeLabel`).

@@ -131,40 +131,40 @@ final class ZeroPlaybackStateView {
 
 // C ABI の型シグネチャ定義
 typedef _NativeCreateState = ffi.Pointer<ZeroPlaybackStateNative> Function();
-typedef _DartCreateState = ffi.Pointer<ZeroPlaybackStateNative> Function();
+typedef DartCreateState = ffi.Pointer<ZeroPlaybackStateNative> Function();
 
 typedef _NativeDestroyState = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>);
-typedef _DartDestroyState = void Function(ffi.Pointer<ZeroPlaybackStateNative>);
+typedef DartDestroyState = void Function(ffi.Pointer<ZeroPlaybackStateNative>);
 
 typedef _NativeSetPosition = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
-typedef _DartSetPosition = void Function(
+typedef DartSetPosition = void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, int);
 
 typedef _NativeSetPositionAnchor = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64, ffi.Float);
-typedef _DartSetPositionAnchor = void Function(
+typedef DartSetPositionAnchor = void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, int, double);
 
 typedef _NativeSetPlaybackSpeed = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, ffi.Float);
-typedef _DartSetPlaybackSpeed = void Function(
+typedef DartSetPlaybackSpeed = void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, double);
 
 typedef _NativeSetDuration = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int64);
-typedef _DartSetDuration = void Function(
+typedef DartSetDuration = void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, int);
 
 typedef _NativeSetStatus = ffi.Void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, ffi.Int32);
-typedef _DartSetStatus = void Function(
+typedef DartSetStatus = void Function(
     ffi.Pointer<ZeroPlaybackStateNative>, int);
 
 typedef _NativeGetDisplayPosition = ffi.Int64 Function(
     ffi.Pointer<ZeroPlaybackStateNative>);
-typedef _DartGetDisplayPosition = int Function(
+typedef DartGetDisplayPosition = int Function(
     ffi.Pointer<ZeroPlaybackStateNative>);
 
 /// ネイティブライブラリのバインディング (`isLeaf: true` で呼び出しオーバーヘッドを最小化)
@@ -172,46 +172,46 @@ class ZeroPlayerNativeBindings {
   static final ZeroPlayerNativeBindings instance = ZeroPlayerNativeBindings._();
 
   late final ffi.DynamicLibrary _dylib;
-  late final _DartCreateState createState;
-  late final _DartDestroyState destroyState;
-  late final _DartSetPosition setPosition;
-  late final _DartSetPositionAnchor setPositionAnchor;
-  late final _DartSetPlaybackSpeed setPlaybackSpeed;
-  late final _DartSetDuration setDuration;
-  late final _DartSetStatus setStatus;
-  late final _DartGetDisplayPosition getDisplayPosition;
+  late final DartCreateState createState;
+  late final DartDestroyState destroyState;
+  late final DartSetPosition setPosition;
+  late final DartSetPositionAnchor setPositionAnchor;
+  late final DartSetPlaybackSpeed setPlaybackSpeed;
+  late final DartSetDuration setDuration;
+  late final DartSetStatus setStatus;
+  late final DartGetDisplayPosition getDisplayPosition;
 
   ZeroPlayerNativeBindings._() {
     _dylib = _loadLibrary();
-    createState = _dylib.lookupFunction<_NativeCreateState, _DartCreateState>(
+    createState = _dylib.lookupFunction<_NativeCreateState, DartCreateState>(
       'zero_create_playback_state',
       isLeaf: true,
     );
-    destroyState = _dylib.lookupFunction<_NativeDestroyState, _DartDestroyState>(
+    destroyState = _dylib.lookupFunction<_NativeDestroyState, DartDestroyState>(
       'zero_destroy_playback_state',
       isLeaf: true,
     );
-    setPosition = _dylib.lookupFunction<_NativeSetPosition, _DartSetPosition>(
+    setPosition = _dylib.lookupFunction<_NativeSetPosition, DartSetPosition>(
       'zero_set_position',
       isLeaf: true,
     );
-    setPositionAnchor = _dylib.lookupFunction<_NativeSetPositionAnchor, _DartSetPositionAnchor>(
+    setPositionAnchor = _dylib.lookupFunction<_NativeSetPositionAnchor, DartSetPositionAnchor>(
       'zero_set_position_anchor',
       isLeaf: true,
     );
-    setPlaybackSpeed = _dylib.lookupFunction<_NativeSetPlaybackSpeed, _DartSetPlaybackSpeed>(
+    setPlaybackSpeed = _dylib.lookupFunction<_NativeSetPlaybackSpeed, DartSetPlaybackSpeed>(
       'zero_set_playback_speed',
       isLeaf: true,
     );
-    setDuration = _dylib.lookupFunction<_NativeSetDuration, _DartSetDuration>(
+    setDuration = _dylib.lookupFunction<_NativeSetDuration, DartSetDuration>(
       'zero_set_duration',
       isLeaf: true,
     );
-    setStatus = _dylib.lookupFunction<_NativeSetStatus, _DartSetStatus>(
+    setStatus = _dylib.lookupFunction<_NativeSetStatus, DartSetStatus>(
       'zero_set_status',
       isLeaf: true,
     );
-    getDisplayPosition = _dylib.lookupFunction<_NativeGetDisplayPosition, _DartGetDisplayPosition>(
+    getDisplayPosition = _dylib.lookupFunction<_NativeGetDisplayPosition, DartGetDisplayPosition>(
       'zero_get_display_position',
       isLeaf: true,
     );

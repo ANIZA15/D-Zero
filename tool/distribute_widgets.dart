@@ -348,8 +348,27 @@ void _syncPackageMetadata(List<_PackageInfo> allPackages) {
     File('${pkg.directory.path}/.pubignore')
         .writeAsStringSync(_defaultPubignore);
     _syncInternalDependencyConstraints(pkg, versionMap);
+    _syncNativeSpmSourcesIfPresent(pkg);
   }
   stdout.writeln('  ✔ 全 ${allPackages.length} パッケージのメタデータ同期が完了しました。');
+}
+
+void _syncNativeSpmSourcesIfPresent(_PackageInfo pkg) {
+  final spmDir = Directory('${pkg.directory.path}/ios/${pkg.name}/Sources/${pkg.name}');
+  if (!spmDir.existsSync()) return;
+
+  final sourceDirs = [
+    Directory('${pkg.directory.path}/src'),
+    Directory('${pkg.directory.path}/ios/Classes'),
+  ];
+  for (final dir in sourceDirs) {
+    if (!dir.existsSync()) continue;
+    for (final file in dir.listSync().whereType<File>()) {
+      final name = file.uri.pathSegments.last;
+      if (name == 'CMakeLists.txt') continue;
+      file.copySync('${spmDir.path}/$name');
+    }
+  }
 }
 
 void _syncInternalDependencyConstraints(

@@ -1,18 +1,16 @@
-# zero_player_example
+# ⚡️ d_zero_player vs video_player Comparison Benchmark App
 
-A new Flutter project.
+Interactive comparison benchmark application for [`d_zero_player`](../README.md) comparing FFI atomic shared-memory playback (`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`) against Flutter's standard `video_player` (`setState` + `MethodChannel`).
 
-## Getting Started
+## 📊 Live Metrics Displayed
+- **FPS & Dropped Frames**: Real-time frame rate and jank counter.
+- **UI CPU Load (%) & RSS Memory (MB)**: Live UI thread CPU budget utilization and process resident memory.
+- **Widget Rebuilds / Sec**: `0` in `d_zero_player` vs `10–30+ / sec` in `video_player`.
+- **MethodChannel vs FFI Pointer Reads**: `0` channel messages during playback in `d_zero_player`.
+- **Heavy Blur Stress Toggle**: Enables `BackdropFilter` load to test resilience under GPU stress.
 
-This project is a starting point for a Flutter application.
+## 🚀 Running the Comparison App
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# d_zero_player
+```bash
+flutter run
+```

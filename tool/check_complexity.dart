@@ -5,52 +5,56 @@ import 'dart:io';
 /// 各関数・メソッドごとの分岐点（if, for, while, case, catch, &&, ||, ?, ??）
 /// を解析し、保守性（しきい値: 10以下が理想・推奨、15超過で警告・エラー）を判定します。
 void main(List<String> args) {
-  final targetDirs = [
-    Directory('packages'),
-    Directory('apps'),
-    Directory('tool'),
-  ];
-
   stdout.writeln('===============================================================');
   stdout.writeln('📊 D-Zero ワークスペース 循環的複雑度（Cyclomatic Complexity）計測');
   stdout.writeln('===============================================================');
 
-  final results = <_FunctionMetric>[];
-
-  for (final dir in targetDirs) {
-    if (!dir.existsSync()) continue;
-    final files = dir.listSync(recursive: true).whereType<File>().where((f) {
-      final p = f.path;
-      // build や .dart_tool などの生成ディレクトリは除外
-      if (p.contains('/.dart_tool/') || p.contains('/build/')) return false;
-      return p.endsWith('.dart') || p.endsWith('.cpp') || p.endsWith('.h');
-    });
-
-    for (final file in files) {
-      results.addAll(_analyzeFile(file));
-    }
-  }
+  final results = _collectWorkspaceMetrics([
+    Directory('packages'),
+    Directory('apps'),
+    Directory('tool'),
+  ]);
 
   if (results.isEmpty) {
     stdout.writeln('計測対象の関数が見つかりませんでした。');
     return;
   }
 
-  // 複雑度が高い順にソート
   results.sort((a, b) => b.complexity.compareTo(a.complexity));
+  _printAndVerifyMetrics(results);
+}
 
+List<_FunctionMetric> _collectWorkspaceMetrics(List<Directory> targetDirs) {
+  final results = <_FunctionMetric>[];
+  for (final dir in targetDirs) {
+    if (!dir.existsSync()) continue;
+    final files = dir.listSync(recursive: true).whereType<File>().where(_isSourceFile);
+    for (final file in files) {
+      results.addAll(_analyzeFile(file));
+    }
+  }
+  return results;
+}
+
+bool _isSourceFile(File f) {
+  final p = f.path;
+  if (p.contains('/.dart_tool/') || p.contains('/build/')) return false;
+  return p.endsWith('.dart') || p.endsWith('.cpp') || p.endsWith('.h');
+}
+
+String _statusLabel(int cc) {
+  if (cc <= 10) return '🟢 OK';
+  if (cc <= 15) return '🟡 注意';
+  return '🔴 警告';
+}
+
+void _printAndVerifyMetrics(List<_FunctionMetric> results) {
   int okCount = 0;
   int warnCount = 0;
   int dangerCount = 0;
 
   for (final m in results) {
-    // 厳格な基準: <= 10 良好, 11..15 注意, > 15 警告
-    final status = m.complexity <= 10
-        ? '🟢 OK'
-        : m.complexity <= 15
-            ? '🟡 注意'
-            : '🔴 警告';
-
+    final status = _statusLabel(m.complexity);
     if (m.complexity <= 10) {
       okCount++;
     } else if (m.complexity <= 15) {
@@ -80,9 +84,8 @@ void main(List<String> args) {
   if (dangerCount > 0) {
     stderr.writeln('⚠️ 循環的複雑度が 15 を超える高リスクな関数が存在します。リファクタリングを義務付けます。');
     exit(1);
-  } else {
-    stdout.writeln('🎉 全ての関数が許容基準（CC <= 15）を満たしています！保守性は極めて良好です。');
   }
+  stdout.writeln('🎉 全ての関数が許容基準（CC <= 15）を満たしています！保守性は極めて良好です。');
 }
 
 class _FunctionMetric {

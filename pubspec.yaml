@@ -13,14 +13,22 @@ workspace:
   - packages/d_zero_counter
   - packages/d_zero_counter/example
   - packages/d_zero_particles
+  - packages/d_zero_particles/example
   - packages/d_zero_ui
+  - packages/d_zero_ui/example
   - packages/d_zero_waveform
+  - packages/d_zero_waveform/example
   - packages/d_zero_chart
+  - packages/d_zero_chart/example
   - packages/d_zero_fx
+  - packages/d_zero_fx/example
   - packages/d_zero_canvas
+  - packages/d_zero_canvas/example
   - packages/d_zero_sensor
+  - packages/d_zero_sensor/example
   - apps/benchmark_app
   - benchmarks
 
 dev_dependencies:
   melos: ^6.3.3
+  flutter_lints: ^3.0.0

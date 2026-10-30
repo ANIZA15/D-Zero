@@ -98,7 +98,7 @@ void runCorePoolBenchmark() {
 
   // Approximate memory footprint: 1 Dart object ~ 32-48 bytes minimum on 64-bit VM
   const approxBytesPerNode = 40;
-  final estimatedGarbageMb = (totalLifecycles * approxBytesPerNode) / (1024 * 1024);
+  const estimatedGarbageMb = (totalLifecycles * approxBytesPerNode) / (1024 * 1024);
 
   // --- Results Summary ---
   stdout.writeln('  📊 Results (Median of $trials runs, $totalLifecycles objects):');

@@ -1,4 +1,7 @@
 ## 0.1.0
 
-* Initial release of `d_zero_ui`.
-* Added `ZMarquee` (`ZRollingText`), `ZTypewriterText`, `ZLinearProgress`, `ZCircularProgress`, `ZSlider`, `ZRangeSlider`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), and `ZKnob` (`ZRotaryDial`).
+* Unified monorepo initial release of `d_zero_ui`.
+* Added `ZCard` (`ZSurfaceCard`), `ZBadge` (`ZNotificationBadge`), `ZButton` (`ZActionButton`), and `ZSwitch` (`ZToggle`).
+* Added `ZMarquee` (`ZRollingText`) and `ZTypewriterText` for zero-allocation text animations.
+* Added `ZLinearProgress`, `ZCircularProgress`, `ZSlider`, and `ZRangeSlider` (`ZeroRangeValuesController`).
+* Added `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`, `ZeroJoystickController`), and `ZKnob` (`ZRotaryDial`).

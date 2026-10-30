@@ -1,0 +1,25 @@
+name: d_zero_particles_example
+description: "High-load benchmark app comparing D-Zero SIMD particles & confetti against traditional Flutter Canvas loops."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  d_zero_core:
+  d_zero_counter:
+  d_zero_particles:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

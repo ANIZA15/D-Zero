@@ -1,10 +1,12 @@
-# ⚡️ d_zero_counter Sample
+# ⚡️ d_zero_counter High-Load Benchmark App
 
-A standalone showcase for `d_zero_counter` widgets:
-- `ZCounter`: High-frequency integer counter (rebuild: 0, String allocations: 0).
-- `ZStopwatch`: Direct-to-canvas 120fps stopwatch.
+Compares `d_zero_counter` (`ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer`, `ZPriceTicker`, `ZFPSMonitor`) against traditional `setState` + `Text` widgets across a 36-cell live financial wall.
 
-## 🚀 Running
+## 📊 Live Metrics Displayed
+- **FPS & Frame Histogram** (`ZFPSMonitor`)
+- **CPU Load (%)** (`ZPriceTicker`)
+- **RSS Memory / Peak MB** (`ZPriceTicker`)
+- **D-Zero vs Traditional Rebuilds & String Allocations** (`ZCounter`)
 
 ```bash
 flutter run

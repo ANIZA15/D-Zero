@@ -487,6 +487,24 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
                 backgroundColor: Color(0xFF090C15),
               ),
               _buildHudMetricBox(
+                label: 'UI CPU Load (%)',
+                child: SizedBox(
+                  width: 68,
+                  height: 20,
+                  child: ZPriceTicker(
+                    valueListenable: _cpuLoad,
+                    currencyGlyph: ZeroNumberPainter.glyphPercent,
+                    fractionDigits: 1,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: Colors.amberAccent,
+                    ),
+                  ),
+                ),
+              ),
+              _buildHudMetricBox(
                 label: 'RSS Memory (Curr / Peak MB)',
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

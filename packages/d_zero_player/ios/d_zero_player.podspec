@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'd_zero_player'
-  s.version          = '0.0.1'
+  s.version          = '0.1.0'
   s.summary          = 'Zero-jank, zero-copy next-gen video player for Flutter Impeller.'
   s.description      = <<-DESC
 A next-generation video player utilizing FFI shared-memory and Impeller-optimized zero-copy textures.

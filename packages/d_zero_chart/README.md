@@ -1,10 +1,62 @@
-# d_zero_chart
+# ⚡️ d_zero_chart
 
-Zero-allocation high-frequency financial and IoT telemetry charts (`ZSparkline`, `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook`) for Flutter and Impeller.
+**Zero-allocation high-frequency financial and IoT telemetry charts (`ZSparkline`, `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook`) for Flutter and Impeller.**
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](../../LICENSE)
+[![Impeller: Vulkan & Metal](https://img.shields.io/badge/Impeller-Vulkan%20%2F%20Metal-red.svg?style=flat-square)](https://flutter.dev/to/impeller)
 
-- **`ZSparkline` (`ZRealtimeChart`)**: Real-time polyline chart backed by `FloatRingBuffer`, `Canvas.drawRawPoints`, and `ZeroNumberPainter`.
-- **`ZCandlestickChart`**: Structure-of-Arrays (SoA) OHLC candlestick chart (`ZeroCandlestickBuffer`) with zero per-candle object allocations.
-- **`ZHeatmap`**: 2D matrix density chart (`ZeroHeatmapBuffer`) using a pre-baked palette of quantized `Paint` buckets.
-- **`ZOrderBook` (`ZDataGrid`)**: Financial L2 depth & bid/ask order book rendered inside a single `ZeroRenderBox` with zero widget rebuilds.
+---
+
+## 📦 Distributed `Z` Widgets & Buffers
+
+| Widget | Active Alias | Controller / Buffer | Zero-Allocation Architecture |
+| :--- | :--- | :--- | :--- |
+| **`ZSparkline`** | `ZRealtimeChart` | `ZeroChartController` | Circular `FloatRingBuffer` + pre-allocated `Float32List` coordinate buffer flushed via `Canvas.drawRawPoints(PointMode.polygon)` + `ZeroNumberPainter` min/max/latest labels. |
+| **`ZCandlestickChart`** | - | `ZeroCandlestickBuffer` | Structure-of-Arrays (SoA) `Float32List` ring buffer storing `open, high, low, close` (`4` floats/candle) with zero `Candle` object allocations. |
+| **`ZHeatmap`** | - | `ZeroHeatmapBuffer` | Contiguous `rows × cols` `Float32List` matrix rendered with a pre-baked 32-bucket quantized `Paint` palette (`0` `Color.lerp` or `Paint` allocations in `paintZero`). |
+| **`ZOrderBook`** | `ZDataGrid` | `ZeroOrderBookController` | L2 market depth Bid/Ask ladder rendered inside a single `ZeroRenderBox` using `ZeroNumberPainter` (`0` `Row`/`Column`/`Text` widget rebuilds). |
+
+---
+
+## 🚀 Installation & Usage
+
+```yaml
+dependencies:
+  d_zero_chart: ^0.1.0
+```
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:d_zero_chart/d_zero_chart.dart';
+
+final sparklineCtrl = ZeroChartController(capacity: 128)..pushBatch([100.0, 102.5, 101.8, 104.2]);
+final candleBuffer = ZeroCandlestickBuffer(capacity: 32)..addCandle(100.0, 105.0, 99.0, 103.5);
+final heatmapBuffer = ZeroHeatmapBuffer(rows: 6, cols: 16);
+final orderBookCtrl = ZeroOrderBookController(maxDepth: 6)
+  ..updateBid(0, 64250.0, 1.45)
+  ..updateAsk(0, 64252.5, 0.95);
+
+Column(
+  children: [
+    SizedBox(height: 90, child: ZSparkline(controller: sparklineCtrl)),
+    SizedBox(height: 120, child: ZCandlestickChart(buffer: candleBuffer)),
+    SizedBox(height: 120, child: ZOrderBook(controller: orderBookCtrl)),
+    SizedBox(height: 120, child: ZHeatmap(buffer: heatmapBuffer)),
+  ],
+);
+```
+
+---
+
+## 📱 High-Load Comparison Benchmark App (`example/`)
+
+The [`example/`](example) app streams high-frequency market ticks across `ZSparkline`, `ZCandlestickChart`, `ZOrderBook`, and `ZHeatmap` simultaneously, comparing `d_zero_chart` against traditional `CustomPaint` (`Path` allocations) and `Row`/`Column` order books with live **FPS, UI CPU Load (%), RSS Memory (MB), and Rebuild counters**.
+
+```bash
+cd packages/d_zero_chart/example
+flutter run
+```
+
+## 📄 License
+
+MIT License © 2026 fexcy
