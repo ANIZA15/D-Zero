@@ -88,5 +88,8 @@ app.*.symbols
 moc/
 **/moc/
 
+# Distribution bundles
+dist/
+
 # Exceptions to above rules.
 !**/android/**/gradle-wrapper.jar

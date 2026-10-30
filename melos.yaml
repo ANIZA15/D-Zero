@@ -34,3 +34,19 @@ scripts:
   clean:
     exec: flutter clean
     description: Clean build artifacts in all packages.
+
+  distribute:
+    run: dart run tool/distribute_widgets.dart --dry-run
+    description: Sync metadata, run quality gates, and validate all Z-Widget packages via pub publish --dry-run in topological order.
+
+  distribute:publish:
+    run: dart run tool/distribute_widgets.dart --publish
+    description: Batch publish all Z-Widget packages to pub.dev in topological dependency order.
+
+  distribute:sync:
+    run: dart run tool/distribute_widgets.dart --sync-only
+    description: Sync LICENSE, .pubignore, internal dependency versions, and audit Z-Prefix widgets across all packages.
+
+  distribute:bundle:
+    run: dart run tool/distribute_widgets.dart --bundle --skip-checks
+    description: Generate local release archives (.tar.gz), manifest.json, and unified barrel file in dist/.

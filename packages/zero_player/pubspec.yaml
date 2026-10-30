@@ -21,7 +21,7 @@ dependencies:
   flutter:
     sdk: flutter
   ffi: ^2.1.2
-  zero_core:
+  zero_core: ^0.1.0
 
 dev_dependencies:
   flutter_test:

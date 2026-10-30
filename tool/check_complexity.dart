@@ -8,6 +8,7 @@ void main(List<String> args) {
   final targetDirs = [
     Directory('packages'),
     Directory('apps'),
+    Directory('tool'),
   ];
 
   stdout.writeln('===============================================================');
