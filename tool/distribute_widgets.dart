@@ -354,12 +354,20 @@ void _syncPackageMetadata(List<_PackageInfo> allPackages) {
 }
 
 void _syncNativeSpmSourcesIfPresent(_PackageInfo pkg) {
-  final spmDir = Directory('${pkg.directory.path}/ios/${pkg.name}/Sources/${pkg.name}');
+  for (final platform in const ['ios', 'macos']) {
+    _syncPlatformSpmSources(pkg, platform);
+  }
+}
+
+void _syncPlatformSpmSources(_PackageInfo pkg, String platform) {
+  final spmDir = Directory(
+    '${pkg.directory.path}/$platform/${pkg.name}/Sources/${pkg.name}',
+  );
   if (!spmDir.existsSync()) return;
 
   final sourceDirs = [
     Directory('${pkg.directory.path}/src'),
-    Directory('${pkg.directory.path}/ios/Classes'),
+    Directory('${pkg.directory.path}/$platform/Classes'),
   ];
   for (final dir in sourceDirs) {
     if (!dir.existsSync()) continue;

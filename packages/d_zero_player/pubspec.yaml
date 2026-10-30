@@ -36,6 +36,8 @@ flutter:
         pluginClass: ZeroPlayerPlugin
       ios:
         pluginClass: ZeroPlayerPlugin
+      macos:
+        pluginClass: ZeroPlayerPlugin
 
   shaders:
     - shaders/zero_blur.frag

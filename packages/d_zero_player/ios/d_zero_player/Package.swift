@@ -20,9 +20,10 @@ let package = Package(
             ],
             path: "Sources/d_zero_player",
             resources: [],
-            publicHeadersPath: ".",
+            publicHeadersPath: "include",
             cxxSettings: [
-                .headerSearchPath(".")
+                .headerSearchPath("."),
+                .headerSearchPath("include/d_zero_player")
             ]
         )
     ],

@@ -1,6 +1,11 @@
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
+#import <TargetConditionals.h>
+#if TARGET_OS_OSX
+#import <FlutterMacOS/FlutterMacOS.h>
+#else
 #import <Flutter/Flutter.h>
+#endif
 #include "zero_playback_state.h"
 
 NS_ASSUME_NONNULL_BEGIN

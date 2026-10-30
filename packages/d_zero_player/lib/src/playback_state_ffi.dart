@@ -222,6 +222,10 @@ class ZeroPlayerNativeBindings {
       return ffi.DynamicLibrary.process();
     }
     if (Platform.isMacOS) {
+      final processLib = ffi.DynamicLibrary.process();
+      if (processLib.providesSymbol('zero_create_playback_state')) {
+        return processLib;
+      }
       // テスト環境およびローカル開発環境の dylib フォールバック
       final candidates = [
         'test/libzero_player_test.dylib',
@@ -235,7 +239,7 @@ class ZeroPlayerNativeBindings {
           return ffi.DynamicLibrary.open(path);
         }
       }
-      return ffi.DynamicLibrary.process();
+      return processLib;
     }
     if (Platform.isAndroid) {
       return ffi.DynamicLibrary.open('libzero_player_native.so');

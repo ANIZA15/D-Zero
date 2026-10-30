@@ -1,7 +1,13 @@
 #import "ZeroPlayerTexture.h"
 #import <CoreVideo/CoreVideo.h>
-#import <QuartzCore/CADisplayLink.h>
+#import <QuartzCore/QuartzCore.h>
 #import <os/lock.h>
+#if TARGET_OS_OSX
+#import <AppKit/AppKit.h>
+#endif
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
 
 static void *kZeroPlayerStatusKVOContext = &kZeroPlayerStatusKVOContext;
 static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
@@ -97,7 +103,7 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
         // Phase 2: 低遅延ライブ配信（LL-HLS）のレイテンシー最適化
         if (isLive) {
             _playerItem.automaticallyPreservesTimeOffsetFromLive = YES;
-            _playerItem.configuredTimeOffsetFromLive = 1.5;
+            _playerItem.configuredTimeOffsetFromLive = CMTimeMakeWithSeconds(1.5, 1000);
         }
 
         _player = [AVPlayer playerWithPlayerItem:_playerItem];
@@ -112,7 +118,12 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
 
         // 4. CADisplayLink による VSync 駆動（Weak Proxy で Retain Cycle を防止）
         _ZeroDisplayLinkProxy *proxy = [[_ZeroDisplayLinkProxy alloc] initWithTarget:self];
+#if TARGET_OS_OSX
+        NSScreen *screen = NSScreen.mainScreen ?: NSScreen.screens.firstObject;
+        _displayLink = [screen displayLinkWithTarget:proxy selector:@selector(onDisplayLink:)];
+#else
         _displayLink = [CADisplayLink displayLinkWithTarget:proxy selector:@selector(onDisplayLink:)];
+#endif
         [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 
         // Duration / Track フレームレート / 再生状態監視
@@ -128,13 +139,13 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
                  context:kZeroPlayerStatusKVOContext];
     _isObservingPlayer = YES;
 
-    __weak typeof(self) weakSelf = self;
+    __weak ZeroPlayerTexture *weakSelf = self;
     _endObserver = [[NSNotificationCenter defaultCenter]
         addObserverForName:AVPlayerItemDidPlayToEndTimeNotification
                     object:_playerItem
                      queue:[NSOperationQueue mainQueue]
                 usingBlock:^(NSNotification * _Nonnull note) {
-                    typeof(weakSelf) strongSelf = weakSelf;
+                    ZeroPlayerTexture *strongSelf = weakSelf;
                     if (!strongSelf || strongSelf->_isDisposed) return;
                     [strongSelf syncPositionAnchorNow];
                     zero_set_status(strongSelf->_playbackState, ZERO_STATUS_COMPLETED);
@@ -143,7 +154,7 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
 
     [_playerItem.asset loadValuesAsynchronouslyForKeys:@[@"duration", @"tracks"] completionHandler:^{
         dispatch_async(dispatch_get_main_queue(), ^{
-            typeof(weakSelf) strongSelf = weakSelf;
+            ZeroPlayerTexture *strongSelf = weakSelf;
             if (!strongSelf || strongSelf->_isDisposed) return;
             [strongSelf applyLoadedAssetMetadata];
         });
@@ -157,7 +168,7 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
         zero_set_duration(_playbackState, (int64_t)(durSec * 1000.0));
     }
 
-    if (@available(iOS 15.0, *)) {
+    if (@available(iOS 15.0, macOS 14.0, *)) {
         NSArray<AVAssetTrack *> *videoTracks = [_playerItem.asset tracksWithMediaType:AVMediaTypeVideo];
         AVAssetTrack *track = videoTracks.firstObject;
         float fps = track ? track.nominalFrameRate : 0.0f;
@@ -195,6 +206,13 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
 
 - (void)syncPositionAnchorNow {
     if (_isDisposed || !_playbackState) return;
+    if (zero_get_duration(_playbackState) <= 0 && _playerItem) {
+        CMTime itemDur = _playerItem.duration;
+        double durSec = CMTimeGetSeconds(itemDur);
+        if (isfinite(durSec) && durSec > 0.0) {
+            zero_set_duration(_playbackState, (int64_t)(durSec * 1000.0));
+        }
+    }
     CMTime currentTime = _player.currentTime;
     double sec = CMTimeGetSeconds(currentTime);
     int64_t currentMs = (isfinite(sec) && sec > 0.0) ? (int64_t)(sec * 1000.0) : 0;
@@ -282,12 +300,12 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
     zero_set_position_anchor(_playbackState, positionMs, rate);
     _lastAnchorSyncTime = CACurrentMediaTime();
 
-    __weak typeof(self) weakSelf = self;
+    __weak ZeroPlayerTexture *weakSelf = self;
     [_player seekToTime:targetTime
         toleranceBefore:kCMTimeZero
          toleranceAfter:kCMTimeZero
       completionHandler:^(BOOL finished) {
-          typeof(weakSelf) strongSelf = weakSelf;
+          ZeroPlayerTexture *strongSelf = weakSelf;
           if (!strongSelf || strongSelf->_isDisposed || !finished) return;
           [strongSelf syncPositionAnchorNow];
       }];
@@ -335,3 +353,5 @@ static const CFTimeInterval kZeroDriftSyncIntervalSec = 0.25;
 }
 
 @end
+
+#pragma clang diagnostic pop

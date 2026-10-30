@@ -9,6 +9,7 @@ analyzer:
     - build/**
     - android/**
     - ios/**
+    - macos/**
 
 linter:
   rules:

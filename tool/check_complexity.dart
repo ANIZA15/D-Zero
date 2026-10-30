@@ -28,7 +28,10 @@ List<_FunctionMetric> _collectWorkspaceMetrics(List<Directory> targetDirs) {
   final results = <_FunctionMetric>[];
   for (final dir in targetDirs) {
     if (!dir.existsSync()) continue;
-    final files = dir.listSync(recursive: true).whereType<File>().where(_isSourceFile);
+    final files = dir
+        .listSync(recursive: true, followLinks: false)
+        .whereType<File>()
+        .where(_isSourceFile);
     for (final file in files) {
       results.addAll(_analyzeFile(file));
     }
@@ -38,7 +41,12 @@ List<_FunctionMetric> _collectWorkspaceMetrics(List<Directory> targetDirs) {
 
 bool _isSourceFile(File f) {
   final p = f.path;
-  if (p.contains('/.dart_tool/') || p.contains('/build/')) return false;
+  if (p.contains('/.dart_tool/') ||
+      p.contains('/build/') ||
+      p.contains('/ephemeral/') ||
+      p.contains('/.symlinks/')) {
+    return false;
+  }
   return p.endsWith('.dart') || p.endsWith('.cpp') || p.endsWith('.h');
 }
 
