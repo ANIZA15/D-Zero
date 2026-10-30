@@ -1,6 +1,6 @@
 name: d_zero_canvas
 description: "Zero-allocation massive-element canvas widgets (live stream danmaku, infinite pan/zoom grid, 120Hz freehand drawing) for Flutter and Impeller."
-version: 0.1.1
+version: 0.1.2
 homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_canvas
 issue_tracker: https://github.com/ANIZA15/D-Zero/issues
@@ -20,7 +20,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  d_zero_core: ^0.1.1
+  d_zero_core: ^0.1.2
 
 dev_dependencies:
   flutter_test:

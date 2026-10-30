@@ -1,3 +1,7 @@
+## 0.1.2
+
+* Synchronized release of `d_zero_player` v0.1.2.
+
 ## 0.1.1
 
 * Hardened C++ `zero_playback_state.cpp` with saturating 64-bit integer addition and `NaN` / `Infinity` speed sanitization in `zero_get_display_position` and `zero_set_position_anchor`.

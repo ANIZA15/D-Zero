@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 - 2026-10-30
+
+* Synchronized release of D-Zero workspace packages v0.1.2.
+
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
 ## 0.1.1 - 2026-10-30

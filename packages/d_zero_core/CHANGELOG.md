@@ -1,3 +1,7 @@
+## 0.1.2
+
+* Synchronized release of `d_zero_core` v0.1.2.
+
 ## 0.1.1
 
 * Hardened `FloatRingBuffer` and `Float32RingBuffer` with `maxCapacity` (`1,048,576`) bounds checks (CWE-789), lazy slice allocation for large capacities (`> 1024`), cached partial `contiguousView`, and strict `copyInto` range validation.
