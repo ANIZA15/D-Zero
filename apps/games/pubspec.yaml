@@ -1,0 +1,31 @@
+name: games
+description: "ZERO OVERDRIVE: High-octane neon bullet-hell & particle survival game showcasing D-Zero vs Standard Flutter rendering."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  d_zero_core:
+  d_zero_counter:
+  d_zero_particles:
+  d_zero_ui:
+  d_zero_chart:
+  d_zero_waveform:
+  d_zero_fx:
+  d_zero_canvas:
+  d_zero_sensor:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
