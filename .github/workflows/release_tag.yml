@@ -1,17 +1,16 @@
 name: Auto Tag & Release on Version Update
 
 on:
-  push:
+  workflow_run:
+    workflows: ["D-Zero Quality Gates (CI)"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'packages/*/pubspec.yaml'
-      - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
       force_update_tag:
-        description: 'Force-update existing tag if the version tag already exists'
+        description: 'Force-update existing tag even if it already points to HEAD'
         required: false
-        default: false
+        default: true
         type: boolean
 
 permissions:
@@ -21,10 +20,16 @@ jobs:
   tag-and-release:
     name: Detect Version & Update Git Tag
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     steps:
       - name: Checkout repository with full history and tags
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Detect workspace package version
@@ -50,16 +55,22 @@ jobs:
             fi
           done
 
-          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
-            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
-            echo "Tag '$VERSION' already exists."
+          HEAD_SHA=$(git rev-parse HEAD)
+          TAG_SHA=$(git rev-list -n 1 "refs/tags/$VERSION" 2>/dev/null || true)
+
+          if [ -z "$TAG_SHA" ]; then
+            echo "should_update=true" >> "$GITHUB_OUTPUT"
+            echo "Tag '$VERSION' does not exist yet and will be created at $HEAD_SHA."
+          elif [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+            echo "should_update=true" >> "$GITHUB_OUTPUT"
+            echo "Tag '$VERSION' points to $TAG_SHA; updating to latest CI-verified commit $HEAD_SHA."
           else
-            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
-            echo "Tag '$VERSION' is new and will be created."
+            echo "should_update=false" >> "$GITHUB_OUTPUT"
+            echo "Tag '$VERSION' already points to $HEAD_SHA."
           fi
 
       - name: Extract release notes from CHANGELOG.md
-        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        if: steps.detect.outputs.should_update == 'true' || inputs.force_update_tag == true
         run: |
           VERSION="${{ steps.detect.outputs.version }}"
           awk -v ver="$VERSION" '
@@ -74,23 +85,24 @@ jobs:
           cat /tmp/release_notes.md
 
       - name: Create or update Git tag
-        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        if: steps.detect.outputs.should_update == 'true' || inputs.force_update_tag == true
         run: |
           VERSION="${{ steps.detect.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -f -a "$VERSION" -m "Release D-Zero v$VERSION"
           git push origin "refs/tags/$VERSION" --force
-          echo "✅ Pushed tag: $VERSION"
+          echo "✅ Pushed tag: $VERSION -> $(git rev-parse HEAD)"
 
       - name: Create or update GitHub Release
-        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        if: steps.detect.outputs.should_update == 'true' || inputs.force_update_tag == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.detect.outputs.version }}"
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release edit "$VERSION" \
+              --target "$(git rev-parse HEAD)" \
               --title "D-Zero v$VERSION" \
               --notes-file /tmp/release_notes.md
           else

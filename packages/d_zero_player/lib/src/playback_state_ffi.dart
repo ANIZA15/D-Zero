@@ -245,6 +245,32 @@ class ZeroPlayerNativeBindings {
         return ffi.DynamicLibrary.open(file.absolute.path);
       }
     }
+    return _buildMacOSTestDylib();
+  }
+
+  static ffi.DynamicLibrary? _buildMacOSTestDylib() {
+    const buildTargets = <(String, String)>[
+      ('src/zero_playback_state.cpp', 'test/libzero_player_test.dylib'),
+      (
+        'packages/d_zero_player/src/zero_playback_state.cpp',
+        'packages/d_zero_player/test/libzero_player_test.dylib',
+      ),
+    ];
+    for (final (srcPath, outPath) in buildTargets) {
+      final srcFile = File(srcPath);
+      if (!srcFile.existsSync()) continue;
+      final res = Process.runSync('clang++', [
+        '-std=c++17',
+        '-O2',
+        '-dynamiclib',
+        srcFile.path,
+        '-o',
+        outPath,
+      ]);
+      if (res.exitCode == 0 && File(outPath).existsSync()) {
+        return ffi.DynamicLibrary.open(File(outPath).absolute.path);
+      }
+    }
     return null;
   }
 

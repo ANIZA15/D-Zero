@@ -35,7 +35,13 @@ jobs:
       - name: 3. Z-Prefix Widget & Metadata Audit
         run: dart run tool/distribute_widgets.dart --sync-only
 
-      - name: 4. Unit, Widget Lifecycle & Memory Safety Tests
+      - name: 4. Build Native FFI Test Library (d_zero_player)
+        run: |
+          clang++ -std=c++17 -O2 -dynamiclib \
+            packages/d_zero_player/src/zero_playback_state.cpp \
+            -o packages/d_zero_player/test/libzero_player_test.dylib
+
+      - name: 5. Unit, Widget Lifecycle & Memory Safety Tests
         run: |
           flutter test \
             packages/d_zero_core/test \
