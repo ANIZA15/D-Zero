@@ -20,7 +20,7 @@ enum SuiteRenderMode {
 }
 
 /// Interactive extreme stress-test & full-suite comparison view that switches
-/// between a dashboard built strictly with `d-zero` (`ZWidget` / `ZLeafWidget` /
+/// between a dashboard built strictly with `D-Zero` (`ZWidget` / `ZLeafWidget` /
 /// `ZSingleChildWidget`) and an identical dashboard built with standard Flutter
 /// widgets (`setState`, `Text`, `Card`, `CustomPaint`, `LinearProgressIndicator`),
 /// demonstrating dramatic FPS, frame-time, and memory/allocation differences.
@@ -47,7 +47,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   int _activeWallCells = 60;
   int _activeParticleCount = 4000;
 
-  // Live Telemetry Notifiers (Zero-Rebuild in d-zero mode)
+  // Live Telemetry Notifiers (Zero-Rebuild in D-Zero mode)
   final ZeroDoubleNotifier _rssMemoryMb = ZeroDoubleNotifier(0.0);
   final ZeroDoubleNotifier _rssPeakMb = ZeroDoubleNotifier(0.0);
   final ZeroIntNotifier _dZeroRebuildCount = ZeroIntNotifier(0);
@@ -61,7 +61,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   late final List<ZeroDoubleNotifier> _wallPriceNotifiers;
   late final List<ZeroDoubleNotifier> _wallLoadNotifiers;
 
-  // Shared Domain State Controllers for d-zero Suite
+  // Shared Domain State Controllers for D-Zero Suite
   final ZeroDoubleNotifier _btcPrice = ZeroDoubleNotifier(64250.0);
   final ZeroDoubleNotifier _ethPrice = ZeroDoubleNotifier(3420.5);
   final ZeroIntNotifier _tradeVolume = ZeroIntNotifier(128400);
@@ -84,7 +84,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   late final ZeroConfettiController _confettiCtrl;
   late final ZeroTiltController _tiltCtrl;
 
-  // Particle stress controllers (d-zero SoA vs Traditional Object List)
+  // Particle stress controllers (D-Zero SoA vs Traditional Object List)
   late ZeroParticleController _particleCtrl;
   late List<TraditionalParticle> _tradParticles;
 
@@ -526,7 +526,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
                 ),
               ),
               _buildHudMetricBox(
-                label: 'd-zero Rebuilds',
+                label: 'D-Zero Rebuilds',
                 child: SizedBox(
                   width: 64,
                   height: 20,
@@ -621,7 +621,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   }
 
   Widget _buildZWidgetVerificationBanner() {
-    // Runtime verification that d-zero widgets implement ZWidget & isZeroAllocation == true
+    // Runtime verification that D-Zero widgets implement ZWidget & isZeroAllocation == true
     const ZWidget sampleLeaf = ZFPSMonitor();
     final bool verified = sampleLeaf.isZeroAllocation;
 
@@ -723,7 +723,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
             children: [
               const Flexible(
                 child: Text(
-                  '🔥 超高負荷ストレステスト & 構成モード切替 (d-zero vs 通常 Widget)',
+                  '🔥 超高負荷ストレステスト & 構成モード切替 (D-Zero vs 通常 Widget)',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -745,7 +745,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
             segments: const [
               ButtonSegment(
                 value: SuiteRenderMode.dZeroOnly,
-                label: Text('⚡️ d-zero (ZWidget 100%)', style: TextStyle(fontSize: 11)),
+                label: Text('⚡️ D-Zero (ZWidget 100%)', style: TextStyle(fontSize: 11)),
               ),
               ButtonSegment(
                 value: SuiteRenderMode.traditionalOnly,
@@ -842,7 +842,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   }
 
   // ============================================================================
-  // Pure d-zero Dashboard (100% ZWidget, 0 Widget Rebuilds, 0 Allocations)
+  // Pure D-Zero Dashboard (100% ZWidget, 0 Widget Rebuilds, 0 Allocations)
   // ============================================================================
   Widget _buildPureDZeroDashboard() {
     return ZCard(
@@ -1006,7 +1006,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '⚡️ d-zero Pure Suite (All Z* Widgets)',
+                '⚡️ D-Zero Pure Suite (All Z* Widgets)',
                 style: TextStyle(
                   color: Color(0xFF00FF88),
                   fontWeight: FontWeight.bold,

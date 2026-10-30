@@ -1,5 +1,5 @@
 name: d_zero
-repository: https://github.com/ANIZA15/d-zero
+repository: https://github.com/ANIZA15/D-Zero
 
 packages:
   - packages/*

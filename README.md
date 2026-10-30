@@ -1,4 +1,4 @@
-# ⚡️ d-zero (Dart Zero)
+# ⚡️ D-Zero (Dart Zero)
 
 **Flutter / Impeller 時代のために設計された、原理的にジャンク（コマ落ち）が発生しないゼロアロケーション Widget スイート。**
 
@@ -24,7 +24,7 @@ Dart VM は世代別ガベージコレクション（Generational GC）を採用
 ### 3. ゲーム・低遅延システム設計思想の輸入
 Cysharp 製の C# ライブラリ群（`UniTask`, `ZString`, `MemoryPack` など）に代表されるゲームエンジン（Unity）やハイパフォーマンスシステムプログラミングの世界では、**「毎フレームのヒープアロケーションを 0 に抑え、GC をそもそも発生させない」** という設計が絶対的な常識です。
 
-`d-zero` は、このゼロアロケーション思想を Flutter / Dart のアーキテクチャに直接適用し、高頻度更新（動画再生、ストップウォッチ、カウンター、音声波形、リアルタイムチャート等）においても **「GC 停止 0」「ウィジェットリビルド 0」「スレッド間通信遅延 0」** を実現します。
+`D-Zero` は、このゼロアロケーション思想を Flutter / Dart のアーキテクチャに直接適用し、高頻度更新（動画再生、ストップウォッチ、カウンター、音声波形、リアルタイムチャート等）においても **「GC 停止 0」「ウィジェットリビルド 0」「スレッド間通信遅延 0」** を実現します。
 
 ---
 
@@ -35,7 +35,7 @@ Cysharp 製の C# ライブラリ群（`UniTask`, `ZString`, `MemoryPack` など
   状態更新 ──> setState() ──> Widget ツリー再構築 ──> 文字列/オブジェクトのアロケーション ──> GC スパイク & Jank
   ネイティブ通信 ──> MethodChannel (JSON/バイナリ直列化) ──> スレッドホップ & レイテンシ
 
-[ d-zero アーキテクチャ ]
+[ D-Zero アーキテクチャ ]
   状態更新 ──> C++ 共有メモリ / Direct Notifier ──> Dart FFI ポインタ直接参照 (0 ns)
   描画処理 ──> ZeroRenderBox / オブジェクトプール (0 Allocations) ──> Impeller Direct Canvas ──> 安定 120fps
 ```
@@ -60,9 +60,9 @@ Cysharp 製の C# ライブラリ群（`UniTask`, `ZString`, `MemoryPack` など
 
 ---
 
-## 📊 性能比較（従来アプローチ vs d-zero）
+## 📊 性能比較（従来アプローチ vs D-Zero）
 
-| 指標 | 従来の Flutter 実装 | d-zero アーキテクチャ | 改善効果 |
+| 指標 | 従来の Flutter 実装 | D-Zero アーキテクチャ | 改善効果 |
 | :--- | :--- | :--- | :--- |
 | **毎フレームの Widget リビルド** | 10〜60+ 回 / 秒 | **0 回 / 秒 (True Zero Rebuild)** | CPU 負荷の劇的低減 |
 | **毎フレームのヒープアロケーション** | String, Map, Widget 等の継続生成 | **0 Bytes / フレーム (GC Free)** | GC スパイク・コマ落ちの根絶 |
@@ -77,9 +77,9 @@ Cysharp 製の C# ライブラリ群（`UniTask`, `ZString`, `MemoryPack` など
 本リポジトリは **Dart Pub Workspaces** および **Melos** で管理されるモジュラーモノレポです。
 
 ```
-d-zero/
+D-Zero/
 ├── apps/
-│   └── benchmark_app/   # ⚡️ 従来 Flutter vs d-zero 統合比較ベンチマークアプリ
+│   └── benchmark_app/   # ⚡️ 従来 Flutter vs D-Zero 統合比較ベンチマークアプリ
 ├── benchmarks/          # ⚡️ CLI マイクロベンチマーク (アロケーション/スループット定量計測)
 └── packages/
     ├── d_zero_core/       # ゼロアロケーション共通基盤ライブラリ
@@ -114,7 +114,7 @@ d-zero/
 ## ⚡️ ベンチマーク & サンプルアプリケーション
 
 ### 1. 統合比較ベンチマークアプリ (Flutter UI)
-従来の `setState` + `Text` 等による実装と `d-zero` スイートを Side-by-side で並べ、**リアルタイム FPS、フレームタイム (ms)、コマ落ち（Janks）、Widget リビルド回数** を可視化して比較できる Flutter アプリケーションです。
+従来の `setState` + `Text` 等による実装と `D-Zero` スイートを Side-by-side で並べ、**リアルタイム FPS、フレームタイム (ms)、コマ落ち（Janks）、Widget リビルド回数** を可視化して比較できる Flutter アプリケーションです。
 
 ```bash
 # 統合比較ベンチマークアプリの起動

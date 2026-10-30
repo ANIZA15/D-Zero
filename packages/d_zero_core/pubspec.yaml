@@ -1,9 +1,9 @@
 name: d_zero_core
 description: "Core foundation library for zero-allocation Flutter widgets and high-performance Impeller rendering."
 version: 0.1.0
-homepage: https://github.com/ANIZA15/d-zero
-repository: https://github.com/ANIZA15/d-zero/tree/main/packages/d_zero_core
-issue_tracker: https://github.com/ANIZA15/d-zero/issues
+homepage: https://github.com/ANIZA15/D-Zero
+repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_core
+issue_tracker: https://github.com/ANIZA15/D-Zero/issues
 topics:
   - performance
   - zero-allocation

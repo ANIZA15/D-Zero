@@ -6,7 +6,7 @@ import 'package:d_zero_core/src/buffer/float_ring_buffer.dart';
 ///
 /// Compares:
 /// 1. [Fair O(1) Standard]: `dart:collection.ListQueue<double>` (Circular dynamic queue)
-/// 2. [d-zero O(1) Zero-Allocation]: `FloatRingBuffer` (`Float64List` based unboxed buffer)
+/// 2. [D-Zero O(1) Zero-Allocation]: `FloatRingBuffer` (`Float64List` based unboxed buffer)
 /// 3. [Reference Naive]: `List.removeAt(0)` (O(N) anti-pattern for comparison)
 void runRingBufferBenchmark() {
   const operations = 200000;
@@ -15,7 +15,7 @@ void runRingBufferBenchmark() {
   const trials = 5;
 
   stdout.writeln('  Scenario: $operations sliding-window push operations (window size: $capacity)');
-  stdout.writeln('  Evaluating O(1) Standard ListQueue vs. d-zero TypedData FloatRingBuffer');
+  stdout.writeln('  Evaluating O(1) Standard ListQueue vs. D-Zero TypedData FloatRingBuffer');
 
   // --- 1. Warmup ---
   _warmupRingBuffer(capacity, warmupRounds);
@@ -38,7 +38,7 @@ void runRingBufferBenchmark() {
   final listQueueMedianMs = listQueueTimes[trials ~/ 2];
   final listQueueOps = (operations / (listQueueMedianMs / 1000.0)).toStringAsFixed(0);
 
-  // --- 3. Benchmark d-zero: FloatRingBuffer (O(1) TypedData) ---
+  // --- 3. Benchmark D-Zero: FloatRingBuffer (O(1) TypedData) ---
   final ringBufferTimes = <double>[];
   for (int t = 0; t < trials; t++) {
     final ring = FloatRingBuffer(capacity);
@@ -71,7 +71,7 @@ void runRingBufferBenchmark() {
 
   stdout.writeln('  📊 Results (Median of $trials runs):');
   stdout.writeln('    - Standard ListQueue<double> (O(1)) : ${listQueueMedianMs.toStringAsFixed(2)} ms ($listQueueOps ops/sec) [Boxed objects]');
-  stdout.writeln('    - d-zero FloatRingBuffer     (O(1)) : ${ringBufferMedianMs.toStringAsFixed(2)} ms ($ringOps ops/sec) [Unboxed Float64List, Zero GC]');
+  stdout.writeln('    - D-Zero FloatRingBuffer     (O(1)) : ${ringBufferMedianMs.toStringAsFixed(2)} ms ($ringOps ops/sec) [Unboxed Float64List, Zero GC]');
   stdout.writeln('    - [Ref] Naive List.removeAt  (O(N)) : ${naiveMs.toStringAsFixed(2)} ms (Array shift anti-pattern)');
   stdout.writeln('  ⚡️ Fair Comparison: FloatRingBuffer is ${fairSpeedup}x faster than ListQueue due to CPU cache locality and zero boxing.');
   stdout.writeln('  ℹ️ Note: Compared to naive List.removeAt(0), FloatRingBuffer is ${naiveSpeedup}x faster (avoiding O(N) array copy).');

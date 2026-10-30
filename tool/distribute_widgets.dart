@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// d-zero 配布用 Widget パッケージ一括検証・同期・パブリッシュ & バンドルツール
+/// D-Zero 配布用 Widget パッケージ一括検証・同期・パブリッシュ & バンドルツール
 ///
 /// 使い方:
 ///   dart run tool/distribute_widgets.dart [options]
@@ -147,7 +147,7 @@ class _PackageInfo {
 
 void _printBanner() {
   stdout.writeln('===============================================================');
-  stdout.writeln('🚀 d-zero Widget Suite 一括配布・パブリッシュパイプライン');
+  stdout.writeln('🚀 D-Zero Widget Suite 一括配布・パブリッシュパイプライン');
   stdout.writeln('===============================================================');
 }
 
@@ -549,7 +549,7 @@ Future<void> _generateDistributionBundle(
       .map((p) => "export 'package:${p.name}/${p.name}.dart';")
       .join('\n');
   barrelFile.writeAsStringSync(
-    '/// d-zero 全配布 Widget 一括エクスポート Barrel ファイル\n'
+    '/// D-Zero 全配布 Widget 一括エクスポート Barrel ファイル\n'
     'library d_zero_widgets;\n\n$exports\n',
   );
   stdout.writeln('  ✔ マニフェスト & 統合 Barrel 生成完了: ${outDir.path}/manifest.json');

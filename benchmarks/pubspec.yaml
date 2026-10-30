@@ -1,5 +1,5 @@
 name: d_zero_benchmarks
-description: "Microbenchmarks comparing traditional Dart/Flutter patterns vs d-zero zero-allocation patterns."
+description: "Microbenchmarks comparing traditional Dart/Flutter patterns vs D-Zero zero-allocation patterns."
 publish_to: 'none'
 version: 1.0.0
 

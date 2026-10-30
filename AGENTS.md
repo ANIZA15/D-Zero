@@ -1,6 +1,6 @@
-# Project Guidelines & Agent Instructions for d-zero
+# Project Guidelines & Agent Instructions for D-Zero
 
-`d-zero` は、Flutter / Impeller 向けの超高性能・ゼロジャンク・ゼロアロケーション（Zero Allocation & Zero Rebuild）ライブラリ群です。
+`D-Zero` は、Flutter / Impeller 向けの超高性能・ゼロジャンク・ゼロアロケーション（Zero Allocation & Zero Rebuild）ライブラリ群です。
 当プロジェクトでコードの追加・変更・リファクタリングを行うすべてのエージェントおよび開発者は、以下の設計原則・命名規約・品質基準を厳格に遵守してください。
 
 ---

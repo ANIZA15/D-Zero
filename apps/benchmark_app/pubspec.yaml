@@ -1,5 +1,5 @@
 name: benchmark_app
-description: "Interactive visual benchmark comparing traditional Flutter implementations vs d-zero zero-allocation suite."
+description: "Interactive visual benchmark comparing traditional Flutter implementations vs D-Zero zero-allocation suite."
 publish_to: 'none'
 version: 1.0.0+1
 

@@ -6,8 +6,8 @@ import 'particle_benchmark.dart';
 
 void main() {
   stdout.writeln('================================================================');
-  stdout.writeln('⚡️ d-zero Rigorous & Fair Performance Benchmarks');
-  stdout.writeln('Evaluating Standard Dart Patterns vs. d-zero Zero-Allocation Suite');
+  stdout.writeln('⚡️ D-Zero Rigorous & Fair Performance Benchmarks');
+  stdout.writeln('Evaluating Standard Dart Patterns vs. D-Zero Zero-Allocation Suite');
   stdout.writeln('================================================================');
   stdout.writeln('Environment:');
   stdout.writeln('  • Dart SDK : ${Platform.version.split(' ').first}');

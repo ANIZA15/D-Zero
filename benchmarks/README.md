@@ -1,6 +1,6 @@
-# ⚡️ d-zero Benchmarks
+# ⚡️ D-Zero Benchmarks
 
-This directory contains standalone microbenchmarks measuring raw CPU performance, memory throughput, and allocation elimination between traditional Flutter/Dart practices and the `d-zero` suite.
+This directory contains standalone microbenchmarks measuring raw CPU performance, memory throughput, and allocation elimination between traditional Flutter/Dart practices and the `D-Zero` suite.
 
 ## 🚀 Running Microbenchmarks
 

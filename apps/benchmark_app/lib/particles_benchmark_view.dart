@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:d_zero_particles/d_zero_particles.dart';
 
-/// Benchmark mode comparing Traditional Flutter vs d-zero Suite.
+/// Benchmark mode comparing Traditional Flutter vs D-Zero Suite.
 enum ParticleRenderMode {
   traditional,
   dZero,
@@ -24,7 +24,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   int _particleCount = 5000;
   bool _isRunning = true;
 
-  // d-zero controller & metrics (ValueNotifier avoids parent setState on ZParticles FPS updates)
+  // D-Zero controller & metrics (ValueNotifier avoids parent setState on ZParticles FPS updates)
   late ZeroParticleController _zController;
   final ValueNotifier<String> _dZeroFpsText = ValueNotifier<String>('60.0 FPS (16.6ms)');
   final ValueNotifier<Color> _dZeroFpsColor = ValueNotifier<Color>(const Color(0xFF00FF88));
@@ -219,7 +219,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: SegmentedButton<ParticleRenderMode>(
         segments: const [
           ButtonSegment(value: ParticleRenderMode.sideBySide, label: Text('2画面比較', style: TextStyle(fontSize: 11))),
-          ButtonSegment(value: ParticleRenderMode.dZero, label: Text('⚡️ d-zero', style: TextStyle(fontSize: 11))),
+          ButtonSegment(value: ParticleRenderMode.dZero, label: Text('⚡️ D-Zero', style: TextStyle(fontSize: 11))),
           ButtonSegment(value: ParticleRenderMode.traditional, label: Text('❌ 従来', style: TextStyle(fontSize: 11))),
         ],
         selected: {_mode},
@@ -311,7 +311,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('⚡️ d-zero Suite', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00FF88))),
+          const Text('⚡️ D-Zero Suite', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00FF88))),
           const Text('ZParticles (Float32List SoA)', style: TextStyle(fontSize: 10, color: Colors.grey)),
           const SizedBox(height: 8),
           Container(

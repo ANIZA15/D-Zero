@@ -11,7 +11,7 @@ import 'dart:typed_data';
 ///    - Produces intermediate String allocations (hours, minutes, seconds, padded strings, merged string)
 ///    - Extracts `codeUnits` for layout/rendering.
 ///
-/// 2. d-zero Zero-Allocation Direct Arithmetic Approach:
+/// 2. D-Zero Zero-Allocation Direct Arithmetic Approach:
 ///    - Employs `ZeroNumberPainter` algorithm.
 ///    - Computes character codes directly via modulo/division arithmetic.
 ///    - Writes directly into a reusable `Uint8List(8)` buffer. Zero String allocations.
@@ -54,7 +54,7 @@ void runCounterAllocationBenchmark() {
   final traditionalMedianMs = traditionalTimes[trials ~/ 2];
   final traditionalOps = (count / (traditionalMedianMs / 1000.0)).toStringAsFixed(0);
 
-  // --- 3. d-zero Zero-Allocation Direct Arithmetic ---
+  // --- 3. D-Zero Zero-Allocation Direct Arithmetic ---
   final zeroTimes = <double>[];
   int zeroChecksum = 0;
   // Reusable scratch buffer (fixed 8 bytes for "HH:MM:SS", exactly like ZeroNumberPainter)
@@ -97,7 +97,7 @@ void runCounterAllocationBenchmark() {
   stdout.writeln('  📊 Results (Median of $trials runs, $count frames):');
   stdout.writeln('    - Traditional String.padLeft : ${traditionalMedianMs.toStringAsFixed(2)} ms ($traditionalOps ops/sec)');
   stdout.writeln('      ↳ Heap allocation: ~$approxStringsCreated String instances discarded to GC (checksum: $traditionalChecksum)');
-  stdout.writeln('    - d-zero Direct Arithmetic   : ${zeroMedianMs.toStringAsFixed(2)} ms ($zeroOps ops/sec)');
+  stdout.writeln('    - D-Zero Direct Arithmetic   : ${zeroMedianMs.toStringAsFixed(2)} ms ($zeroOps ops/sec)');
   stdout.writeln('      ↳ Heap allocation: 0 String instances, in-place Uint8List buffer (checksum: $zeroChecksum)');
   stdout.writeln('  ⚡️ Fair Speedup: Direct arithmetic is ${speedup}x faster with 100% eliminated String allocation.');
   stdout.writeln('  💡 Integrity Check: Output checksums match perfectly (${traditionalChecksum == zeroChecksum ? "MATCHED ✅" : "MISMATCH ❌"}).');

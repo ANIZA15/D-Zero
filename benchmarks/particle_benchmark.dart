@@ -22,7 +22,7 @@ class HeapParticle {
 /// 1. Traditional Object-Oriented Dart (Array of Structures / Heap Object Pointers):
 ///    - `List<HeapParticle>` requires pointer dereferencing for each particle on each frame.
 ///    - Cache misses when traversing pointer-based structures on large arrays.
-/// 2. d-zero Flat SoA (Structure of Arrays):
+/// 2. D-Zero Flat SoA (Structure of Arrays):
 ///    - `ZeroParticleBuffer` uses flat contiguous `Float32List` for positions and velocities.
 ///    - Maximizes SIMD-friendly continuous CPU cache prefetching and eliminates all object pointer overhead.
 void runParticleBenchmark() {
@@ -91,7 +91,7 @@ void runParticleBenchmark() {
   heapFrameTimesUs.sort();
   final heapMedianUs = heapFrameTimesUs[trials ~/ 2];
 
-  // --- 3. d-zero Flat SoA Buffer ---
+  // --- 3. D-Zero Flat SoA Buffer ---
   final zeroFrameTimesUs = <double>[];
   for (int t = 0; t < trials; t++) {
     final zBuffer = ZeroParticleBuffer(particleCount);
@@ -118,7 +118,7 @@ void runParticleBenchmark() {
 
   stdout.writeln('  📊 Results (Median of $trials runs, $particleCount particles/frame):');
   stdout.writeln('    - Standard AoS Heap Objects : ${heapMedianUs.toStringAsFixed(1)} μs / frame ($particleCount separate object pointers)');
-  stdout.writeln('    - d-zero Flat SoA Buffer    : ${zeroMedianUs.toStringAsFixed(1)} μs / frame (Flat continuous Float32List, 0 pointers)');
+  stdout.writeln('    - D-Zero Flat SoA Buffer    : ${zeroMedianUs.toStringAsFixed(1)} μs / frame (Flat continuous Float32List, 0 pointers)');
   stdout.writeln('  ⚡️ Architecture: SoA flat memory layout operates at ${speedup}x speed with zero GC pointer tracking.');
 }
 

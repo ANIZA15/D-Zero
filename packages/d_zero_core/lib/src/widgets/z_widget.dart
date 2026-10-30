@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../rendering/zero_render_box.dart';
 
-/// Marker interface and base class for all d-zero zero-allocation widgets.
+/// Marker interface and base class for all D-Zero zero-allocation widgets.
 ///
 /// [ZWidget] instances are designed to be constructed with `const` and bound to
 /// reactive sources (such as [ValueListenable], signals, or native FFI pointers).

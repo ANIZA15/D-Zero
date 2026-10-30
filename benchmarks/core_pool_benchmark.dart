@@ -58,7 +58,7 @@ void runCorePoolBenchmark() {
   final heapMedianMs = heapTimes[trials ~/ 2];
   final heapOps = (totalLifecycles / (heapMedianMs / 1000.0)).toStringAsFixed(0);
 
-  // --- 3. d-zero ZeroPool Recycling ---
+  // --- 3. D-Zero ZeroPool Recycling ---
   final pool = ZeroPool<NodeItem>(
     factory: () => NodeItem(),
     reset: (n) => n.reset(),
@@ -104,7 +104,7 @@ void runCorePoolBenchmark() {
   stdout.writeln('  📊 Results (Median of $trials runs, $totalLifecycles objects):');
   stdout.writeln('    - Standard Heap Allocation : ${heapMedianMs.toStringAsFixed(2)} ms ($heapOps ops/sec)');
   stdout.writeln('      ↳ Discards ~${estimatedGarbageMb.toStringAsFixed(1)} MB garbage across $totalLifecycles instances (sum: ${heapChecksum.toStringAsFixed(0)})');
-  stdout.writeln('    - d-zero ZeroPool Recycling: ${poolMedianMs.toStringAsFixed(2)} ms ($poolOps ops/sec)');
+  stdout.writeln('    - D-Zero ZeroPool Recycling: ${poolMedianMs.toStringAsFixed(2)} ms ($poolOps ops/sec)');
   stdout.writeln('      ↳ Heap garbage: 0 MB / 0 objects after initial buffer allocation (sum: ${poolChecksum.toStringAsFixed(0)})');
 
   _printAnalysis(heapMedianMs, poolMedianMs, totalLifecycles, estimatedGarbageMb);

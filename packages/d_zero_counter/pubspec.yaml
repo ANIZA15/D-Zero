@@ -1,9 +1,9 @@
 name: d_zero_counter
 description: "A zero-allocation, zero-rebuild high-frequency counter and stopwatch widget for Flutter / Impeller."
 version: 0.1.0
-homepage: https://github.com/ANIZA15/d-zero
-repository: https://github.com/ANIZA15/d-zero/tree/main/packages/d_zero_counter
-issue_tracker: https://github.com/ANIZA15/d-zero/issues
+homepage: https://github.com/ANIZA15/D-Zero
+repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_counter
+issue_tracker: https://github.com/ANIZA15/D-Zero/issues
 topics:
   - counter
   - stopwatch

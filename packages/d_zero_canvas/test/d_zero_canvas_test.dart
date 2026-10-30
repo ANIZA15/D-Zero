@@ -6,7 +6,7 @@ void main() {
   group('ZeroDanmakuController & ZDanmaku', () {
     test('ZeroDanmakuController survives double dispose and post-dispose calls', () {
       final ZeroDanmakuController controller = ZeroDanmakuController(capacity: 8);
-      controller.emit('Hello d-zero!', speed: 150.0);
+      controller.emit('Hello D-Zero!', speed: 150.0);
       expect(controller.activeCount, equals(1));
       expect(controller.step(0.1), isTrue);
 

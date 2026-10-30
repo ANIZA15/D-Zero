@@ -1,6 +1,6 @@
 import 'dart:io';
 
-/// 循環的複雑度（Cyclomatic Complexity, McCabe Metric）計測ツール (d-zero ワークスペース全体対応)
+/// 循環的複雑度（Cyclomatic Complexity, McCabe Metric）計測ツール (D-Zero ワークスペース全体対応)
 ///
 /// 各関数・メソッドごとの分岐点（if, for, while, case, catch, &&, ||, ?, ??）
 /// を解析し、保守性（しきい値: 10以下が理想・推奨、15超過で警告・エラー）を判定します。
@@ -12,7 +12,7 @@ void main(List<String> args) {
   ];
 
   stdout.writeln('===============================================================');
-  stdout.writeln('📊 d-zero ワークスペース 循環的複雑度（Cyclomatic Complexity）計測');
+  stdout.writeln('📊 D-Zero ワークスペース 循環的複雑度（Cyclomatic Complexity）計測');
   stdout.writeln('===============================================================');
 
   final results = <_FunctionMetric>[];

@@ -18,7 +18,7 @@ class DZeroBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd-zero Benchmark Suite',
+      title: 'D-Zero Benchmark Suite',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF090A0F),
@@ -82,7 +82,7 @@ class _BenchmarkHomeScreenState extends State<BenchmarkHomeScreen> {
           children: [
             const Flexible(
               child: Text(
-                '⚡️ d-zero',
+                '⚡️ D-Zero',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -279,7 +279,7 @@ class _CounterBenchmarkViewState extends State<CounterBenchmarkView> {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildPanel(
-                  title: '⚡️ d-zero Suite',
+                  title: '⚡️ D-Zero Suite',
                   subtitle: 'ZCounter (Direct Canvas)',
                   badgeColor: const Color(0xFF00FF88),
                   rebuildCount: 0,
@@ -544,7 +544,7 @@ class _BufferPoolBenchmarkViewState extends State<BufferPoolBenchmarkView> {
                     ),
                     Column(
                       children: [
-                        const Text('d-zero FloatRingBuffer', style: TextStyle(color: Color(0xFF00FF88), fontSize: 12)),
+                        const Text('D-Zero FloatRingBuffer', style: TextStyle(color: Color(0xFF00FF88), fontSize: 12)),
                         const SizedBox(height: 4),
                         Text('${_ringBufferWriteTimeUs.toStringAsFixed(1)} μs (O(1) Ring)', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00FF88))),
                       ],
@@ -670,7 +670,7 @@ class ArchitectureOverviewView extends StatelessWidget {
 - 60fps: 16.6ms / フレーム
 - 120fps: 8.33ms / フレーム
 
-Impeller によりシェーダーコンパイルジャンクが解消された現代、残る最大のコマ落ち原因は「Dart UI スレッドにおける毎フレームのアロケーションと GC ポーズ」です。d-zero はこの根本原因を排除します。
+Impeller によりシェーダーコンパイルジャンクが解消された現代、残る最大のコマ落ち原因は「Dart UI スレッドにおける毎フレームのアロケーションと GC ポーズ」です。D-Zero はこの根本原因を排除します。
 ''',
           ),
         ],

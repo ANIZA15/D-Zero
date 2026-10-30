@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 A next-generation video player utilizing FFI shared-memory and Impeller-optimized zero-copy textures.
                        DESC
-  s.homepage         = 'https://github.com/ANIZA15/d-zero/tree/main/packages/d_zero_player'
+  s.homepage         = 'https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_player'
   s.license          = { :type => 'MIT' }
   s.author           = { 'fexcy' => 'contact@fexcy.com' }
   s.source           = { :path => '.' }

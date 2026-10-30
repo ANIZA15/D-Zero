@@ -1,13 +1,13 @@
 ---
 name: zero-engineering
 description: >-
-  Guide for developing, refactoring, and verifying high-performance components in d-zero.
+  Guide for developing, refactoring, and verifying high-performance components in D-Zero.
   Enforces Z-prefix Widget naming, Cyclomatic Complexity limits, and strict memory/lifecycle testing.
 ---
 
-# d-zero Engineering & Quality Guide
+# D-Zero Engineering & Quality Guide
 
-This skill provides step-by-step guidance for implementing and validating widgets, render boxes, and native FFI bindings in the `d-zero` monorepo.
+This skill provides step-by-step guidance for implementing and validating widgets, render boxes, and native FFI bindings in the `D-Zero` monorepo.
 
 ---
 

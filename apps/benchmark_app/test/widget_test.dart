@@ -17,7 +17,7 @@ import 'package:benchmark_app/particles_benchmark_view.dart';
 import 'package:benchmark_app/suite_switch_demo_view.dart';
 
 void main() {
-  testWidgets('Suite comparison demo switches between d-zero and traditional widgets with FPS & memory HUD', (WidgetTester tester) async {
+  testWidgets('Suite comparison demo switches between D-Zero and traditional widgets with FPS & memory HUD', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1280, 2400);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -27,11 +27,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 16));
 
-    // Verify FPS & Memory HUD and pure d-zero mode default
+    // Verify FPS & Memory HUD and pure D-Zero mode default
     expect(find.byType(ZFPSMonitor), findsWidgets);
     expect(find.textContaining('Live FPS & Memory Diagnostics HUD'), findsOneWidget);
     expect(find.textContaining('ZWidget Verification'), findsOneWidget);
-    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsOneWidget);
+    expect(find.text('⚡️ D-Zero Pure Suite (All Z* Widgets)'), findsOneWidget);
     expect(find.text('❌ Traditional Flutter Widgets'), findsNothing);
     expect(find.byType(ZSparkline), findsOneWidget);
     expect(find.byType(ZCandlestickChart), findsOneWidget);
@@ -47,7 +47,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 32));
 
     expect(find.text('❌ Traditional Flutter Widgets'), findsOneWidget);
-    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsNothing);
+    expect(find.text('⚡️ D-Zero Pure Suite (All Z* Widgets)'), findsNothing);
 
     // Switch to Side-by-Side mode
     await tester.tap(find.descendant(
@@ -56,7 +56,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 32));
 
-    expect(find.text('⚡️ d-zero Pure Suite (All Z* Widgets)'), findsOneWidget);
+    expect(find.text('⚡️ D-Zero Pure Suite (All Z* Widgets)'), findsOneWidget);
     expect(find.text('❌ Traditional Flutter Widgets'), findsOneWidget);
 
     // Unmount and verify clean disposal (no leaked tickers or listeners)
@@ -77,7 +77,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
 
     // Verify header exists.
-    expect(find.text('⚡️ d-zero'), findsOneWidget);
+    expect(find.text('⚡️ D-Zero'), findsOneWidget);
 
     // Switch to Particle Stress tab
     await tester.ensureVisible(find.text('Particle Stress'));
@@ -86,7 +86,7 @@ void main() {
 
     // Verify Particle Stress view rendered and ZParticles actively steps physics every frame
     expect(find.text('レンダリング方式の切り替え'), findsOneWidget);
-    expect(find.text('⚡️ d-zero Suite'), findsOneWidget);
+    expect(find.text('⚡️ D-Zero Suite'), findsOneWidget);
     expect(find.text('❌ Traditional'), findsOneWidget);
 
     final renderParticles = tester.renderObject<RenderZParticles>(find.byType(ZParticles));
@@ -101,13 +101,13 @@ void main() {
     final updatedY = renderParticles.controller.buffer.positions[1];
     expect(initialX != updatedX || initialY != updatedY, isTrue);
 
-    // Switch to d-zero single view
+    // Switch to D-Zero single view
     await tester.tap(find.descendant(
       of: find.byType(SegmentedButton<ParticleRenderMode>),
-      matching: find.text('⚡️ d-zero'),
+      matching: find.text('⚡️ D-Zero'),
     ));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('⚡️ d-zero Suite'), findsOneWidget);
+    expect(find.text('⚡️ D-Zero Suite'), findsOneWidget);
     expect(find.text('❌ Traditional'), findsNothing);
 
     // Switch to Traditional single view
@@ -117,6 +117,6 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('❌ Traditional'), findsOneWidget);
-    expect(find.text('⚡️ d-zero Suite'), findsNothing);
+    expect(find.text('⚡️ D-Zero Suite'), findsNothing);
   });
 }

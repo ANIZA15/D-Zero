@@ -14,7 +14,7 @@ abstract interface class ZeroSlottedFrameListener implements ZeroFrameListener {
   set zeroSchedulerSlot(int slot);
 }
 
-/// A single shared VSync driver for every d-zero per-frame render object.
+/// A single shared VSync driver for every D-Zero per-frame render object.
 ///
 /// Instead of each [RenderBox] owning its own [Ticker] (N tickers =
 /// N frame-callback registrations per frame), all subscribers are multiplexed
