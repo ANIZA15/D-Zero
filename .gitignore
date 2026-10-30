@@ -59,6 +59,9 @@ migrate_working_dir/
 **/.flutter-plugins
 .flutter-plugins-dependencies
 **/.flutter-plugins-dependencies
+.metadata
+**/.metadata
+/pubspec.lock
 pubspec_overrides.yaml
 **/pubspec_overrides.yaml
 build/
@@ -206,7 +209,6 @@ dist/
 !**/android/**/gradle-wrapper.jar
 !apps/benchmark_app/macos/Flutter/Flutter-Debug.xcconfig
 !apps/benchmark_app/macos/Flutter/Flutter-Release.xcconfig
-!apps/benchmark_app/macos/Flutter/GeneratedPluginRegistrant.swift
 !packages/d_zero_player/example/.gitignore
 !packages/d_zero_player/example/android/**
 !packages/d_zero_player/example/ios/**
