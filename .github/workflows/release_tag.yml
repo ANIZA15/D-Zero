@@ -1,0 +1,101 @@
+name: Auto Tag & Release on Version Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/*/pubspec.yaml'
+      - 'CHANGELOG.md'
+  workflow_dispatch:
+    inputs:
+      force_update_tag:
+        description: 'Force-update existing tag if the version tag already exists'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  tag-and-release:
+    name: Detect Version & Update Git Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository with full history and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect workspace package version
+        id: detect
+        run: |
+          VERSION=$(grep -E '^version:[[:space:]]*' packages/d_zero_core/pubspec.yaml | head -n 1 | sed -E 's/^version:[[:space:]]*["'\'']?([^"'\''[:space:]]+)["'\'']?/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Failed to parse version from packages/d_zero_core/pubspec.yaml"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected D-Zero version: $VERSION"
+
+          # Verify all publishable packages share the same synchronized version
+          for pubspec in packages/*/pubspec.yaml; do
+            if grep -q "^publish_to:[[:space:]]*'none'" "$pubspec"; then
+              continue
+            fi
+            PKG_VER=$(grep -E '^version:[[:space:]]*' "$pubspec" | head -n 1 | sed -E 's/^version:[[:space:]]*["'\'']?([^"'\''[:space:]]+)["'\'']?/\1/')
+            if [ "$PKG_VER" != "$VERSION" ]; then
+              echo "::error::Version mismatch in $pubspec ($PKG_VER != $VERSION). Run 'dart run tool/distribute_widgets.dart --set-version=$VERSION --sync-only' first."
+              exit 1
+            fi
+          done
+
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag '$VERSION' already exists."
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag '$VERSION' is new and will be created."
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        run: |
+          VERSION="${{ steps.detect.outputs.version }}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## " ver "([[:space:]]|$)" { in_section=1; next }
+            in_section && $0 ~ "^## " { exit }
+            in_section { print }
+          ' CHANGELOG.md > /tmp/release_notes.md
+
+          if [ ! -s /tmp/release_notes.md ]; then
+            echo "Synchronized release of D-Zero workspace packages v$VERSION." > /tmp/release_notes.md
+          fi
+          cat /tmp/release_notes.md
+
+      - name: Create or update Git tag
+        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        run: |
+          VERSION="${{ steps.detect.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f -a "$VERSION" -m "Release D-Zero v$VERSION"
+          git push origin "refs/tags/$VERSION" --force
+          echo "✅ Pushed tag: $VERSION"
+
+      - name: Create or update GitHub Release
+        if: steps.detect.outputs.tag_exists == 'false' || inputs.force_update_tag == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.detect.outputs.version }}"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release edit "$VERSION" \
+              --title "D-Zero v$VERSION" \
+              --notes-file /tmp/release_notes.md
+          else
+            gh release create "$VERSION" \
+              --verify-tag \
+              --title "D-Zero v$VERSION" \
+              --notes-file /tmp/release_notes.md
+          fi

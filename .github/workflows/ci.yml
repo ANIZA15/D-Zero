@@ -1,0 +1,50 @@
+name: D-Zero Quality Gates (CI)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Analyze, Complexity & Test
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: 1. Static Analysis (flutter analyze)
+        run: flutter analyze
+
+      - name: 2. Cyclomatic Complexity Gate (CC <= 15)
+        run: dart run tool/check_complexity.dart
+
+      - name: 3. Z-Prefix Widget & Metadata Audit
+        run: dart run tool/distribute_widgets.dart --sync-only
+
+      - name: 4. Unit, Widget Lifecycle & Memory Safety Tests
+        run: |
+          flutter test \
+            packages/d_zero_core/test \
+            packages/d_zero_counter/test \
+            packages/d_zero_particles/test \
+            packages/d_zero_ui/test \
+            packages/d_zero_waveform/test \
+            packages/d_zero_chart/test \
+            packages/d_zero_fx/test \
+            packages/d_zero_canvas/test \
+            packages/d_zero_sensor/test \
+            packages/d_zero_player/test

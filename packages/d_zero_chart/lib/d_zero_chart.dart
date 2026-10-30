@@ -6,3 +6,4 @@ export 'src/z_candlestick_chart.dart';
 export 'src/z_heatmap.dart';
 export 'src/z_order_book.dart';
 export 'src/z_sparkline.dart';
+export 'src/z_virtual_grid.dart';

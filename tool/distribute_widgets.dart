@@ -13,6 +13,8 @@ import 'dart:io';
 ///   --sync-only           LICENSE / .pubignore / 内部依存バージョンの同期と Z-Widget 監査のみ実行
 ///   --set-version=X.Y.Z   対象パッケージのバージョンを一括設定し内部依存制約も更新
 ///   --bump=TYPE           バージョンを一括バンプ (patch | minor | major)
+///   --tag                 現在のバージョンに対応する Git タグを自動作成・更新
+///   --push-tag            --tag で作成・更新した Git タグを origin に push
 ///   --packages=a,b        対象パッケージをカンマ区切りで指定 (例: d_zero_core,d_zero_counter)
 ///   --skip-checks         事前品質ゲート (analyze / complexity / test) をスキップ
 ///   --with-benchmark      事前品質ゲートにマイクロベンチマークを追加
@@ -43,6 +45,7 @@ Future<void> main(List<String> args) async {
   _syncPackageMetadata(sortedAll);
   _auditExportedWidgets(targetPackages);
   _printPackageTable(targetPackages);
+  _applyGitTagIfRequested(sortedAll, config);
 
   if (config.syncOnly) {
     stdout.writeln('\n✅ パッケージ同期および Z-Prefix Widget 監査が完了しました。');
@@ -77,6 +80,8 @@ class _CliConfig {
   final String bundleDir;
   final String? newVersion;
   final String? bumpType;
+  final bool createGitTag;
+  final bool pushGitTag;
   final Set<String> packageFilter;
 
   const _CliConfig({
@@ -90,6 +95,8 @@ class _CliConfig {
     required this.bundleDir,
     required this.newVersion,
     required this.bumpType,
+    required this.createGitTag,
+    required this.pushGitTag,
     required this.packageFilter,
   });
 
@@ -122,6 +129,8 @@ class _CliConfig {
       bundleDir: kvMap['output'] ?? 'dist',
       newVersion: kvMap['set-version'],
       bumpType: kvMap['bump'],
+      createGitTag: flagSet.contains('--tag') || flagSet.contains('--push-tag'),
+      pushGitTag: flagSet.contains('--push-tag'),
       packageFilter: filter,
     );
   }
@@ -162,6 +171,8 @@ void _printUsage() {
   --sync-only             LICENSE / .pubignore / 内部依存バージョン同期と Z-Widget 監査のみ実行
   --set-version=X.Y.Z     対象パッケージのバージョンを一括変更し、内部依存バージョンも同期
   --bump=patch|minor|major セマンティックバージョンを一括インクリメント
+  --tag                   現在のパッケージバージョンで Git タグを作成・更新
+  --push-tag              Git タグを作成・更新し origin リモートへ push
   --packages=pkg1,pkg2    特定パッケージのみを対象に指定 (例: --packages=d_zero_counter,d_zero_particles)
   --skip-checks           事前品質ゲート (analyze / complexity / test) をスキップ
   --with-benchmark        品質ゲートにマイクロベンチマーク実行を含める
@@ -296,6 +307,52 @@ void _applyVersionUpdate(
     _ensureChangelogVersion(pkg, nextVersion);
     stdout.writeln('  ✔ ${pkg.name}: ${pkg.version} -> $nextVersion');
     pkg.version = nextVersion;
+  }
+  if (targetPackages.isNotEmpty) {
+    _ensureRootChangelogVersion(targetPackages.first.version);
+  }
+}
+
+void _ensureRootChangelogVersion(String version) {
+  final rootChangelog = File('CHANGELOG.md');
+  if (!rootChangelog.existsSync()) return;
+  final existing = rootChangelog.readAsStringSync();
+  final header = '## $version';
+  if (existing.contains(header)) return;
+  final dateStr = DateTime.now().toIso8601String().split('T').first;
+  final updated = existing.replaceFirst(
+    '# Changelog\n',
+    '# Changelog\n\n$header - $dateStr\n\n* Synchronized release of D-Zero workspace packages v$version.\n',
+  );
+  rootChangelog.writeAsStringSync(updated);
+}
+
+void _applyGitTagIfRequested(
+  List<_PackageInfo> allPackages,
+  _CliConfig config,
+) {
+  if (!config.createGitTag || allPackages.isEmpty) return;
+  final version = allPackages.first.version;
+  stdout.writeln('\n🏷️  Git タグ ($version) を作成・更新中...');
+  final tagRes = Process.runSync(
+    'git',
+    ['tag', '-f', '-a', version, '-m', 'Release D-Zero v$version'],
+  );
+  if (tagRes.exitCode != 0) {
+    stderr.writeln('❌ Git タグの作成に失敗しました: ${tagRes.stderr}');
+    exit(tagRes.exitCode);
+  }
+  stdout.writeln('  ✔ Git タグを更新しました: $version');
+  if (config.pushGitTag) {
+    final pushRes = Process.runSync(
+      'git',
+      ['push', 'origin', 'refs/tags/$version', '--force'],
+    );
+    if (pushRes.exitCode != 0) {
+      stderr.writeln('❌ Git タグの push に失敗しました: ${pushRes.stderr}');
+      exit(pushRes.exitCode);
+    }
+    stdout.writeln('  ✔ リモート (origin) へタグ $version を push しました。');
   }
 }
 

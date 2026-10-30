@@ -115,4 +115,71 @@ void main() {
       progress.dispose();
     });
   });
+
+  group('ZMeshGradient & Z3DTilt', () {
+    testWidgets('ZMeshGradient animates raw vertex mesh and stops on unmount', (tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZFluidGradient(
+              size: Size(240.0, 140.0),
+              warpIntensity: 0.35,
+              borderRadius: 12.0,
+            ),
+          ),
+        ),
+      );
+
+      final renderMesh = tester.renderObject<RenderZMeshGradient>(find.byType(ZMeshGradient));
+      expect(renderMesh.isRepaintBoundary, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.drag(find.byType(ZMeshGradient), const Offset(30.0, 20.0));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('Z3DTilt updates TransformLayer without rebuilding child and unsubscribes on unmount', (tester) async {
+      final tilt = ValueNotifier<Offset>(Offset.zero);
+      addTearDown(tilt.dispose);
+      int childBuilds = 0;
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZParallaxContainer(
+              tiltListenable: tilt,
+              child: Builder(
+                builder: (context) {
+                  childBuilds++;
+                  return const SizedBox(width: 180.0, height: 120.0);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final renderTilt = tester.renderObject<RenderZ3DTilt>(find.byType(Z3DTilt));
+      expect(renderTilt.isRepaintBoundary, isTrue);
+      expect(childBuilds, equals(1));
+
+      tilt.value = const Offset(0.5, -0.4);
+      await tester.pump();
+      expect(renderTilt.normalizedTiltX, closeTo(0.5, 1e-3));
+      expect(renderTilt.normalizedTiltY, closeTo(-0.4, 1e-3));
+      expect(childBuilds, equals(1));
+
+      await tester.drag(find.byType(Z3DTilt), const Offset(25.0, -15.0));
+      await tester.pump();
+      expect(childBuilds, equals(1));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => tilt.value = const Offset(0.9, 0.9), returnsNormally);
+    });
+  });
 }

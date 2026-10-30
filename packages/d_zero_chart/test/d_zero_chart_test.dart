@@ -208,4 +208,59 @@ void main() {
       expect(controller.hasListeners, isFalse);
     });
   });
+
+  group('ZVirtualGrid & ZeroVirtualGridController', () {
+    test('ZeroVirtualGridController stores 2D numeric matrix and survives double-dispose', () {
+      final controller = ZeroVirtualGridController(rows: 100, cols: 6);
+      expect(controller.length, equals(600));
+      controller.setCell(10, 3, 42.75);
+      controller.updateRow(20, const [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+      expect(controller.cellAt(10, 3), closeTo(42.75, 1e-4));
+      expect(controller.cellAt(20, 5), closeTo(6.0, 1e-4));
+
+      controller.clear();
+      expect(controller.cellAt(10, 3), equals(0.0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.setCell(0, 0, 99.0);
+      expect(controller.cellAt(0, 0), equals(0.0));
+      expect(controller.length, equals(0));
+    });
+
+    testWidgets('ZVirtualGrid culls and renders visible cells and unsubscribes on unmount', (tester) async {
+      final controller = ZeroVirtualGridController(rows: 500, cols: 8);
+      addTearDown(controller.dispose);
+      for (int r = 0; r < 50; r++) {
+        for (int c = 0; c < 8; c++) {
+          controller.setCell(r, c, (r * 10 + c) * 1.25);
+        }
+      }
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZTimeSeriesTable(
+              controller: controller,
+              size: const Size(320.0, 180.0),
+            ),
+          ),
+        ),
+      );
+      expect(controller.hasListeners, isTrue);
+
+      final renderGrid = tester.renderObject<RenderZVirtualGrid>(find.byType(ZVirtualGrid));
+      expect(renderGrid.isRepaintBoundary, isTrue);
+
+      await tester.drag(find.byType(ZVirtualGrid), const Offset(-60.0, -120.0));
+      await tester.pump();
+      expect(renderGrid.scrollX, greaterThan(0.0));
+      expect(renderGrid.scrollY, greaterThan(0.0));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
 }

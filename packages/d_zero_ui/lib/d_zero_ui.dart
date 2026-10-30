@@ -11,4 +11,5 @@ export 'src/z_marquee.dart';
 export 'src/z_progress.dart';
 export 'src/z_slider.dart';
 export 'src/z_switch.dart';
+export 'src/z_terminal.dart';
 export 'src/z_typewriter_text.dart';

@@ -397,4 +397,68 @@ void main() {
       controller.dispose();
     });
   });
+
+  group('ZeroTerminalController & ZTerminal', () {
+    test('ZeroTerminalController wraps ring buffer and survives double-dispose', () {
+      final controller = ZeroTerminalController(maxLines: 4, maxCols: 16);
+      controller.writeLine('BOOT OK', level: ZeroTerminalController.levelInfo);
+      controller.writeAscii('WARN 42'.codeUnits, level: ZeroTerminalController.levelWarn);
+      expect(controller.lineCount, equals(2));
+      expect(controller.totalLinesWritten, equals(2));
+      expect(controller.lineLengthAt(0), equals(7));
+      expect(controller.lineLevelAt(1), equals(ZeroTerminalController.levelWarn));
+      expect(controller.glyphAt(0, 0), equals('B'.codeUnitAt(0) - 0x20));
+
+      for (int i = 0; i < 6; i++) {
+        controller.writeLine('LINE $i', level: ZeroTerminalController.levelError);
+      }
+      expect(controller.lineCount, equals(4));
+      expect(controller.totalLinesWritten, equals(8));
+
+      controller.clear();
+      expect(controller.lineCount, equals(0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.writeLine('AFTER DISPOSE');
+      expect(controller.lineCount, equals(0));
+      expect(controller.glyphAt(0, 0), equals(0));
+    });
+
+    testWidgets('ZTerminal streams logs via drawRawAtlas and detaches on unmount', (tester) async {
+      final controller = ZeroTerminalController(maxLines: 128, maxCols: 64);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZLogStream(
+              controller: controller,
+              size: const Size(320.0, 180.0),
+            ),
+          ),
+        ),
+      );
+
+      final renderTerm = tester.renderObject<RenderZTerminal>(find.byType(ZTerminal));
+      expect(renderTerm.isRepaintBoundary, isTrue);
+
+      for (int i = 0; i < 60; i++) {
+        controller.writeLine(
+          '[#${i.toString().padLeft(3, '0')}] Packet recv 1024B OK',
+          level: i % 4,
+        );
+      }
+      await tester.pump();
+      expect(renderTerm.scrollOffset, greaterThan(0.0));
+
+      await tester.drag(find.byType(ZTerminal), const Offset(0.0, 40.0));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => controller.writeLine('post-unmount log'), returnsNormally);
+    });
+  });
 }

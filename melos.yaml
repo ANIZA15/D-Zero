@@ -49,6 +49,10 @@ scripts:
     run: dart run tool/distribute_widgets.dart --sync-only
     description: Sync LICENSE, .pubignore, internal dependency versions, and audit Z-Prefix widgets across all packages.
 
+  distribute:tag:
+    run: dart run tool/distribute_widgets.dart --sync-only --tag
+    description: Sync metadata, audit Z-Prefix widgets, and create/update the Git tag for the current release version.
+
   distribute:bundle:
     run: dart run tool/distribute_widgets.dart --bundle --skip-checks
     description: Generate local release archives (.tar.gz), manifest.json, and unified barrel file in dist/.

@@ -122,4 +122,57 @@ void main() {
       controller.dispose();
     });
   });
+
+  group('ZeroRibbonController & ZRibbon', () {
+    test('ZeroRibbonController extrudes triangle strip with degenerate bridges and survives double-dispose', () {
+      final controller = ZeroRibbonController(maxSamples: 64);
+      controller.addSample(10.0, 10.0, pressure: 0.3);
+      controller.addSample(25.0, 20.0, pressure: 0.7);
+      controller.addSample(45.0, 35.0, pressure: 0.9);
+      controller.endStroke();
+      expect(controller.sampleCount, equals(3));
+      expect(controller.vertexCount, equals(6));
+
+      // Second stroke adds 2 degenerate bridge vertices + 2 start vertices + 2 move vertices = +6
+      controller.addSample(80.0, 80.0, pressure: 0.5);
+      controller.addSample(100.0, 95.0, pressure: 0.8);
+      controller.endStroke();
+      expect(controller.sampleCount, equals(5));
+      expect(controller.vertexCount, equals(12));
+
+      controller.clear();
+      expect(controller.vertexCount, equals(0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.addSample(10.0, 20.0);
+      expect(controller.vertexCount, equals(0));
+    });
+
+    testWidgets('ZRibbon renders triangle strip ink on drag and detaches on unmount', (tester) async {
+      final controller = ZeroRibbonController(maxSamples: 256);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZLowLatencyInk(
+              controller: controller,
+              size: const Size(300.0, 180.0),
+            ),
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ZRibbon), const Offset(80.0, 40.0));
+      await tester.pump();
+      expect(controller.sampleCount, greaterThan(1));
+      expect(controller.vertexCount, greaterThanOrEqualTo(4));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => controller.addSample(50.0, 50.0), returnsNormally);
+    });
+  });
 }
