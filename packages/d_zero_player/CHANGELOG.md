@@ -1,6 +1,9 @@
 ## 0.1.1
 
-* Synchronized release of `d_zero_player` v0.1.1.
+* Hardened C++ `zero_playback_state.cpp` with saturating 64-bit integer addition and `NaN` / `Infinity` speed sanitization in `zero_get_display_position` and `zero_set_position_anchor`.
+* Restricted relative `.dylib` fallback loading on macOS to debug and test environments (CWE-426).
+* Enforced non-nullable `ZeroPlayerController` and disposal checks in `RenderDirectSeekBar` and `RenderDirectTimeLabel`.
+* Added 1MB pipe backpressure protection in Android `ZeroWebSocketStreamHandler` to prevent OkHttp callback thread stalls and OOM.
 
 ## 0.1.0
 

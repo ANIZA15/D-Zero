@@ -1,6 +1,7 @@
 ## 0.1.1
 
-* Synchronized release of `d_zero_sensor` v0.1.1.
+* Added `maxCapacity` (`4096`) bounds enforcement and post-disposal buffer zeroing in `ZeroDetectionController`.
+* Updated `d_zero_core` dependency constraint to `^0.1.1`.
 
 ## 0.1.0
 
