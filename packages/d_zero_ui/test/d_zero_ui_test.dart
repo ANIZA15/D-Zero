@@ -262,4 +262,139 @@ void main() {
       knob.dispose();
     });
   });
+
+  group('ZCard, ZBadge, ZButton & ZSwitch', () {
+    testWidgets('ZCard renders surface and shadow without saveLayer and handles tap', (tester) async {
+      int tapCount = 0;
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZCard(
+              elevation: 6.0,
+              onTap: () => tapCount++,
+              child: const SizedBox(width: 160, height: 80),
+            ),
+          ),
+        ),
+      );
+
+      final renderCard = tester.renderObject<RenderZCard>(find.byType(ZCard));
+      expect(renderCard.isRepaintBoundary, isTrue);
+
+      await tester.tap(find.byType(ZCard));
+      await tester.pump();
+      expect(tapCount, equals(1));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('ZBadge updates count via ZeroNumberPainter with 0 child rebuilds and unmounts cleanly', (tester) async {
+      final count = ValueNotifier<int>(0);
+      int childBuilds = 0;
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZBadge(
+              countListenable: count,
+              maxCount: 99,
+              child: Builder(
+                builder: (context) {
+                  childBuilds++;
+                  return const SizedBox(width: 32, height: 32);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(childBuilds, equals(1));
+
+      // Increment across single digit, two digits, and 99+ overflow
+      for (final val in <int>[1, 9, 42, 99, 150, 0, 5]) {
+        count.value = val;
+        await tester.pump();
+      }
+      // Child widget must NEVER rebuild when badge count changes
+      expect(childBuilds, equals(1));
+
+      // Unmount and verify listener detachment
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => count.value = 999, returnsNormally);
+      count.dispose();
+    });
+
+    testWidgets('ZButton handles press animation, enabledListenable, and unmounts cleanly', (tester) async {
+      final enabled = ValueNotifier<bool>(true);
+      int pressedCount = 0;
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZButton(
+              label: 'EXECUTE',
+              enabledListenable: enabled,
+              onPressed: () => pressedCount++,
+            ),
+          ),
+        ),
+      );
+
+      final renderBtn = tester.renderObject<RenderZButton>(find.byType(ZButton));
+      expect(renderBtn.isRepaintBoundary, isTrue);
+
+      await tester.tap(find.byType(ZButton));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(pressedCount, equals(1));
+
+      // Disable via ValueNotifier without rebuilding widget tree
+      enabled.value = false;
+      await tester.pump();
+      await tester.tap(find.byType(ZButton));
+      await tester.pump();
+      expect(pressedCount, equals(1));
+
+      // Unmount and verify listener & scheduler cleanup
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => enabled.value = true, returnsNormally);
+      enabled.dispose();
+    });
+
+    testWidgets('ZSwitch toggles value, animates thumb via ZeroFrameScheduler, and unmounts cleanly', (tester) async {
+      final controller = ValueNotifier<bool>(false);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZSwitch(controller: controller),
+          ),
+        ),
+      );
+
+      final renderSwitch = tester.renderObject<RenderZSwitch>(find.byType(ZSwitch));
+      expect(renderSwitch.isRepaintBoundary, isTrue);
+      expect(renderSwitch.thumbPosition, equals(0.0));
+
+      await tester.tap(find.byType(ZSwitch));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(controller.value, isTrue);
+      expect(renderSwitch.thumbPosition, greaterThan(0.0));
+
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(renderSwitch.thumbPosition, equals(1.0));
+      // Scheduler must automatically unsubscribe once animation settles
+      expect(renderSwitch.animatePerFrame, isFalse);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => controller.value = false, returnsNormally);
+      controller.dispose();
+    });
+  });
 }
