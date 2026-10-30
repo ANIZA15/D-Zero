@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:math';
-import 'package:zero_particles/src/zero_particle_buffer.dart';
+import 'package:d_zero_particles/src/zero_particle_buffer.dart';
 
 class HeapParticle {
   double x;

@@ -13,7 +13,7 @@ import 'dart:io';
 ///   --sync-only           LICENSE / .pubignore / 内部依存バージョンの同期と Z-Widget 監査のみ実行
 ///   --set-version=X.Y.Z   対象パッケージのバージョンを一括設定し内部依存制約も更新
 ///   --bump=TYPE           バージョンを一括バンプ (patch | minor | major)
-///   --packages=a,b        対象パッケージをカンマ区切りで指定 (例: zero_core,zero_counter)
+///   --packages=a,b        対象パッケージをカンマ区切りで指定 (例: d_zero_core,d_zero_counter)
 ///   --skip-checks         事前品質ゲート (analyze / complexity / test) をスキップ
 ///   --with-benchmark      事前品質ゲートにマイクロベンチマークを追加
 ///   --bundle              dist/ ディレクトリに配布用アーカイブ (.tar.gz) とマニフェストを出力
@@ -157,12 +157,12 @@ void _printUsage() {
 
 オプション:
   --dry-run               pub.dev パブリッシュの事前検証 (dry-run) を一括実行 [デフォルト]
-  --publish               依存順 (zero_core -> 各 Widget パッケージ) に pub.dev へ一括公開
+  --publish               依存順 (d_zero_core -> 各 Widget パッケージ) に pub.dev へ一括公開
   --yes, -y               --publish 実行時の確認プロンプトをスキップ
   --sync-only             LICENSE / .pubignore / 内部依存バージョン同期と Z-Widget 監査のみ実行
   --set-version=X.Y.Z     対象パッケージのバージョンを一括変更し、内部依存バージョンも同期
   --bump=patch|minor|major セマンティックバージョンを一括インクリメント
-  --packages=pkg1,pkg2    特定パッケージのみを対象に指定 (例: --packages=zero_counter,zero_particles)
+  --packages=pkg1,pkg2    特定パッケージのみを対象に指定 (例: --packages=d_zero_counter,d_zero_particles)
   --skip-checks           事前品質ゲート (analyze / complexity / test) をスキップ
   --with-benchmark        品質ゲートにマイクロベンチマーク実行を含める
   --bundle                dist/ にリリース用アーカイブ (.tar.gz) と統合 barrel ファイルを生成
@@ -600,22 +600,8 @@ Future<bool> _executePubWorkflow(
       '  [${i + 1}/${packages.length}] ${pkg.name} (v${pkg.version}) ... ',
     );
 
-    final pubArgs = config.publish
-        ? ['pub', 'publish', '--force', '-C', pkg.directory.path]
-        : ['pub', 'publish', '--dry-run', '-C', pkg.directory.path];
-
-    final result = await Process.run('dart', pubArgs);
-    final combinedOut = '${result.stdout}\n${result.stderr}';
-    if (result.exitCode == 0) {
-      final sizeInfo = _extractArchiveSize(combinedOut);
-      stdout.writeln('✅ OK $sizeInfo');
-    } else if (!config.publish && _isOnlyGitDirtyWarning(combinedOut)) {
-      final sizeInfo = _extractArchiveSize(combinedOut);
-      stdout.writeln('✅ OK $sizeInfo (※未コミットの変更あり)');
-    } else {
-      stdout.writeln('❌ FAILED');
-      stdout.writeln(result.stdout);
-      stderr.writeln(result.stderr);
+    final ok = await _publishSinglePackage(pkg, isLivePublish: config.publish);
+    if (!ok) {
       allSucceeded = false;
       break;
     }
@@ -629,6 +615,61 @@ Future<bool> _executePubWorkflow(
     stdout.writeln(msg);
   }
   return allSucceeded;
+}
+
+Future<bool> _publishSinglePackage(
+  _PackageInfo pkg, {
+  required bool isLivePublish,
+}) async {
+  final pubArgs = isLivePublish
+      ? ['pub', 'publish', '--force', '-C', pkg.directory.path]
+      : ['pub', 'publish', '--dry-run', '-C', pkg.directory.path];
+
+  final maxAttempts = isLivePublish ? 4 : 1;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    final result = await Process.run('dart', pubArgs);
+    final combinedOut = '${result.stdout}\n${result.stderr}';
+    if (_handlePubResult(result.exitCode, combinedOut, isLivePublish)) {
+      if (isLivePublish && pkg.internalDeps.isEmpty) {
+        await Future<void>.delayed(const Duration(seconds: 3));
+      }
+      return true;
+    }
+    if (attempt < maxAttempts && _isPropagationDelay(combinedOut)) {
+      stdout.write('⏳ (pub.dev インデックス反映待機中...) ');
+      await Future<void>.delayed(const Duration(seconds: 5));
+      continue;
+    }
+    stdout.writeln('❌ FAILED');
+    stdout.writeln(result.stdout);
+    stderr.writeln(result.stderr);
+    return false;
+  }
+  return false;
+}
+
+bool _handlePubResult(int exitCode, String combinedOut, bool isLivePublish) {
+  final sizeInfo = _extractArchiveSize(combinedOut);
+  if (exitCode == 0) {
+    stdout.writeln('✅ OK $sizeInfo');
+    return true;
+  }
+  if (!isLivePublish && _isOnlyGitDirtyWarning(combinedOut)) {
+    stdout.writeln('✅ OK $sizeInfo (※未コミットの変更あり)');
+    return true;
+  }
+  if (isLivePublish && combinedOut.contains('already exists')) {
+    stdout.writeln('✅ SKIP (同バージョンが既に公開済み)');
+    return true;
+  }
+  return false;
+}
+
+bool _isPropagationDelay(String output) {
+  return output.contains('d_zero_core') &&
+      (output.contains('version solving failed') ||
+          output.contains('does not exist') ||
+          output.contains("doesn't exist"));
 }
 
 bool _confirmLivePublish(List<_PackageInfo> packages) {

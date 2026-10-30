@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:zero_core/zero_core.dart';
-import 'package:zero_counter/zero_counter.dart';
+import 'package:d_zero_core/d_zero_core.dart';
+import 'package:d_zero_counter/d_zero_counter.dart';
 import 'particles_benchmark_view.dart';
 
 void main() {
@@ -611,7 +611,7 @@ class VideoBenchmarkView extends StatelessWidget {
                   color: const Color(0xFF1E2235),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text('cd packages/zero_player/example && flutter run', style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF00E5FF))),
+                child: const Text('cd packages/d_zero_player/example && flutter run', style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF00E5FF))),
               ),
             ],
           ),

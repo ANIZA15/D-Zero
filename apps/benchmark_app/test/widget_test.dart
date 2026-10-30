@@ -7,7 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_particles/zero_particles.dart';
+import 'package:d_zero_particles/d_zero_particles.dart';
 
 import 'package:benchmark_app/main.dart';
 import 'package:benchmark_app/particles_benchmark_view.dart';

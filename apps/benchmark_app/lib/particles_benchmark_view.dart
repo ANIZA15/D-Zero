@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:zero_particles/zero_particles.dart';
+import 'package:d_zero_particles/d_zero_particles.dart';
 
 /// Benchmark mode comparing Traditional Flutter vs d-zero Suite.
 enum ParticleRenderMode {

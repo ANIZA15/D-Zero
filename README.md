@@ -82,32 +82,32 @@ d-zero/
 │   └── benchmark_app/   # ⚡️ 従来 Flutter vs d-zero 統合比較ベンチマークアプリ
 ├── benchmarks/          # ⚡️ CLI マイクロベンチマーク (アロケーション/スループット定量計測)
 └── packages/
-    ├── zero_core/       # ゼロアロケーション共通基盤ライブラリ
-    ├── zero_player/     # ゼロジャンク動画プレイヤー (ZPlayer, ZSeekBar, ZTimeLabel)
-    ├── zero_counter/    # 高速カウンター・タイマー・価格ティッカー・FPS計 (ZCounter, ZStopwatch, ZCountdown, ZOdometer, ZPriceTicker, ZFPSMonitor)
-    ├── zero_ui/         # 高頻度 UI コントロール (ZSlider, ZRangeSlider, ZLinearProgress, ZCircularProgress, ZGauge, ZJoystick, ZKnob, ZMarquee, ZTypewriterText)
-    ├── zero_waveform/   # リアルタイム音声波形・FFT・メーター (ZWaveform, ZSpectrumAnalyzer, ZAudioMeter)
-    ├── zero_chart/      # 高頻度チャート・気配値板 (ZSparkline, ZCandlestickChart, ZHeatmap, ZOrderBook)
-    ├── zero_particles/  # SoA パーティクル & 紙吹雪シミュレーション (ZParticles, ZConfetti)
-    ├── zero_fx/         # saveLayer フリー視覚エフェクト (ZShimmer, ZBlur, ZRipple, ZLiquidProgress)
-    ├── zero_canvas/     # 大量要素キャンバス (ZDanmaku, ZInfiniteGrid, ZFreehandCanvas)
-    └── zero_sensor/     # カメラ枠オーバーレイ・センサー計器 (ZBarcodeScanner, ZCompass, ZLeveler)
+    ├── d_zero_core/       # ゼロアロケーション共通基盤ライブラリ
+    ├── d_zero_player/     # ゼロジャンク動画プレイヤー (ZPlayer, ZSeekBar, ZTimeLabel)
+    ├── d_zero_counter/    # 高速カウンター・タイマー・価格ティッカー・FPS計 (ZCounter, ZStopwatch, ZCountdown, ZOdometer, ZPriceTicker, ZFPSMonitor)
+    ├── d_zero_ui/         # 高頻度 UI コントロール (ZSlider, ZRangeSlider, ZLinearProgress, ZCircularProgress, ZGauge, ZJoystick, ZKnob, ZMarquee, ZTypewriterText)
+    ├── d_zero_waveform/   # リアルタイム音声波形・FFT・メーター (ZWaveform, ZSpectrumAnalyzer, ZAudioMeter)
+    ├── d_zero_chart/      # 高頻度チャート・気配値板 (ZSparkline, ZCandlestickChart, ZHeatmap, ZOrderBook)
+    ├── d_zero_particles/  # SoA パーティクル & 紙吹雪シミュレーション (ZParticles, ZConfetti)
+    ├── d_zero_fx/         # saveLayer フリー視覚エフェクト (ZShimmer, ZBlur, ZRipple, ZLiquidProgress)
+    ├── d_zero_canvas/     # 大量要素キャンバス (ZDanmaku, ZInfiniteGrid, ZFreehandCanvas)
+    └── d_zero_sensor/     # カメラ枠オーバーレイ・センサー計器 (ZBarcodeScanner, ZCompass, ZLeveler)
 ```
 
 ### 🔗 各パッケージへのリンク
 
 | パッケージ | バージョン | 説明 | リンク | サンプル App |
 | :--- | :---: | :--- | :---: | :---: |
-| **`zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、単一 GPU ドローコール数値・通貨・オドメーター描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/zero_core) | [📱 サンプル](packages/zero_core/example) |
-| **`zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ゼロリビルド UI（`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`）を備えた動画プレイヤー。 | [📦 パッケージ詳細](packages/zero_player) | [📱 比較アプリ](packages/zero_player/example) |
-| **`zero_counter`** | `0.1.0` | **【数値・タイマー・計器】** `ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer` (`ZAnimatedNumber`), `ZPriceTicker` (`ZCurrencyLabel`), `ZFPSMonitor` (`ZFrameOverlay`)。 | [📦 パッケージ詳細](packages/zero_counter) | [📱 サンプル](packages/zero_counter/example) |
-| **`zero_ui`** | `0.1.0` | **【高頻度 UI・入力コントロール】** `ZSlider`, `ZRangeSlider`, `ZLinearProgress`, `ZCircularProgress`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), `ZKnob` (`ZRotaryDial`), `ZMarquee` (`ZRollingText`), `ZTypewriterText`。 | [📦 パッケージ詳細](packages/zero_ui) | - |
-| **`zero_waveform`** | `0.1.0` | **【リアルタイムオーディオ】** `ZWaveform` (`ZAudioVisualizer`), `ZSpectrumAnalyzer`, `ZAudioMeter` (`ZVUMeter`)。 | [📦 パッケージ詳細](packages/zero_waveform) | - |
-| **`zero_chart`** | `0.1.0` | **【高頻度チャート・板情報】** `ZSparkline` (`ZRealtimeChart`), `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook` (`ZDataGrid`)。 | [📦 パッケージ詳細](packages/zero_chart) | - |
-| **`zero_particles`** | `0.1.0` | **【SoA パーティクル】** `ZParticles`, `ZConfetti`。 | [📦 パッケージ詳細](packages/zero_particles) | - |
-| **`zero_fx`** | `0.1.0` | **【ゼロ saveLayer 視覚効果】** `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`)。 | [📦 パッケージ詳細](packages/zero_fx) | - |
-| **`zero_canvas`** | `0.1.0` | **【大量要素・高速キャンバス】** `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas`。 | [📦 パッケージ詳細](packages/zero_canvas) | - |
-| **`zero_sensor`** | `0.1.0` | **【カメラ・センサー直結 UI】** `ZBarcodeScanner` (`ZCameraPreview`), `ZCompass`, `ZLeveler`。 | [📦 パッケージ詳細](packages/zero_sensor) | - |
+| **`d_zero_core`** | `0.1.0` | **【共通基盤】** ゼロアロケーション RenderBox（`ZeroRenderBox`）、単一 GPU ドローコール数値・通貨・オドメーター描画エンジン（`ZeroNumberPainter`）、固定長リングバッファ（`FloatRingBuffer`）、オブジェクトプール（`ZeroPool`）。 | [📦 パッケージ詳細](packages/d_zero_core) | [📱 サンプル](packages/d_zero_core/example) |
+| **`d_zero_player`** | `0.0.2` | **【超低遅延ビデオ】** C++ Atomic 共有メモリ & Dart FFI ダイレクトマッピング、ゼロリビルド UI（`ZPlayer`, `ZDirectSeekBar`, `ZDirectTimeLabel`）を備えた動画プレイヤー。 | [📦 パッケージ詳細](packages/d_zero_player) | [📱 比較アプリ](packages/d_zero_player/example) |
+| **`d_zero_counter`** | `0.1.0` | **【数値・タイマー・計器】** `ZCounter`, `ZStopwatch`, `ZCountdown`, `ZOdometer` (`ZAnimatedNumber`), `ZPriceTicker` (`ZCurrencyLabel`), `ZFPSMonitor` (`ZFrameOverlay`)。 | [📦 パッケージ詳細](packages/d_zero_counter) | [📱 サンプル](packages/d_zero_counter/example) |
+| **`d_zero_ui`** | `0.1.0` | **【高頻度 UI・入力コントロール】** `ZSlider`, `ZRangeSlider`, `ZLinearProgress`, `ZCircularProgress`, `ZGauge` (`ZSpeedometer`), `ZJoystick` (`ZVirtualPad`), `ZKnob` (`ZRotaryDial`), `ZMarquee` (`ZRollingText`), `ZTypewriterText`。 | [📦 パッケージ詳細](packages/d_zero_ui) | - |
+| **`d_zero_waveform`** | `0.1.0` | **【リアルタイムオーディオ】** `ZWaveform` (`ZAudioVisualizer`), `ZSpectrumAnalyzer`, `ZAudioMeter` (`ZVUMeter`)。 | [📦 パッケージ詳細](packages/d_zero_waveform) | - |
+| **`d_zero_chart`** | `0.1.0` | **【高頻度チャート・板情報】** `ZSparkline` (`ZRealtimeChart`), `ZCandlestickChart`, `ZHeatmap`, `ZOrderBook` (`ZDataGrid`)。 | [📦 パッケージ詳細](packages/d_zero_chart) | - |
+| **`d_zero_particles`** | `0.1.0` | **【SoA パーティクル】** `ZParticles`, `ZConfetti`。 | [📦 パッケージ詳細](packages/d_zero_particles) | - |
+| **`d_zero_fx`** | `0.1.0` | **【ゼロ saveLayer 視覚効果】** `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`)。 | [📦 パッケージ詳細](packages/d_zero_fx) | - |
+| **`d_zero_canvas`** | `0.1.0` | **【大量要素・高速キャンバス】** `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas`。 | [📦 パッケージ詳細](packages/d_zero_canvas) | - |
+| **`d_zero_sensor`** | `0.1.0` | **【カメラ・センサー直結 UI】** `ZBarcodeScanner` (`ZCameraPreview`), `ZCompass`, `ZLeveler`。 | [📦 パッケージ詳細](packages/d_zero_sensor) | - |
 
 ---
 
@@ -132,14 +132,14 @@ dart run benchmarks/run_benchmarks.dart
 
 ### 3. 各プロジェクトの単体サンプル
 ```bash
-# zero_core サンプル (FloatRingBuffer & ZeroPool)
-cd packages/zero_core/example && flutter run
+# d_zero_core サンプル (FloatRingBuffer & ZeroPool)
+cd packages/d_zero_core/example && flutter run
 
-# zero_counter サンプル (高速カウンター & ストップウォッチ)
-cd packages/zero_counter/example && flutter run
+# d_zero_counter サンプル (高速カウンター & ストップウォッチ)
+cd packages/d_zero_counter/example && flutter run
 
-# zero_player サンプル (標準 video_player との動画再生比較)
-cd packages/zero_player/example && flutter run
+# d_zero_player サンプル (標準 video_player との動画再生比較)
+cd packages/d_zero_player/example && flutter run
 ```
 
 ---
@@ -154,7 +154,7 @@ flutter pub get
 flutter analyze
 
 # 全パッケージのユニットテスト実行
-flutter test packages/zero_core/test packages/zero_counter/test packages/zero_player/test
+flutter test packages/d_zero_core/test packages/d_zero_counter/test packages/d_zero_player/test
 
 # マイクロベンチマークの実行
 dart run benchmarks/run_benchmarks.dart

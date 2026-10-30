@@ -1,0 +1,28 @@
+name: d_zero_particles
+description: "Ultra high-performance, zero-allocation particle simulation and batch rendering for Flutter and Impeller."
+version: 0.1.0
+homepage: https://github.com/ANIZA15/d-zero
+repository: https://github.com/ANIZA15/d-zero/tree/main/packages/d_zero_particles
+issue_tracker: https://github.com/ANIZA15/d-zero/issues
+topics:
+  - performance
+  - zero-allocation
+  - impeller
+  - particles
+  - simulation
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  d_zero_core: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0

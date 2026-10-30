@@ -9,6 +9,6 @@ environment:
 resolution: workspace
 
 dependencies:
-  zero_core:
-  zero_counter:
-  zero_particles:
+  d_zero_core:
+  d_zero_counter:
+  d_zero_particles:

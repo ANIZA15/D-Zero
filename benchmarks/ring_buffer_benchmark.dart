@@ -1,6 +1,6 @@
 import 'dart:collection';
 import 'dart:io';
-import 'package:zero_core/src/buffer/float_ring_buffer.dart';
+import 'package:d_zero_core/src/buffer/float_ring_buffer.dart';
 
 /// Benchmarks circular buffer and sliding window performance.
 ///

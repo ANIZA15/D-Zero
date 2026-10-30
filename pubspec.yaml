@@ -6,19 +6,19 @@ environment:
   flutter: ">=3.24.0"
 
 workspace:
-  - packages/zero_core
-  - packages/zero_core/example
-  - packages/zero_player
-  - packages/zero_player/example
-  - packages/zero_counter
-  - packages/zero_counter/example
-  - packages/zero_particles
-  - packages/zero_ui
-  - packages/zero_waveform
-  - packages/zero_chart
-  - packages/zero_fx
-  - packages/zero_canvas
-  - packages/zero_sensor
+  - packages/d_zero_core
+  - packages/d_zero_core/example
+  - packages/d_zero_player
+  - packages/d_zero_player/example
+  - packages/d_zero_counter
+  - packages/d_zero_counter/example
+  - packages/d_zero_particles
+  - packages/d_zero_ui
+  - packages/d_zero_waveform
+  - packages/d_zero_chart
+  - packages/d_zero_fx
+  - packages/d_zero_canvas
+  - packages/d_zero_sensor
   - apps/benchmark_app
   - benchmarks
 
