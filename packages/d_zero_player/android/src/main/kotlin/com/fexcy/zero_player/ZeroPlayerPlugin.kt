@@ -201,6 +201,11 @@ class ZeroExoPlayerWrapper(
     }
 
     init {
+        if (statePtr == 0L) {
+            surfaceProducer.release()
+            exoPlayer.release()
+            throw IllegalStateException("Failed to allocate native ZeroPlaybackState (OOM)")
+        }
         try {
             exoPlayer.setVideoSurface(surfaceProducer.surface)
             surfaceProducer.setCallback(object : TextureRegistry.SurfaceProducer.Callback {
@@ -418,9 +423,14 @@ class ZeroWebSocketStreamHandler(
     private val wsUrl: String,
     private val headers: Map<String, String>
 ) {
+    companion object {
+        private const val PIPE_BUFFER_BYTES = 1024 * 1024 // 1MB hard cap
+    }
+
     private var webSocket: WebSocket? = null
     private val pipedOutput = PipedOutputStream()
-    private val pipedInput = PipedInputStream(pipedOutput, 1024 * 1024) // 1MB バッファ
+    private val pipedInput = PipedInputStream(pipedOutput, PIPE_BUFFER_BYTES)
+    @Volatile
     private var isDisposed = false
 
     fun start() {
@@ -431,7 +441,12 @@ class ZeroWebSocketStreamHandler(
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 if (isDisposed) return
+                val frameSize = bytes.size
+                if (frameSize <= 0 || frameSize > PIPE_BUFFER_BYTES) return
                 try {
+                    // Backpressure / OOM DoS guard: never block OkHttp thread if pipe is full
+                    val freeSpace = PIPE_BUFFER_BYTES - pipedInput.available()
+                    if (frameSize > freeSpace) return
                     bytes.write(pipedOutput)
                     pipedOutput.flush()
                 } catch (e: IOException) {

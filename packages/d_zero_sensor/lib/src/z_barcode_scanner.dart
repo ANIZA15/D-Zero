@@ -19,6 +19,9 @@ typedef ZeroBarcodeScanner = ZBarcodeScanner;
 class ZeroDetectionController {
   static const int _floatsPerBox = 5;
 
+  /// Maximum allowed detection slots to prevent uncontrolled allocation (CWE-789).
+  static const int maxCapacity = 4096;
+
   /// Maximum number of concurrent detection boxes.
   final int capacity;
 
@@ -31,10 +34,11 @@ class ZeroDetectionController {
   bool _isDisposed = false;
 
   /// Creates a [ZeroDetectionController] with fixed [capacity] (default 16).
-  ZeroDetectionController({this.capacity = 16})
-      : assert(capacity > 0),
-        boxes = Float32List(capacity * _floatsPerBox),
-        _active = Uint8List(capacity);
+  ZeroDetectionController({int capacity = 16})
+      : assert(capacity > 0 && capacity <= maxCapacity),
+        capacity = capacity.clamp(1, maxCapacity),
+        boxes = Float32List(capacity.clamp(1, maxCapacity) * _floatsPerBox),
+        _active = Uint8List(capacity.clamp(1, maxCapacity));
 
   /// Whether this controller has been disposed.
   bool get isDisposed => _isDisposed;
@@ -99,6 +103,8 @@ class ZeroDetectionController {
   void dispose() {
     if (_isDisposed) return;
     _isDisposed = true;
+    _active.fillRange(0, capacity, 0);
+    boxes.fillRange(0, boxes.length, 0.0);
     _activeCount = 0;
     _revision.dispose();
   }

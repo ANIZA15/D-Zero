@@ -51,16 +51,17 @@ typedef DirectTimeLabel = ZDirectTimeLabel;
 typedef ZTimeLabel = ZDirectTimeLabel;
 
 class RenderDirectTimeLabel extends ZeroRenderBox {
-  ZeroPlayerController? _controller;
+  ZeroPlayerController _controller;
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
   ZeroPlaybackStateView _view;
   TextStyle _style;
   late ZeroNumberPainter _numberPainter;
   int _lastSec = -1;
   int _lastDurSec = -1;
+  bool _isDisposed = false;
 
   RenderDirectTimeLabel({
-    ZeroPlayerController? controller,
+    required ZeroPlayerController controller,
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
     required TextStyle style,
   })  : _controller = controller,
@@ -71,7 +72,7 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
     _numberPainter = ZeroNumberPainter(style: _style);
   }
 
-  set controller(ZeroPlayerController? val) {
+  set controller(ZeroPlayerController val) {
     if (identical(_controller, val)) return;
     _controller = val;
     _lastSec = -1;
@@ -90,8 +91,7 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
 
   @pragma('vm:prefer-inline')
   bool get _canReadState {
-    final ZeroPlayerController? ctrl = _controller;
-    if (ctrl != null && ctrl.isDisposed) return false;
+    if (_isDisposed || _controller.isDisposed) return false;
     return _view.isValid;
   }
 
@@ -148,6 +148,7 @@ class RenderDirectTimeLabel extends ZeroRenderBox {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _numberPainter.dispose();
     super.dispose();
   }

@@ -217,6 +217,37 @@ class ZeroPlayerNativeBindings {
     );
   }
 
+  static bool _isTestOrDebugEnvironment() {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      return true;
+    }
+    bool inDebugMode = false;
+    assert(() {
+      inDebugMode = true;
+      return true;
+    }());
+    return inDebugMode;
+  }
+
+  static ffi.DynamicLibrary? _loadMacOSTestFallback() {
+    if (!_isTestOrDebugEnvironment()) {
+      return null;
+    }
+    const candidates = <String>[
+      'test/libzero_player_test.dylib',
+      'packages/d_zero_player/test/libzero_player_test.dylib',
+      'src/libzero_player_native.dylib',
+      'packages/d_zero_player/src/libzero_player_native.dylib',
+    ];
+    for (final relativePath in candidates) {
+      final file = File(relativePath);
+      if (file.existsSync()) {
+        return ffi.DynamicLibrary.open(file.absolute.path);
+      }
+    }
+    return null;
+  }
+
   static ffi.DynamicLibrary _loadLibrary() {
     if (Platform.isIOS) {
       return ffi.DynamicLibrary.process();
@@ -226,29 +257,13 @@ class ZeroPlayerNativeBindings {
       if (processLib.providesSymbol('zero_create_playback_state')) {
         return processLib;
       }
-      // テスト環境およびローカル開発環境の dylib フォールバック
-      final candidates = [
-        'test/libzero_player_test.dylib',
-        'packages/d_zero_player/test/libzero_player_test.dylib',
-        'src/libzero_player_native.dylib',
-        'packages/d_zero_player/src/libzero_player_native.dylib',
-        'libzero_player_native.dylib',
-      ];
-      for (final path in candidates) {
-        if (File(path).existsSync()) {
-          return ffi.DynamicLibrary.open(path);
-        }
-      }
-      return processLib;
+      return _loadMacOSTestFallback() ?? processLib;
     }
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isLinux) {
       return ffi.DynamicLibrary.open('libzero_player_native.so');
     }
     if (Platform.isWindows) {
       return ffi.DynamicLibrary.open('zero_player_native.dll');
-    }
-    if (Platform.isLinux) {
-      return ffi.DynamicLibrary.open('libzero_player_native.so');
     }
     throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
   }

@@ -7,6 +7,9 @@ import 'package:d_zero_core/d_zero_core.dart';
 /// Zero-allocation controller for FFT spectrum analyzer frequency bins (`0.0` to `1.0`)
 /// and gravity-decayed peak-hold indicators.
 class ZeroSpectrumController implements Listenable {
+  /// Maximum allowed frequency bins to prevent uncontrolled allocation (CWE-789).
+  static const int maxBinCount = 4096;
+
   /// Number of frequency bins managed by this controller.
   final int binCount;
 
@@ -20,10 +23,11 @@ class ZeroSpectrumController implements Listenable {
 
   /// Creates a [ZeroSpectrumController] with [binCount] frequency bands.
   ZeroSpectrumController({
-    this.binCount = 32,
+    int binCount = 32,
     this.peakDecayPerStep = 0.015,
-  })  : _bins = Float32List(binCount > 0 ? binCount : 1),
-        _peakHolds = Float32List(binCount > 0 ? binCount : 1);
+  })  : binCount = binCount.clamp(1, maxBinCount),
+        _bins = Float32List(binCount.clamp(1, maxBinCount)),
+        _peakHolds = Float32List(binCount.clamp(1, maxBinCount));
 
   /// Whether this controller has been disposed.
   bool get isDisposed => _isDisposed;
@@ -75,7 +79,8 @@ class ZeroSpectrumController implements Listenable {
   /// Applies one step of gravity decay across all bins and peak-holds.
   void decayStep([double? customDecay]) {
     if (_isDisposed) return;
-    final double step = customDecay ?? peakDecayPerStep;
+    final double rawStep = customDecay ?? peakDecayPerStep;
+    final double step = (!rawStep.isFinite || rawStep < 0.0) ? 0.0 : rawStep;
     for (int i = 0; i < _bins.length; i++) {
       final double b = _bins[i] - step;
       final double p = _peakHolds[i] - step * 0.5;

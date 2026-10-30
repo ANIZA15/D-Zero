@@ -11,23 +11,26 @@ import 'dart:typed_data';
 /// - Zero-allocation [contiguousView] returning the elements in oldest-to-newest
 ///   order for direct batch consumption.
 class FloatRingBuffer {
+  /// Maximum allowed capacity (1,048,576 elements) to prevent uncontrolled
+  /// memory allocation (CWE-789) and integer overflow in double-length buffers.
+  static const int maxCapacity = 1048576;
+  static const int _eagerViewThreshold = 1024;
+
   final Float64List _data;
   final Float64List _rawView;
-  final List<Float64List> _fullViews;
+  final List<Float64List?> _fullViews;
   final int capacity;
   int _head = 0;
   int _length = 0;
+  Float64List? _cachedPartialView;
+  int _cachedPartialLen = -1;
 
   /// Creates a [FloatRingBuffer] with the specified fixed [capacity].
   factory FloatRingBuffer(int capacity) {
     final int cap = _validateCapacity(capacity);
     final Float64List backing = Float64List(cap * 2);
     final Float64List raw = Float64List.sublistView(backing, 0, cap);
-    final List<Float64List> views = List<Float64List>.generate(
-      cap,
-      (int start) => Float64List.sublistView(backing, start, start + cap),
-      growable: false,
-    );
+    final List<Float64List?> views = _createInitialViews64(backing, cap);
     return FloatRingBuffer._internal(cap, backing, raw, views);
   }
 
@@ -39,10 +42,21 @@ class FloatRingBuffer {
   );
 
   static int _validateCapacity(int capacity) {
-    if (capacity <= 0) {
-      throw ArgumentError.value(capacity, 'capacity', 'Capacity must be greater than zero.');
+    if (capacity <= 0 || capacity > maxCapacity) {
+      throw RangeError.range(capacity, 1, maxCapacity, 'capacity');
     }
     return capacity;
+  }
+
+  static List<Float64List?> _createInitialViews64(Float64List backing, int cap) {
+    if (cap <= _eagerViewThreshold) {
+      return List<Float64List?>.generate(
+        cap,
+        (int start) => Float64List.sublistView(backing, start, start + cap),
+        growable: false,
+      );
+    }
+    return List<Float64List?>.filled(cap, null, growable: false);
   }
 
   /// Number of elements currently stored.
@@ -136,6 +150,7 @@ class FloatRingBuffer {
   /// Returns the number of elements copied.
   int copyInto(List<double> dest, [int destOffset = 0]) {
     final int len = _length;
+    RangeError.checkValidRange(destOffset, destOffset + len, dest.length, 'destOffset');
     if (len == 0) return 0;
     final int start = len < capacity ? 0 : _head;
     dest.setRange(destOffset, destOffset + len, _data, start);
@@ -189,10 +204,16 @@ class FloatRingBuffer {
   /// Returns a contiguous view of all currently stored elements in oldest-to-newest order.
   Float64List get contiguousView {
     if (_length == capacity) {
-      return _fullViews[_head];
+      final int h = _head;
+      return _fullViews[h] ??= Float64List.sublistView(_data, h, h + capacity);
     }
-    final int start = _length < capacity ? 0 : _head;
-    return Float64List.sublistView(_data, start, start + _length);
+    if (_cachedPartialLen == _length && _cachedPartialView != null) {
+      return _cachedPartialView!;
+    }
+    _cachedPartialLen = _length;
+    final Float64List view = Float64List.sublistView(_data, 0, _length);
+    _cachedPartialView = view;
+    return view;
   }
 
   /// Clears all elements without releasing the underlying allocated memory.
@@ -208,25 +229,28 @@ class FloatRingBuffer {
 /// Mirrors writes into a `2 * capacity` [Float32List] and pre-allocates views so
 /// [contiguousView] is 100% allocation-free once the buffer is full.
 class Float32RingBuffer {
+  /// Maximum allowed capacity (1,048,576 elements) to prevent uncontrolled
+  /// memory allocation (CWE-789).
+  static const int maxCapacity = FloatRingBuffer.maxCapacity;
+  static const int _eagerViewThreshold = 1024;
+
   final Float32List _data;
   final Float32List _rawView;
-  final List<Float32List> _fullViews;
+  final List<Float32List?> _fullViews;
   final int capacity;
   int _head = 0;
   int _length = 0;
+  Float32List? _cachedPartialView;
+  int _cachedPartialLen = -1;
 
   /// Creates a [Float32RingBuffer] with the specified fixed [capacity].
   factory Float32RingBuffer(int capacity) {
-    if (capacity <= 0) {
-      throw ArgumentError.value(capacity, 'capacity', 'Capacity must be greater than zero.');
+    if (capacity <= 0 || capacity > maxCapacity) {
+      throw RangeError.range(capacity, 1, maxCapacity, 'capacity');
     }
     final Float32List backing = Float32List(capacity * 2);
     final Float32List raw = Float32List.sublistView(backing, 0, capacity);
-    final List<Float32List> views = List<Float32List>.generate(
-      capacity,
-      (int start) => Float32List.sublistView(backing, start, start + capacity),
-      growable: false,
-    );
+    final List<Float32List?> views = _createInitialViews32(backing, capacity);
     return Float32RingBuffer._(capacity, backing, raw, views);
   }
 
@@ -236,6 +260,17 @@ class Float32RingBuffer {
     this._rawView,
     this._fullViews,
   );
+
+  static List<Float32List?> _createInitialViews32(Float32List backing, int cap) {
+    if (cap <= _eagerViewThreshold) {
+      return List<Float32List?>.generate(
+        cap,
+        (int start) => Float32List.sublistView(backing, start, start + cap),
+        growable: false,
+      );
+    }
+    return List<Float32List?>.filled(cap, null, growable: false);
+  }
 
   @pragma('vm:prefer-inline')
   int get length => _length;
@@ -322,6 +357,7 @@ class Float32RingBuffer {
   /// Returns the number of elements copied.
   int copyInto(List<double> dest, [int destOffset = 0]) {
     final int len = _length;
+    RangeError.checkValidRange(destOffset, destOffset + len, dest.length, 'destOffset');
     if (len == 0) return 0;
     final int start = len < capacity ? 0 : _head;
     dest.setRange(destOffset, destOffset + len, _data, start);
@@ -348,9 +384,16 @@ class Float32RingBuffer {
   /// (zero heap allocations when the buffer is full).
   Float32List get contiguousView {
     if (_length == capacity) {
-      return _fullViews[_head];
+      final int h = _head;
+      return _fullViews[h] ??= Float32List.sublistView(_data, h, h + capacity);
     }
-    return Float32List.sublistView(_data, 0, _length);
+    if (_cachedPartialLen == _length && _cachedPartialView != null) {
+      return _cachedPartialView!;
+    }
+    _cachedPartialLen = _length;
+    final Float32List view = Float32List.sublistView(_data, 0, _length);
+    _cachedPartialView = view;
+    return view;
   }
 
   void clear() {

@@ -1,11 +1,14 @@
 #include "zero_playback_state.h"
 #include <chrono>
+#include <climits>
+#include <cmath>
 #include <cstdlib>
 #include <new>
 
 namespace {
 
 constexpr int kMaxSeqlockRetries = 64;
+constexpr double kMaxSafeInt64Double = 9223372036854774784.0;
 
 // seqlock 書き込み区間の開始 (seq を奇数にする)
 inline void seq_begin_write(ZeroPlaybackState* state) {
@@ -22,6 +25,18 @@ inline int64_t clamp_position(int64_t pos, int64_t duration) {
     if (pos < 0) return 0;
     if (duration > 0 && pos > duration) return duration;
     return pos;
+}
+
+inline float sanitize_speed(float speed) {
+    if (!std::isfinite(speed) || speed <= 0.0f) return 0.0f;
+    if (speed > 1000.0f) return 1000.0f;
+    return speed;
+}
+
+inline int64_t saturating_add_nonneg(int64_t base, int64_t delta) {
+    if (delta <= 0) return base;
+    if (base > 0 && delta > LLONG_MAX - base) return LLONG_MAX;
+    return base + delta;
 }
 
 struct Anchor {
@@ -90,10 +105,11 @@ void zero_set_position(ZeroPlaybackState* state, int64_t position_ms) {
 
 void zero_set_position_anchor(ZeroPlaybackState* state, int64_t position_ms, float speed) {
     if (!state) return;
+    const float safe_speed = sanitize_speed(speed);
     seq_begin_write(state);
     state->position_ms.store(position_ms, std::memory_order_relaxed);
     state->anchor_time_us.store(zero_now_us(), std::memory_order_relaxed);
-    state->playback_speed.store(speed, std::memory_order_relaxed);
+    state->playback_speed.store(safe_speed, std::memory_order_relaxed);
     seq_end_write(state);
 }
 
@@ -163,12 +179,17 @@ int64_t zero_get_display_position(const ZeroPlaybackState* state) {
     if (state->status.load(std::memory_order_acquire) != ZERO_STATUS_PLAYING) {
         return a.position_ms;
     }
-    const int64_t elapsed_us = zero_now_us() - a.anchor_time_us;
-    if (elapsed_us <= 0) {
+    const int64_t now_us = zero_now_us();
+    if (a.anchor_time_us <= 0 || now_us <= a.anchor_time_us) {
         return clamp_position(a.position_ms, duration);
     }
-    const auto advanced_ms = static_cast<int64_t>(static_cast<double>(elapsed_us) * a.speed / 1000.0);
-    return clamp_position(a.position_ms + advanced_ms, duration);
+    const int64_t elapsed_us = now_us - a.anchor_time_us;
+    const float safe_speed = sanitize_speed(a.speed);
+    const double scaled_ms = static_cast<double>(elapsed_us) * static_cast<double>(safe_speed) / 1000.0;
+    const int64_t advanced_ms = (!std::isfinite(scaled_ms) || scaled_ms >= kMaxSafeInt64Double)
+        ? LLONG_MAX
+        : static_cast<int64_t>(scaled_ms);
+    return clamp_position(saturating_add_nonneg(a.position_ms, advanced_ms), duration);
 }
 
 }  // extern "C"

@@ -101,6 +101,29 @@ void main() {
         controller.dispose();
       }, returnsNormally);
     });
+
+    test('C++ 整数オーバーフロー / NaN / Infinity 再生速度サニタイズ検証', () {
+      final controller = ZeroPlayerController.simulated();
+      final bindings = ZeroPlayerNativeBindings.instance;
+      const int maxInt64 = 0x7FFFFFFFFFFFFFFF;
+
+      // LLONG_MAX 近傍での PLAYING 外挿がオーバーフロー（負数化・UB）しないこと
+      controller.setDurationSimulated(0);
+      bindings.setPositionAnchor(controller.statePointer, maxInt64 - 10, 100.0);
+      controller.setStatusSimulated(ZeroPlaybackStatus.playing);
+      expect(controller.positionMs, greaterThanOrEqualTo(maxInt64 - 10));
+
+      // NaN / Infinity / 負の playbackSpeed が安全に無害化されること
+      controller.setDurationSimulated(100000);
+      bindings.setPositionAnchor(controller.statePointer, 5000, double.nan);
+      expect(controller.positionMs, equals(5000));
+      bindings.setPositionAnchor(controller.statePointer, 5000, double.infinity);
+      expect(controller.positionMs, equals(5000));
+      bindings.setPositionAnchor(controller.statePointer, 5000, -5.0);
+      expect(controller.positionMs, equals(5000));
+
+      controller.dispose();
+    });
   });
 
   group('【3. ペネトレーション / 耐久ストレステスト】', () {

@@ -7,6 +7,7 @@
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include "../src/zero_playback_state.h"
 
 // テストユーティリティ
@@ -85,8 +86,27 @@ void test_abnormal_and_edge_cases() {
     zero_set_position(state, -99999);
     TEST_ASSERT(zero_get_position(state) == -99999, "負の値を受け入れて保持できること");
 
-    // int64_t 最大値（オーバーフロー耐性）
+    // int64_t 最大値（オーバーフロー耐性 & PLAYING 外挿時の UB 防止）
     int64_t max_val = LLONG_MAX;
+    zero_set_duration(state, 0);
+    zero_set_position_anchor(state, max_val - 5, 100.0f);
+    zero_set_status(state, ZERO_STATUS_PLAYING);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    TEST_ASSERT(zero_get_display_position(state) == max_val,
+                "PLAYING 外挿時に LLONG_MAX を超えても符号付き整数オーバーフロー(UB)せず飽和すること");
+
+    // NaN / Infinity 再生速度に対する防御
+    zero_set_duration(state, 100000);
+    zero_set_position_anchor(state, 5000, std::numeric_limits<float>::quiet_NaN());
+    TEST_ASSERT(zero_get_display_position(state) == 5000,
+                "NaN 速度が渡されても UB を起こさず現在位置を維持すること");
+    zero_set_position_anchor(state, 5000, std::numeric_limits<float>::infinity());
+    TEST_ASSERT(zero_get_display_position(state) == 5000,
+                "Infinity 速度が渡されても UB を起こさず安全にサニタイズされること");
+    zero_set_position_anchor(state, 5000, -10.0f);
+    TEST_ASSERT(zero_get_display_position(state) == 5000,
+                "負の速度が渡されても安全に 0.0f にクランプされること");
+
     zero_set_duration(state, max_val);
     TEST_ASSERT(zero_get_duration(state) == max_val, "int64 最大値（オーバーフロー限界）を正しく保持できること");
 

@@ -81,7 +81,7 @@ typedef DirectSeekBar = ZDirectSeekBar;
 typedef ZSeekBar = ZDirectSeekBar;
 
 class RenderDirectSeekBar extends ZeroRenderBox {
-  ZeroPlayerController? _controller;
+  ZeroPlayerController _controller;
   ffi.Pointer<ZeroPlaybackStateNative> _statePointer;
   ZeroPlaybackStateView _view;
   Color _activeTrackColor;
@@ -90,6 +90,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   double _trackHeight;
   double _thumbRadius;
   ValueChanged<Duration>? onSeek;
+  bool _isDisposed = false;
 
   // Pre-allocated Paints and raw coordinate buffers reused across every frame
   // (zero Offset / Paint allocations in paintZero)
@@ -107,7 +108,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
   int _lastDurationMs = -1;
 
   RenderDirectSeekBar({
-    ZeroPlayerController? controller,
+    required ZeroPlayerController controller,
     required ffi.Pointer<ZeroPlaybackStateNative> statePointer,
     required Color activeTrackColor,
     required Color inactiveTrackColor,
@@ -142,7 +143,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
     _tapRecognizer = TapGestureRecognizer()..onTapDown = _handleTapDown;
   }
 
-  set controller(ZeroPlayerController? val) {
+  set controller(ZeroPlayerController val) {
     if (identical(_controller, val)) return;
     _controller = val;
     _lastQuantizedStep = -1;
@@ -161,8 +162,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
 
   @pragma('vm:prefer-inline')
   bool get _canReadState {
-    final ZeroPlayerController? ctrl = _controller;
-    if (ctrl != null && ctrl.isDisposed) return false;
+    if (_isDisposed || _controller.isDisposed) return false;
     return _view.isValid;
   }
 
@@ -319,6 +319,7 @@ class RenderDirectSeekBar extends ZeroRenderBox {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _dragRecognizer.dispose();
     _tapRecognizer.dispose();
     super.dispose();

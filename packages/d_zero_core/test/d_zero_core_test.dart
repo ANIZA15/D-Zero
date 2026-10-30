@@ -107,6 +107,41 @@ void main() {
       expect(buf.min, equals(3.0));
       expect(buf.max, equals(6.0));
     });
+
+    test('CWE-789 無制限メモリ割り当て防御・copyInto 境界検証・遅延ビュー生成テスト', () {
+      // 不正な capacity (<= 0 または > maxCapacity) を拒否すること
+      expect(() => FloatRingBuffer(0), throwsRangeError);
+      expect(() => FloatRingBuffer(-10), throwsRangeError);
+      expect(() => FloatRingBuffer(FloatRingBuffer.maxCapacity + 1), throwsRangeError);
+      expect(() => Float32RingBuffer(0), throwsRangeError);
+      expect(() => Float32RingBuffer(Float32RingBuffer.maxCapacity + 1), throwsRangeError);
+
+      // 大容量 (> 1024) の遅延ビュー生成とキャッシュ同一性検証
+      final large64 = FloatRingBuffer(2048);
+      final large32 = Float32RingBuffer(2048);
+      large64.push(1.0);
+      large32.push(1.0);
+      expect(identical(large64.contiguousView, large64.contiguousView), isTrue);
+      expect(identical(large32.contiguousView, large32.contiguousView), isTrue);
+
+      for (int i = 0; i < 2050; i++) {
+        large64.push(i.toDouble());
+        large32.push(i.toDouble());
+      }
+      expect(large64.isFull, isTrue);
+      expect(large32.isFull, isTrue);
+      expect(identical(large64.contiguousView, large64.contiguousView), isTrue);
+      expect(identical(large32.contiguousView, large32.contiguousView), isTrue);
+
+      // copyInto の範囲外書き込み防御 (OOB Write 防御)
+      final smallDest = List<double>.filled(2, 0.0);
+      final ring64 = FloatRingBuffer(4)..pushAll([1.0, 2.0, 3.0]);
+      final ring32 = Float32RingBuffer(4)..pushAll([1.0, 2.0, 3.0]);
+      expect(() => ring64.copyInto(smallDest, 0), throwsRangeError);
+      expect(() => ring64.copyInto(smallDest, -1), throwsRangeError);
+      expect(() => ring32.copyInto(smallDest, 0), throwsRangeError);
+      expect(() => ring32.copyInto(smallDest, -1), throwsRangeError);
+    });
   });
 
   group('【2. ZeroPool 基本 & メモリ再利用テスト】', () {
@@ -424,6 +459,9 @@ void main() {
         returnsNormally,
       );
 
+      // Extreme float-to-int overflow safety (double.maxFinite, 1e25, -double.maxFinite)
+      _verifyExtremeDoublePainting(painter, canvas);
+
       recorder.endRecording().dispose();
       painter.dispose();
     });
@@ -570,6 +608,41 @@ void main() {
       notifier.dispose();
     });
   });
+}
+
+void _verifyExtremeDoublePainting(ZeroNumberPainter painter, Canvas canvas) {
+  for (final extreme in <double>[double.maxFinite, -double.maxFinite, 1e25, -1e25]) {
+    expect(
+      () => painter.paintDouble(canvas, Offset.zero, extreme, fractionDigits: 0),
+      returnsNormally,
+    );
+    expect(
+      () => painter.paintDouble(canvas, Offset.zero, extreme, fractionDigits: 6),
+      returnsNormally,
+    );
+    expect(
+      () => painter.paintCurrency(canvas, Offset.zero, extreme, fractionDigits: 6),
+      returnsNormally,
+    );
+    expect(
+      () => painter.paintPercent(canvas, Offset.zero, extreme, fractionDigits: 6),
+      returnsNormally,
+    );
+    expect(
+      () => painter.paintWithSuffix(
+        canvas,
+        Offset.zero,
+        extreme,
+        suffixGlyph: ZeroNumberPainter.glyphFps,
+        fractionDigits: 6,
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => painter.paintOdometer(canvas, Offset.zero, extreme, minDigits: 6),
+      returnsNormally,
+    );
+  }
 }
 
 class _DummyZLeafWidget extends ZLeafWidget<_TestZeroRenderBox> {

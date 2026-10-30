@@ -326,10 +326,29 @@ class ZeroNumberPainter {
     return glyphId;
   }
 
+  static const double _maxSafeIntDouble = 9223372036854774784.0;
+  static const double _exactIntPrecisionLimit = 9007199254740992.0;
+
   @pragma('vm:prefer-inline')
   static int _safeAbsInt(int value) {
     final int neg = -value;
     return neg < 0 ? 0x7FFFFFFFFFFFFFFF : neg;
+  }
+
+  @pragma('vm:prefer-inline')
+  static int _safeScaledInt(double absVal, int scale) {
+    final double scaled = absVal * scale + 0.5;
+    if (!scaled.isFinite || scaled >= _maxSafeIntDouble) {
+      return 0x7FFFFFFFFFFFFFFF;
+    }
+    return scaled.floor();
+  }
+
+  @pragma('vm:prefer-inline')
+  static int _safeRoundToInt(double value) {
+    if (value >= _maxSafeIntDouble) return 0x7FFFFFFFFFFFFFFF;
+    if (value <= -_maxSafeIntDouble) return -0x7FFFFFFFFFFFFFFF;
+    return value.round();
   }
 
   @pragma('vm:prefer-inline')
@@ -487,7 +506,7 @@ class ZeroNumberPainter {
       return paintInt(
         canvas,
         offset,
-        value.round(),
+        _safeRoundToInt(value),
         minDigits: minIntegerDigits,
         monospaceAlignment: monospaceAlignment,
       );
@@ -496,7 +515,7 @@ class ZeroNumberPainter {
     final int scale = _pow10Table[clampedFrac];
     final bool isNeg = value < 0.0;
     final double absVal = isNeg ? -value : value;
-    final int scaled = (absVal * scale + 0.5).floor();
+    final int scaled = _safeScaledInt(absVal, scale);
     final int intPart = scaled ~/ scale;
     final int fracPart = scaled - intPart * scale;
 
@@ -650,7 +669,7 @@ class ZeroNumberPainter {
     final int clampedFrac = fractionDigits.clamp(0, 6);
     final int scale = _pow10Table[clampedFrac];
     final double absVal = value < 0.0 ? -value : value;
-    final int scaled = (absVal * scale + 0.5).floor();
+    final int scaled = _safeScaledInt(absVal, scale);
     final int intPart = scaled ~/ scale;
     final int fracPart = scaled - intPart * scale;
 
@@ -718,7 +737,7 @@ class ZeroNumberPainter {
     final int clampedFrac = fractionDigits.clamp(0, 6);
     final int scale = _pow10Table[clampedFrac];
     final double absVal = value < 0.0 ? -value : value;
-    final int scaled = (absVal * scale + 0.5).floor();
+    final int scaled = _safeScaledInt(absVal, scale);
     final int intPart = scaled ~/ scale;
     final int fracPart = scaled - intPart * scale;
 
@@ -753,8 +772,8 @@ class ZeroNumberPainter {
   }) {
     if (_isDisposed || value.isNaN || value.isInfinite) return 0.0;
     final double nonNeg = value < 0.0 ? -value : value;
-    final int intFloor = nonNeg.floor();
-    final double frac = nonNeg - intFloor;
+    final int intFloor = nonNeg >= _maxSafeIntDouble ? 0x7FFFFFFFFFFFFFFF : nonNeg.floor();
+    final double frac = nonNeg >= _exactIntPrecisionLimit ? 0.0 : (nonNeg - intFloor);
     final int digitCount = _extractDigits(intFloor, minDigits);
     final double totalWidth = digitCount * _maxDigitWidth;
 
