@@ -1,67 +1,146 @@
-# Miscellaneous
+# =============================================================================
+# OS & Miscellaneous
+# =============================================================================
 *.class
 *.log
 *.pyc
 *.swp
+*.swo
+*~
+*.bak
+*.tmp
 .DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
+**/.swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# =============================================================================
+# IDE & Editors
+# =============================================================================
+# IntelliJ / Android Studio
 *.iml
+**/*.iml
 *.ipr
 *.iws
 .idea/
+**/.idea/
 
-# Visual Studio Code related
+# Visual Studio Code
 .vscode/
+**/.vscode/
 
-# Flutter repo-specific
+# =============================================================================
+# Flutter / Dart / Pub / Melos
+# =============================================================================
 /bin/cache/
 /packages/flutter_tools/test/data/create_flutter_project/
-
-# Flutter / Dart
 .dart_tool/
+**/.dart_tool/
 .packages
+**/.packages
 .pub-cache/
+**/.pub-cache/
 .pub/
+**/.pub/
+.flutter-plugins
+**/.flutter-plugins
+.flutter-plugins-dependencies
+**/.flutter-plugins-dependencies
+pubspec_overrides.yaml
+**/pubspec_overrides.yaml
 build/
 **/build/
 *.dill
+.widget_preview/
+**/.widget_preview/
+melos_*.log
 
-# Native build artifacts
+# Documentation & Coverage
+doc/api/
+**/doc/api/
+coverage/
+**/coverage/
+*.lcov
+lcov.info
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# =============================================================================
+# Native FFI / C++ / CMake / Clang Build Artifacts
+# =============================================================================
 *.dylib
 *.so
 *.dll
 *.exe
 *.o
+*.obj
 *.a
+*.lib
+*.exp
+*.pdb
+*.dSYM/
+**/*.dSYM/
+CMakeFiles/
+**/CMakeFiles/
+CMakeCache.txt
+**/CMakeCache.txt
+cmake_install.cmake
+**/cmake_install.cmake
+compile_commands.json
+**/compile_commands.json
 test/native_stress_test
+**/test/native_stress_test
 test/libzero_player_test.dylib
+**/test/libzero_player_test.*
 src/libzero_player_native.dylib
+**/src/libzero_player_native.*
 
-# Android related
+# =============================================================================
+# Android / Gradle / NDK
+# =============================================================================
 **/android/**/gradle-wrapper.jar
-**/android/.gradle
-**/android/.cxx
+**/android/.gradle/
+**/android/.cxx/
 **/android/captures/
 **/android/gradlew
 **/android/gradlew.bat
 **/android/local.properties
 **/local.properties
 **/android/**/GeneratedPluginRegistrant.java
+**/android/**/GeneratedPluginRegistrant.kt
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
 **/android/**/*.apk
 **/android/**/*.aab
+*.hprof
+*.keystore
+*.jks
 
-# iOS/macOS related
+# =============================================================================
+# iOS / macOS / Xcode / CocoaPods
+# =============================================================================
 **/ios/**/*.mode1v3
 **/ios/**/*.mode2v3
 **/ios/**/*.moved-aside
 **/ios/**/*.pbxuser
 **/ios/**/*.perspectivev3
+**/ios/**/xcuserdata/
 **/ios/**/DerivedData/
 **/ios/**/Icon?
 **/ios/**/Pods/
@@ -74,6 +153,7 @@ src/libzero_player_native.dylib
 **/ios/**/Flutter/Flutter.framework
 **/ios/**/Flutter/Flutter.podspec
 **/ios/**/Flutter/Generated.xcconfig
+**/ios/**/Flutter/.last_build_id
 **/ios/**/Flutter/app.flx
 **/ios/**/Flutter/app.zip
 **/ios/**/Flutter/flutter_assets/
@@ -81,15 +161,53 @@ src/libzero_player_native.dylib
 **/ios/**/Flutter/ephemeral/
 **/ios/Podfile.lock
 
-# Symbols
-app.*.symbols
+**/macos/**/*.mode1v3
+**/macos/**/*.mode2v3
+**/macos/**/*.moved-aside
+**/macos/**/*.pbxuser
+**/macos/**/*.perspectivev3
+**/macos/**/xcuserdata/
+**/macos/**/DerivedData/
+**/macos/**/Icon?
+**/macos/**/Pods/
+**/macos/**/.symlinks/
+**/macos/**/profile
+**/macos/**/framework
+**/macos/**/Flutter/Flutter-Debug.xcconfig
+**/macos/**/Flutter/Flutter-Release.xcconfig
+**/macos/**/Flutter/GeneratedPluginRegistrant.swift
+**/macos/**/Flutter/ephemeral/
+**/macos/Podfile.lock
 
-# Mock experiments (MOC)
+# =============================================================================
+# Package Example Local Platform Scaffolds (generated via `flutter create .`)
+# =============================================================================
+# Pure widget packages only track example/lib, pubspec.yaml, analysis_options.yaml, and README.md.
+packages/*/example/.gitignore
+packages/*/example/.metadata
+packages/*/example/android/
+packages/*/example/ios/
+packages/*/example/macos/
+packages/*/example/linux/
+packages/*/example/windows/
+packages/*/example/web/
+packages/*/example/test/
+
+# =============================================================================
+# Project Specific (MOC / Distribution Bundles)
+# =============================================================================
 moc/
 **/moc/
-
-# Distribution bundles
 dist/
 
-# Exceptions to above rules.
+# =============================================================================
+# Exceptions
+# =============================================================================
 !**/android/**/gradle-wrapper.jar
+!apps/benchmark_app/macos/Flutter/Flutter-Debug.xcconfig
+!apps/benchmark_app/macos/Flutter/Flutter-Release.xcconfig
+!apps/benchmark_app/macos/Flutter/GeneratedPluginRegistrant.swift
+!packages/d_zero_player/example/.gitignore
+!packages/d_zero_player/example/.metadata
+!packages/d_zero_player/example/android/**
+!packages/d_zero_player/example/ios/**

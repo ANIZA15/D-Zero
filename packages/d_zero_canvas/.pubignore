@@ -9,9 +9,15 @@ test/native_stress_test
 src/libzero_player_native.dylib
 tool/
 
-# Example build & ephemeral files
+# Example build & local platform scaffolds
 example/.dart_tool/
 example/build/
+example/.metadata
+example/macos/
+example/linux/
+example/windows/
+example/web/
+example/test/
 example/ios/Flutter/ephemeral/
 example/ios/Flutter/Generated.xcconfig
 example/ios/Flutter/flutter_export_environment.sh

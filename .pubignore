@@ -1,10 +1,15 @@
 # Build and test artifacts
 .dart_tool/
 build/
+coverage/
+doc/api/
 *.dylib
 *.so
 *.dll
 *.exe
+*.o
+*.a
+*.dSYM/
 test/native_stress_test
 src/libzero_player_native.dylib
 
@@ -17,5 +22,6 @@ src/libzero_player_native.dylib
 .DS_Store
 Thumbs.db
 
-# Mock apps
+# Mock apps & local bundles
 moc/
+dist/

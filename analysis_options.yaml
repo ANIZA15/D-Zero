@@ -6,6 +6,13 @@ analyzer:
     - "**/*.freezed.dart"
     - "**/build/**"
     - "**/.dart_tool/**"
+    - "packages/*/example/android/**"
+    - "packages/*/example/ios/**"
+    - "packages/*/example/macos/**"
+    - "packages/*/example/linux/**"
+    - "packages/*/example/windows/**"
+    - "packages/*/example/web/**"
+    - "packages/*/example/test/**"
 
 linter:
   rules:
