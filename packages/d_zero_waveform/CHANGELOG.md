@@ -1,3 +1,7 @@
+## 0.1.3
+
+* Synchronized release of `d_zero_waveform` v0.1.3.
+
 ## 0.1.2
 
 * Synchronized release of `d_zero_waveform` v0.1.2.

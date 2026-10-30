@@ -2,6 +2,10 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.3 - 2026-10-30
+
+* chore(rules,tool): enforce README and pubspec sync audit for all exported Z-Widgets (eed8a3c)
+
 ## 0.1.2 - 2026-10-30
 
 ### 🚀 3D Graphics, Impeller GLSL 460 Shaders & Low-Level Widgets
