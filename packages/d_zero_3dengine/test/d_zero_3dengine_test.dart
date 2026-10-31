@@ -104,6 +104,26 @@ void main() {
 
       controller.moveCameraLocal(forward: 0.5, right: -0.2, up: 0.1);
       expect(controller.targetY, closeTo(0.1, 0.25));
+
+      controller.setPostProcess(
+        fogDensity: 0.06,
+        exposureEv: 1.35,
+        bloomIntensity: 0.75,
+      );
+      expect(controller.fogDensity, closeTo(0.06, 0.005));
+      expect(controller.exposureEv, closeTo(1.35, 0.01));
+      expect(controller.bloomIntensity, closeTo(0.75, 0.01));
+
+      controller.setSequencerState(timeSec: 3.2, playing: true);
+      expect(controller.sequencerTimeSec, closeTo(3.2, 0.01));
+      expect(controller.isSequencerPlaying, isTrue);
+      controller.stepSimulation(dtMs: 16.0);
+      expect(controller.sequencerTimeSec, greaterThan(3.2));
+
+      final objClusters = controller.loadBuiltinObjPreset(presetId: 1);
+      expect(objClusters, greaterThanOrEqualTo(1));
+      expect(controller.loadedObjVertices, greaterThan(0));
+      expect(controller.loadedObjTriangles, greaterThan(0));
     });
   });
 
@@ -360,6 +380,48 @@ void main() {
         await tester.pump();
 
         expect(ctrl.isPhysicsEnabled, isTrue);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(ctrl.hasListeners, isFalse);
+
+        await ctrl.dispose();
+      },
+    );
+
+    testWidgets(
+      'ZPostProcess3D (ZPostProcessPanel3D) と ZSequencer3D (ZTimelineSequencer3D) の操作と解放が機能すること',
+      (tester) async {
+        final ctrl = Zero3DEngineController.simulated();
+
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              children: [
+                ZPostProcess3D(controller: ctrl),
+                ZSequencer3D(controller: ctrl),
+              ],
+            ),
+          ),
+        );
+
+        expect(find.byType(ZPostProcess3D), findsOneWidget);
+        expect(find.byType(ZSequencer3D), findsOneWidget);
+
+        final ppTopLeft = tester.getTopLeft(find.byType(ZPostProcess3D));
+        await tester.tapAt(ppTopLeft + const Offset(160.0, 20.0));
+        await tester.tapAt(ppTopLeft + const Offset(140.0, 62.0));
+        await tester.tapAt(ppTopLeft + const Offset(180.0, 104.0));
+        await tester.tapAt(ppTopLeft + const Offset(120.0, 146.0));
+
+        final seqTopLeft = tester.getTopLeft(find.byType(ZSequencer3D));
+        await tester.tapAt(seqTopLeft + const Offset(20.0, 22.0));
+        await tester.tapAt(seqTopLeft + const Offset(200.0, 22.0));
+        await tester.tapAt(seqTopLeft + const Offset(460.0, 22.0));
+        await tester.pump();
+
+        expect(ctrl.loadedObjTriangles, greaterThan(0));
+        expect(ctrl.sequencerTimeSec, greaterThan(1.0));
 
         await tester.pumpWidget(const SizedBox.shrink());
         expect(ctrl.hasListeners, isFalse);

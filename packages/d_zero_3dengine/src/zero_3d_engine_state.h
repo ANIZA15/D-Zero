@@ -132,6 +132,13 @@ struct alignas(64) Zero3DEcsWorld {
     std::atomic<float> pbr_metallic;           // PBR 金属度 (0.0 .. 1.0)
     std::atomic<float> pbr_roughness;          // PBR 粗さ (0.04 .. 1.0)
     std::atomic<float> pbr_emissive;           // PBR 自己発光強度 (0.0 .. 5.0)
+    std::atomic<float> fog_density;            // 大気ボリューメトリックフォグ濃度 (0.0 .. 1.0)
+    std::atomic<float> exposure_ev;            // ACES Filmic 露出補正 (0.2 .. 4.0)
+    std::atomic<float> bloom_intensity;        // ブルーム発光強度 (0.0 .. 2.0)
+    std::atomic<float> sequencer_time_sec;     // 3D Sequencer タイムライン再生位置 (0.0 .. 30.0s)
+    std::atomic<int32_t> sequencer_playing;    // 3D Sequencer 再生中フラグ (0 or 1)
+    std::atomic<int32_t> loaded_obj_vertices;  // Wavefront .obj からロードされた頂点数
+    std::atomic<int32_t> loaded_obj_triangles; // Wavefront .obj からロードされた三角形数
     alignas(64) float pos_x[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_y[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_z[ZERO_3D_ECS_MAX_ENTITIES];
@@ -311,6 +318,42 @@ ZERO_3D_EXPORT int32_t zero_3d_ecs_build_procedural_meshlets(
     int32_t triangle_count
 );
 ZERO_3D_EXPORT int32_t zero_3d_ecs_get_built_meshlet_count(const Zero3DEcsWorld* world);
+
+// 7. ポストプロセス (Volumetric Fog / ACES Exposure / Bloom) & 3D Sequencer & Wavefront .obj ローダー
+ZERO_3D_EXPORT void zero_3d_ecs_set_post_process(
+    Zero3DEcsWorld* world,
+    float fog_density,
+    float exposure_ev,
+    float bloom_intensity
+);
+ZERO_3D_EXPORT float zero_3d_ecs_get_fog_density(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT float zero_3d_ecs_get_exposure_ev(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT float zero_3d_ecs_get_bloom_intensity(const Zero3DEcsWorld* world);
+
+ZERO_3D_EXPORT void zero_3d_ecs_set_sequencer_state(
+    Zero3DEcsWorld* world,
+    float time_sec,
+    int32_t playing
+);
+ZERO_3D_EXPORT void zero_3d_ecs_step_sequencer(
+    Zero3DEcsWorld* world,
+    float dt_sec
+);
+ZERO_3D_EXPORT float zero_3d_ecs_get_sequencer_time(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_sequencer_playing(const Zero3DEcsWorld* world);
+
+// インメモリ Wavefront .obj テキストから頂点・三角形をパースし自動的に Nanite Meshlet 階層を構築
+ZERO_3D_EXPORT int32_t zero_3d_ecs_load_obj_from_memory(
+    Zero3DEcsWorld* world,
+    const char* obj_text,
+    int32_t length
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_load_builtin_obj_preset(
+    Zero3DEcsWorld* world,
+    int32_t preset_id
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_loaded_obj_vertices(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_loaded_obj_triangles(const Zero3DEcsWorld* world);
 
 // 64-bit Visibility Buffer パック/アンパック ((uint64_t)DepthBits << 32 | (ClusterID << 8) | TriID)
 ZERO_3D_EXPORT uint64_t zero_3d_pack_visbuffer64(

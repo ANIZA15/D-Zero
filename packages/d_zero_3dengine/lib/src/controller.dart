@@ -402,6 +402,10 @@ class Zero3DEngineController implements Listenable {
   void stepSimulation({double dtMs = 6.94, int totalDagClusters = 4096}) {
     if (_isDisposed || !_view.isValid) return;
     if (ecsWorldPointer.address != 0 && _spawnedEntityCount > 0) {
+      Zero3DEngineNativeBindings.instance.ecsStepSequencer(
+        ecsWorldPointer,
+        dtMs * 0.001,
+      );
       Zero3DEngineNativeBindings.instance.ecsStepPhysics(
         ecsWorldPointer,
         dtMs * 0.001,
@@ -514,6 +518,99 @@ class Zero3DEngineController implements Listenable {
         .ecsBuildProceduralMeshlets(ecsWorldPointer, triangleCount);
     _revision.add(1);
     return count;
+  }
+
+  /// Volumetric Fog density (`0.0 .. 1.0`).
+  double get fogDensity {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.15;
+    return Zero3DEngineNativeBindings.instance.ecsGetFogDensity(
+      ecsWorldPointer,
+    );
+  }
+
+  /// ACES Filmic exposure EV (`0.2 .. 4.0`).
+  double get exposureEv {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 1.25;
+    return Zero3DEngineNativeBindings.instance.ecsGetExposureEv(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Specular Bloom intensity (`0.0 .. 2.0`).
+  double get bloomIntensity {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.45;
+    return Zero3DEngineNativeBindings.instance.ecsGetBloomIntensity(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Updates Volumetric Fog, ACES Exposure EV, and Specular Bloom intensity.
+  void setPostProcess({
+    double? fogDensity,
+    double? exposureEv,
+    double? bloomIntensity,
+  }) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    Zero3DEngineNativeBindings.instance.ecsSetPostProcess(
+      ecsWorldPointer,
+      fogDensity ?? this.fogDensity,
+      exposureEv ?? this.exposureEv,
+      bloomIntensity ?? this.bloomIntensity,
+    );
+    _revision.add(1);
+  }
+
+  /// Current 3D Sequencer timeline position in seconds (`0.0 .. 30.0`).
+  double get sequencerTimeSec {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.0;
+    return Zero3DEngineNativeBindings.instance.ecsGetSequencerTime(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Whether the 3D Sequencer timeline is actively playing.
+  bool get isSequencerPlaying {
+    if (_isDisposed || ecsWorldPointer.address == 0) return false;
+    return Zero3DEngineNativeBindings.instance.ecsGetSequencerPlaying(
+          ecsWorldPointer,
+        ) !=
+        0;
+  }
+
+  /// Sets the 3D Sequencer timeline scrub position (`0.0 .. 30.0s`) and play state.
+  void setSequencerState({double? timeSec, bool? playing}) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    Zero3DEngineNativeBindings.instance.ecsSetSequencerState(
+      ecsWorldPointer,
+      timeSec ?? sequencerTimeSec,
+      (playing ?? isSequencerPlaying) ? 1 : 0,
+    );
+    _revision.add(1);
+  }
+
+  /// Number of vertices parsed by the C++ Wavefront `.obj` mesh loader.
+  int get loadedObjVertices {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    return Zero3DEngineNativeBindings.instance.ecsGetLoadedObjVertices(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Number of triangles parsed by the C++ Wavefront `.obj` mesh loader.
+  int get loadedObjTriangles {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    return Zero3DEngineNativeBindings.instance.ecsGetLoadedObjTriangles(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Parses a Wavefront `.obj` 3D mesh preset (`presetId = 0 or 1`) in C++ and builds Nanite meshlets.
+  int loadBuiltinObjPreset({int presetId = 1}) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    final int tris = Zero3DEngineNativeBindings.instance
+        .ecsLoadBuiltinObjPreset(ecsWorldPointer, presetId);
+    _revision.add(1);
+    return tris;
   }
 
   /// Number of 3D entities spawned in the C++ SoA ECS world.

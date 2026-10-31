@@ -31,6 +31,8 @@
 | **`ZTransformGizmo3D`** | `Z3DGizmoOverlay` (`ZeroTransformGizmo3D`) | Interactive zero-allocation 3D entity transform gizmo (X/Y/Z world translation and uniform scale) wired directly to C++ `Zero3DEcsWorld`. |
 | **`ZOutliner3D`** | `ZEntityOutliner3D` (`ZeroOutliner3D`) | Zero-allocation 3D World Outliner & 48-sample lock-free Frame Time Sparkline HUD. |
 | **`ZMaterialEditor3D`** | `ZPbrMaterialPanel` (`ZeroMaterialEditor3D`) | Zero-allocation Cook-Torrance GGX PBR Material Editor (Metallic, Roughness, Emissive) & C++ rigid-body physics impulse controller. |
+| **`ZPostProcess3D`** | `ZPostProcessPanel3D` (`ZeroPostProcess3D`) | Zero-allocation Volumetric Atmosphere & ACES Filmic Tone Mapping post-process panel (Fog Density, Exposure EV, Bloom) & Wavefront `.obj` mesh loader trigger. |
+| **`ZSequencer3D`** | `ZTimelineSequencer3D` (`ZeroSequencer3D`) | Zero-allocation 3D Keyframe Timeline Sequencer bar with play/pause button and interactive keyframe scrubbing. |
 | **`Zero3DEngineController`** | - | 128-byte FFI shared-memory & C++ SoA ECS controller managing camera, lighting, Nanite LOD threshold, and 144Hz/240Hz/Uncapped scheduling. |
 
 ---

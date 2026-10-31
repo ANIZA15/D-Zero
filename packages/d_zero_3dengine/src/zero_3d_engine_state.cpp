@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <new>
+#include <sstream>
+#include <string>
 #include <vector>
 
 namespace {
@@ -413,6 +415,13 @@ Zero3DEcsWorld* zero_3d_ecs_create_world(void) {
     world->pbr_metallic.store(0.75f, std::memory_order_relaxed);
     world->pbr_roughness.store(0.18f, std::memory_order_relaxed);
     world->pbr_emissive.store(0.25f, std::memory_order_relaxed);
+    world->fog_density.store(0.15f, std::memory_order_relaxed);
+    world->exposure_ev.store(1.25f, std::memory_order_relaxed);
+    world->bloom_intensity.store(0.45f, std::memory_order_relaxed);
+    world->sequencer_time_sec.store(0.0f, std::memory_order_relaxed);
+    world->sequencer_playing.store(1, std::memory_order_relaxed);
+    world->loaded_obj_vertices.store(0, std::memory_order_relaxed);
+    world->loaded_obj_triangles.store(0, std::memory_order_relaxed);
     for (int i = 0; i < ZERO_3D_ECS_MAX_ENTITIES; ++i) {
         world->pos_x[i] = 0.0f;
         world->pos_y[i] = 0.0f;
@@ -835,6 +844,176 @@ int32_t zero_3d_ecs_build_procedural_meshlets(
 
 int32_t zero_3d_ecs_get_built_meshlet_count(const Zero3DEcsWorld* world) {
     return is_ecs_valid_alive(world) ? world->built_meshlet_count.load(std::memory_order_acquire) : 0;
+}
+
+void zero_3d_ecs_set_post_process(
+    Zero3DEcsWorld* world,
+    float fog_density,
+    float exposure_ev,
+    float bloom_intensity
+) {
+    if (!is_ecs_valid_alive(world)) return;
+    world->fog_density.store(sanitize_float(fog_density, 0.15f, 0.0f, 1.0f), std::memory_order_relaxed);
+    world->exposure_ev.store(sanitize_float(exposure_ev, 1.25f, 0.2f, 4.0f), std::memory_order_relaxed);
+    world->bloom_intensity.store(sanitize_float(bloom_intensity, 0.45f, 0.0f, 2.0f), std::memory_order_relaxed);
+}
+
+float zero_3d_ecs_get_fog_density(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->fog_density.load(std::memory_order_relaxed) : 0.15f;
+}
+
+float zero_3d_ecs_get_exposure_ev(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->exposure_ev.load(std::memory_order_relaxed) : 1.25f;
+}
+
+float zero_3d_ecs_get_bloom_intensity(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->bloom_intensity.load(std::memory_order_relaxed) : 0.45f;
+}
+
+void zero_3d_ecs_set_sequencer_state(
+    Zero3DEcsWorld* world,
+    float time_sec,
+    int32_t playing
+) {
+    if (!is_ecs_valid_alive(world)) return;
+    world->sequencer_time_sec.store(sanitize_float(time_sec, 0.0f, 0.0f, 30.0f), std::memory_order_relaxed);
+    world->sequencer_playing.store(playing != 0 ? 1 : 0, std::memory_order_release);
+}
+
+void zero_3d_ecs_step_sequencer(Zero3DEcsWorld* world, float dt_sec) {
+    if (!is_ecs_valid_alive(world)) return;
+    if (world->sequencer_playing.load(std::memory_order_acquire) == 0) return;
+    const float safe_dt = sanitize_float(dt_sec, 0.00694f, 0.0f, 0.25f);
+    float next_t = world->sequencer_time_sec.load(std::memory_order_relaxed) + safe_dt;
+    if (next_t >= 30.0f) next_t -= 30.0f;
+    world->sequencer_time_sec.store(next_t, std::memory_order_relaxed);
+}
+
+float zero_3d_ecs_get_sequencer_time(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->sequencer_time_sec.load(std::memory_order_relaxed) : 0.0f;
+}
+
+int32_t zero_3d_ecs_get_sequencer_playing(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->sequencer_playing.load(std::memory_order_acquire) : 0;
+}
+
+static inline void parse_obj_vertex_line(
+    std::istringstream& line_stream,
+    std::vector<float>& out_verts
+) {
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    if (line_stream >> x >> y >> z) {
+        out_verts.push_back(sanitize_float(x, 0.0f, -10000.0f, 10000.0f));
+        out_verts.push_back(sanitize_float(y, 0.0f, -10000.0f, 10000.0f));
+        out_verts.push_back(sanitize_float(z, 0.0f, -10000.0f, 10000.0f));
+    }
+}
+
+static inline int32_t resolve_obj_vertex_index(
+    const std::string& token,
+    int32_t current_vert_count
+) {
+    char* end_ptr = nullptr;
+    const long raw_idx = std::strtol(token.c_str(), &end_ptr, 10);
+    if (end_ptr == token.c_str() || raw_idx == 0) return -1;
+    const long resolved = (raw_idx > 0)
+        ? (raw_idx - 1)
+        : (static_cast<long>(current_vert_count) + raw_idx);
+    if (resolved < 0 || resolved >= static_cast<long>(current_vert_count)) {
+        return -1;
+    }
+    return static_cast<int32_t>(resolved);
+}
+
+static inline void parse_obj_face_line(
+    std::istringstream& line_stream,
+    int32_t current_vert_count,
+    std::vector<uint32_t>& out_indices
+) {
+    uint32_t poly[16];
+    int32_t poly_len = 0;
+    std::string token;
+    while (poly_len < 16 && (line_stream >> token)) {
+        const int32_t idx = resolve_obj_vertex_index(token, current_vert_count);
+        if (idx < 0) return;
+        poly[poly_len++] = static_cast<uint32_t>(idx);
+    }
+    for (int32_t k = 2; k < poly_len; ++k) {
+        out_indices.push_back(poly[0]);
+        out_indices.push_back(poly[k - 1]);
+        out_indices.push_back(poly[k]);
+    }
+}
+
+int32_t zero_3d_ecs_load_obj_from_memory(
+    Zero3DEcsWorld* world,
+    const char* obj_text,
+    int32_t length
+) {
+    if (!is_ecs_valid_alive(world) || !obj_text || length <= 0) return 0;
+    const size_t max_len = static_cast<size_t>(clamp_i32(length, 1, 4 * 1024 * 1024));
+    size_t actual_len = 0;
+    while (actual_len < max_len && obj_text[actual_len] != '\0') {
+        ++actual_len;
+    }
+    std::string content(obj_text, actual_len);
+    std::istringstream stream(content);
+
+    std::vector<float> verts;
+    std::vector<uint32_t> indices;
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        std::istringstream ls(line);
+        std::string tag;
+        if (!(ls >> tag)) continue;
+        if (tag == "v") {
+            parse_obj_vertex_line(ls, verts);
+        } else if (tag == "f") {
+            parse_obj_face_line(ls, static_cast<int32_t>(verts.size() / 3u), indices);
+        }
+    }
+
+    const int32_t vert_count = static_cast<int32_t>(verts.size() / 3u);
+    const int32_t tri_count = static_cast<int32_t>(indices.size() / 3u);
+    world->loaded_obj_vertices.store(vert_count, std::memory_order_release);
+    world->loaded_obj_triangles.store(tri_count, std::memory_order_release);
+
+    if (vert_count > 0 && tri_count > 0) {
+        return zero_3d_ecs_build_meshlets_from_triangles(
+            world, verts.data(), vert_count, indices.data(), tri_count * 3
+        );
+    }
+    return 0;
+}
+
+int32_t zero_3d_ecs_load_builtin_obj_preset(
+    Zero3DEcsWorld* world,
+    int32_t preset_id
+) {
+    if (!is_ecs_valid_alive(world)) return 0;
+    const int32_t tris = (preset_id == 1) ? 1024 : 512;
+    std::ostringstream oss;
+    oss << "# Wavefront OBJ generated preset\n";
+    for (int32_t v = 0; v < tris + 2; ++v) {
+        const float a = static_cast<float>(v) * 0.15f;
+        oss << "v " << std::cos(a) << " " << std::sin(a * 0.5f) << " " << std::sin(a) << "\n";
+    }
+    for (int32_t f = 1; f <= tris; ++f) {
+        oss << "f " << f << " " << (f + 1) << " " << (f + 2) << "\n";
+    }
+    const std::string obj_str = oss.str();
+    return zero_3d_ecs_load_obj_from_memory(
+        world, obj_str.c_str(), static_cast<int32_t>(obj_str.size())
+    );
+}
+
+int32_t zero_3d_ecs_get_loaded_obj_vertices(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->loaded_obj_vertices.load(std::memory_order_acquire) : 0;
+}
+
+int32_t zero_3d_ecs_get_loaded_obj_triangles(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->loaded_obj_triangles.load(std::memory_order_acquire) : 0;
 }
 
 } // extern "C"

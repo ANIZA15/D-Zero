@@ -99,6 +99,16 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
                           child: ZOutliner3D(controller: _controller),
                         ),
                         Positioned(
+                          right: 14.0,
+                          top: 218.0,
+                          child: ZPostProcess3D(controller: _controller),
+                        ),
+                        Positioned(
+                          left: 290.0,
+                          top: 14.0,
+                          child: ZSequencer3D(controller: _controller),
+                        ),
+                        Positioned(
                           left: 14.0,
                           bottom: 14.0,
                           child: ZTransformGizmo3D(controller: _controller),
@@ -180,6 +190,12 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
             triangleCount: 8192,
           ),
           child: const Text('Build 8K Nanite Meshlets'),
+        ),
+        ElevatedButton(
+          onPressed: () => _controller.loadBuiltinObjPreset(
+            presetId: 1,
+          ),
+          child: const Text('Load OBJ Mesh (C++)'),
         ),
       ],
     );

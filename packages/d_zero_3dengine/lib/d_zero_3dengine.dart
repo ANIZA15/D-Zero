@@ -16,3 +16,5 @@ export 'src/widgets/z_scene_inspector_3d.dart';
 export 'src/widgets/z_transform_gizmo_3d.dart';
 export 'src/widgets/z_outliner_3d.dart';
 export 'src/widgets/z_material_editor_3d.dart';
+export 'src/widgets/z_post_process_3d.dart';
+export 'src/widgets/z_sequencer_3d.dart';

@@ -415,6 +415,17 @@ typedef Dart3DEcsBuildProcMeshlets = int Function(
   int,
 );
 
+typedef _NativeEcsSetSequencer = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Float,
+  ffi.Int32,
+);
+typedef Dart3DEcsSetSequencer = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  double,
+  int,
+);
+
 typedef _NativeEcsSetTransform = ffi.Void Function(
   ffi.Pointer<Zero3DEcsWorldNative>,
   ffi.Int32,
@@ -627,6 +638,39 @@ class Zero3DEngineNativeBindings {
   /// Returns the number of Nanite meshlet clusters built by the C++ meshlet builder.
   late final Dart3DEcsGetInt ecsGetBuiltMeshletCount;
 
+  /// Updates Volumetric Fog, ACES Exposure EV, and Bloom Intensity.
+  late final Dart3DEcsSetPbr ecsSetPostProcess;
+
+  /// Reads Volumetric Fog density (`0.0 .. 1.0`).
+  late final Dart3DEcsGetFloat ecsGetFogDensity;
+
+  /// Reads ACES Filmic exposure EV (`0.2 .. 4.0`).
+  late final Dart3DEcsGetFloat ecsGetExposureEv;
+
+  /// Reads Specular Bloom intensity (`0.0 .. 2.0`).
+  late final Dart3DEcsGetFloat ecsGetBloomIntensity;
+
+  /// Updates 3D Sequencer timeline position (`0.0 .. 30.0s`) and play state (`0/1`).
+  late final Dart3DEcsSetSequencer ecsSetSequencerState;
+
+  /// Advances the 3D Sequencer timeline by `dtSec`.
+  late final Dart3DEcsStepFloat ecsStepSequencer;
+
+  /// Reads current 3D Sequencer timeline position in seconds.
+  late final Dart3DEcsGetFloat ecsGetSequencerTime;
+
+  /// Returns `1` if the 3D Sequencer timeline is playing, `0` if paused.
+  late final Dart3DEcsGetInt ecsGetSequencerPlaying;
+
+  /// Parses a built-in Wavefront `.obj` 3D mesh preset and builds Nanite meshlets.
+  late final Dart3DEcsBuildProcMeshlets ecsLoadBuiltinObjPreset;
+
+  /// Returns vertex count parsed by the C++ Wavefront `.obj` loader.
+  late final Dart3DEcsGetInt ecsGetLoadedObjVertices;
+
+  /// Returns triangle count parsed by the C++ Wavefront `.obj` loader.
+  late final Dart3DEcsGetInt ecsGetLoadedObjTriangles;
+
   /// Packs normalized depth, cluster ID, and triangle ID into a 64-bit Visibility Buffer pixel.
   late final Dart3DPackVisBuffer64 packVisBuffer64;
 
@@ -795,6 +839,61 @@ class Zero3DEngineNativeBindings {
     ecsGetBuiltMeshletCount =
         _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
       'zero_3d_ecs_get_built_meshlet_count',
+      isLeaf: true,
+    );
+    ecsSetPostProcess =
+        _dylib.lookupFunction<_NativeEcsSetPbr, Dart3DEcsSetPbr>(
+      'zero_3d_ecs_set_post_process',
+      isLeaf: true,
+    );
+    ecsGetFogDensity =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_fog_density',
+      isLeaf: true,
+    );
+    ecsGetExposureEv =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_exposure_ev',
+      isLeaf: true,
+    );
+    ecsGetBloomIntensity =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_bloom_intensity',
+      isLeaf: true,
+    );
+    ecsSetSequencerState =
+        _dylib.lookupFunction<_NativeEcsSetSequencer, Dart3DEcsSetSequencer>(
+      'zero_3d_ecs_set_sequencer_state',
+      isLeaf: true,
+    );
+    ecsStepSequencer =
+        _dylib.lookupFunction<_NativeEcsStepFloat, Dart3DEcsStepFloat>(
+      'zero_3d_ecs_step_sequencer',
+      isLeaf: true,
+    );
+    ecsGetSequencerTime =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_sequencer_time',
+      isLeaf: true,
+    );
+    ecsGetSequencerPlaying =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_sequencer_playing',
+      isLeaf: true,
+    );
+    ecsLoadBuiltinObjPreset = _dylib
+        .lookupFunction<_NativeEcsBuildProcMeshlets, Dart3DEcsBuildProcMeshlets>(
+      'zero_3d_ecs_load_builtin_obj_preset',
+      isLeaf: true,
+    );
+    ecsGetLoadedObjVertices =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_loaded_obj_vertices',
+      isLeaf: true,
+    );
+    ecsGetLoadedObjTriangles =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_loaded_obj_triangles',
       isLeaf: true,
     );
     packVisBuffer64 =

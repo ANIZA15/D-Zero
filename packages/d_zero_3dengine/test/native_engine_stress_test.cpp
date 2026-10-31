@@ -259,6 +259,37 @@ void test_ecs_world_and_visbuffer64() {
 
     zero_3d_move_camera_local(state, 1.0f, -0.5f, 0.25f);
 
+    // 7. Wavefront .obj 3D メッシュパーサ & Volumetric Post-Process & 3D Sequencer 検証
+    zero_3d_ecs_set_post_process(world, 0.08f, 1.4f, 0.9f);
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_fog_density(world) - 0.08f) < 0.005f, "Fog Density が反映されること");
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_exposure_ev(world) - 1.4f) < 0.01f, "Exposure EV が反映されること");
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_bloom_intensity(world) - 0.9f) < 0.01f, "Bloom Intensity が反映されること");
+
+    zero_3d_ecs_set_sequencer_state(world, 2.5f, 1);
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_sequencer_time(world) - 2.5f) < 0.01f, "Sequencer Time が反映されること");
+    TEST_ASSERT(zero_3d_ecs_get_sequencer_playing(world) == 1, "Sequencer Playing が有効化されること");
+    zero_3d_ecs_step_sequencer(world, 0.016f);
+    TEST_ASSERT(zero_3d_ecs_get_sequencer_time(world) > 2.5f, "Sequencer ステップでタイムラインが進行すること");
+
+    const char* sample_obj =
+        "# Wavefront OBJ Test\n"
+        "v 0.0 1.0 0.0\n"
+        "v -1.0 -1.0 1.0\n"
+        "v 1.0 -1.0 1.0\n"
+        "v 0.0 -1.0 -1.0\n"
+        "f 1/1/1 2/2/1 3/3/1\n"
+        "f 1 3 4\n"
+        "f -4 -3 -2 -1\n"
+        "f 99999 0 -99999\n"; // 不正インデックス混入テスト
+    int32_t obj_clusters = zero_3d_ecs_load_obj_from_memory(world, sample_obj, 512);
+    TEST_ASSERT(obj_clusters >= 1, "Wavefront .obj から Nanite Meshlet が構築されること");
+    TEST_ASSERT(zero_3d_ecs_get_loaded_obj_vertices(world) == 4, "OBJ 頂点数 4 が記録されること");
+    TEST_ASSERT(zero_3d_ecs_get_loaded_obj_triangles(world) == 4, "Quad 展開および不正インデックス除外後の三角形数 4 が記録されること");
+    TEST_ASSERT(zero_3d_ecs_load_obj_from_memory(world, nullptr, 0) == 0, "nullptr OBJ 文字列を安全に拒絶すること");
+
+    int32_t preset_clusters = zero_3d_ecs_load_builtin_obj_preset(world, 6);
+    TEST_ASSERT(preset_clusters >= 1, "ビルトイン OBJ トーラスメッシュから Meshlet が生成されること");
+
     zero_3d_ecs_destroy_world(world);
     zero_3d_ecs_destroy_world(nullptr);
     zero_3d_destroy_state(state);

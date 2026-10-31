@@ -28,6 +28,7 @@ typedef struct {
     float heroPosScale[4];
     float cameraTarget[4];
     float pbrParams[4];
+    float postProcess[4];
 } Zero3DGpuUniforms;
 
 static NSString *const kZero3DMetalShaderSource = @R"(
@@ -48,7 +49,8 @@ struct Uniforms {
     int maxRayBounces;
     float4 heroPosScale;
     float4 cameraTarget;
-    float4 pbrParams; // x: metallic, y: roughness, z: emissive, w: physicsEnabled
+    float4 pbrParams;   // x: metallic, y: roughness, z: emissive, w: physicsEnabled
+    float4 postProcess; // x: fogDensity, y: exposureEv, z: bloomIntensity, w: sequencerTime
 };
 
 float sdOctahedron(float3 p, float s) {
@@ -180,6 +182,34 @@ float3 evalCookTorranceGGX(
     return albedo * (0.18 * ao) + (diffuse + spec) * radiance * NdotL + albedo * emissive;
 }
 
+// Volumetric Distance Fog & Mie Sun Scattering (God-Ray Halo)
+float3 applyVolumetricAtmosphere(
+    float3 col,
+    float3 rd,
+    float3 lightDir,
+    float firstHitDist,
+    float fogDensity
+) {
+    float fogAmount = 1.0 - exp(-firstHitDist * fogDensity * 0.28);
+    float sunDot = max(dot(rd, lightDir), 0.0);
+    float3 fogCol = mix(
+        float3(0.05, 0.09, 0.17),
+        float3(0.95, 0.68, 0.38),
+        pow(sunDot, 6.0)
+    );
+    return mix(col, fogCol, clamp(fogAmount, 0.0, 0.92));
+}
+
+// Academy ACES Filmic Tone Mapping Curve
+float3 acesFilmicToneMap(float3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 kernel void zero3d_render_kernel(
     texture2d<half, access::write> outTex [[texture(0)]],
     constant Uniforms& u [[buffer(0)]],
@@ -208,13 +238,15 @@ kernel void zero3d_render_kernel(
 
     float3 accumCol = float3(0.0);
     float3 throughput = float3(1.0);
+    float firstHitDist = 14.0;
+    float animTime = u.postProcess.w > 0.001 ? u.postProcess.w : u.timeSec;
     int bounces = (u.renderMode == 1) ? clamp(u.maxRayBounces, 1, 4) : 1;
 
     for (int bounce = 0; bounce < bounces; ++bounce) {
         float t = 0.0;
         float matId = -1.0;
         for (int i = 0; i < 64; ++i) {
-            float2 h = mapScene(ro + rd * t, u.timeSec, u.heroPosScale);
+            float2 h = mapScene(ro + rd * t, animTime, u.heroPosScale);
             if (h.x < 0.002) {
                 matId = h.y;
                 break;
@@ -228,11 +260,12 @@ kernel void zero3d_render_kernel(
             accumCol += throughput * sky;
             break;
         }
+        if (bounce == 0) firstHitDist = t;
 
         float3 pos = ro + rd * t;
-        float3 nor = calcNormal(pos, u.timeSec, u.heroPosScale);
-        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec, u.heroPosScale) : 1.0;
-        float ao = calcAmbientOcclusion(pos, nor, u.timeSec, u.heroPosScale);
+        float3 nor = calcNormal(pos, animTime, u.heroPosScale);
+        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, animTime, u.heroPosScale) : 1.0;
+        float ao = calcAmbientOcclusion(pos, nor, animTime, u.heroPosScale);
 
         float3 baseCol = materialColorForId(matId, pos, u.renderMode, u.lodThreshold, t);
         float metallic = (matId == 1.0) ? 0.25 : clamp(u.pbrParams.x, 0.0, 1.0);
@@ -249,9 +282,13 @@ kernel void zero3d_render_kernel(
         rd = reflect(rd, nor);
     }
 
-    // Tone mapping & gamma curve for vivid HDR presentation
-    float3 mapped = accumCol / (accumCol + float3(0.65));
-    mapped = pow(clamp(mapped * 1.35, 0.0, 1.0), float3(0.85));
+    // Volumetric Fog & Sun Scattering + Bloom + ACES Filmic Tone Mapping
+    float3 fogged = applyVolumetricAtmosphere(
+        accumCol, rd, lightDir, firstHitDist, clamp(u.postProcess.x, 0.0, 1.0)
+    );
+    float3 bloomHighlight = max(fogged - float3(0.75), float3(0.0)) * clamp(u.postProcess.z, 0.0, 2.0);
+    float3 exposed = (fogged + bloomHighlight) * clamp(u.postProcess.y, 0.2, 4.0);
+    float3 mapped = pow(acesFilmicToneMap(exposed), float3(0.88));
     outTex.write(half4(half3(mapped), 1.0h), gid);
 }
 )";
@@ -335,6 +372,7 @@ kernel void zero3d_render_kernel(
             float z = (float)((i / 8) - 3.5f) * 1.2f;
             zero_3d_ecs_spawn_entity(_ecsWorld, x, 0.0f, z, 1.0f, 0.6f, 64);
         }
+        zero_3d_ecs_load_builtin_obj_preset(_ecsWorld, 1);
         zero_3d_set_status(_engineState, ZERO_3D_STATUS_RENDERING);
 
         [self setupMetalPipeline];
@@ -503,6 +541,10 @@ kernel void zero3d_render_kernel(
     u.pbrParams[1] = _ecsWorld ? zero_3d_ecs_get_pbr_roughness(_ecsWorld) : 0.18f;
     u.pbrParams[2] = _ecsWorld ? zero_3d_ecs_get_pbr_emissive(_ecsWorld) : 0.25f;
     u.pbrParams[3] = _ecsWorld ? (float)zero_3d_ecs_get_physics_enabled(_ecsWorld) : 0.0f;
+    u.postProcess[0] = _ecsWorld ? zero_3d_ecs_get_fog_density(_ecsWorld) : 0.15f;
+    u.postProcess[1] = _ecsWorld ? zero_3d_ecs_get_exposure_ev(_ecsWorld) : 1.25f;
+    u.postProcess[2] = _ecsWorld ? zero_3d_ecs_get_bloom_intensity(_ecsWorld) : 0.45f;
+    u.postProcess[3] = _ecsWorld ? zero_3d_ecs_get_sequencer_time(_ecsWorld) : u.timeSec;
 
     id<MTLCommandBuffer> cmdBuf = [_commandQueue commandBuffer];
     id<MTLComputeCommandEncoder> enc = [cmdBuf computeCommandEncoder];
@@ -527,6 +569,7 @@ kernel void zero3d_render_kernel(
     float monitorHz = [self detectNativeMonitorRefreshRate];
     _engineState->display_refresh_hz.store(monitorHz, std::memory_order_relaxed);
     if (_ecsWorld) {
+        zero_3d_ecs_step_sequencer(_ecsWorld, dtMs * 0.001f);
         zero_3d_ecs_step_transforms(_ecsWorld, dtMs * 0.001f);
         zero_3d_ecs_step_physics(_ecsWorld, dtMs * 0.001f);
         zero_3d_ecs_cull_and_update_state(_ecsWorld, _engineState, dtMs);
