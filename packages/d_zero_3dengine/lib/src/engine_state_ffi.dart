@@ -406,6 +406,15 @@ typedef Dart3DEcsSetInt = void Function(
   int,
 );
 
+typedef _NativeEcsBuildProcMeshlets = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Int32,
+);
+typedef Dart3DEcsBuildProcMeshlets = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  int,
+);
+
 typedef _NativeEcsSetTransform = ffi.Void Function(
   ffi.Pointer<Zero3DEcsWorldNative>,
   ffi.Int32,
@@ -445,6 +454,65 @@ typedef Dart3DEcsRaycastPick = int Function(
   double,
 );
 
+typedef _NativeEcsSetPbr = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+);
+typedef Dart3DEcsSetPbr = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  double,
+  double,
+  double,
+);
+
+typedef _NativeEcsGetFloat = ffi.Float Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+typedef Dart3DEcsGetFloat = double Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+
+typedef _NativeEcsStepFloat = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Float,
+);
+typedef Dart3DEcsStepFloat = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  double,
+);
+
+typedef _NativeEcsApplyImpulse = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Int32,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+);
+typedef Dart3DEcsApplyImpulse = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  int,
+  double,
+  double,
+  double,
+);
+
+typedef _NativeEcsBuildMeshlets = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<ffi.Float>,
+  ffi.Int32,
+  ffi.Pointer<ffi.Uint32>,
+  ffi.Int32,
+);
+typedef Dart3DEcsBuildMeshlets = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<ffi.Float>,
+  int,
+  ffi.Pointer<ffi.Uint32>,
+  int,
+);
+
 typedef _NativePackVisBuffer64 = ffi.Uint64 Function(
   ffi.Float,
   ffi.Uint32,
@@ -474,6 +542,9 @@ class Zero3DEngineNativeBindings {
 
   /// Updates 3D camera target position (`tx, ty, tz`) atomically via seqlock.
   late final Dart3DSetCameraTarget setCameraTarget;
+
+  /// Moves the 3D camera in local 6DOF coordinates (`forward, right, up`).
+  late final Dart3DSetCameraTarget moveCameraLocal;
 
   /// Updates directional light angles atomically via seqlock.
   late final Dart3DSetLightAngles setLightAngles;
@@ -523,6 +594,39 @@ class Zero3DEngineNativeBindings {
   /// Performs a 3D ray-sphere intersection pick test against all ECS entities.
   late final Dart3DEcsRaycastPick ecsRaycastPick;
 
+  /// Updates PBR material parameters (`metallic`, `roughness`, `emissive`).
+  late final Dart3DEcsSetPbr ecsSetPbrMaterial;
+
+  /// Reads PBR metallic parameter (`0.0 .. 1.0`).
+  late final Dart3DEcsGetFloat ecsGetPbrMetallic;
+
+  /// Reads PBR roughness parameter (`0.04 .. 1.0`).
+  late final Dart3DEcsGetFloat ecsGetPbrRoughness;
+
+  /// Reads PBR emissive intensity (`0.0 .. 5.0`).
+  late final Dart3DEcsGetFloat ecsGetPbrEmissive;
+
+  /// Enables or disables C++ rigid-body physics (`0` or `1`).
+  late final Dart3DEcsSetInt ecsSetPhysicsEnabled;
+
+  /// Returns `1` if C++ rigid-body physics is enabled, `0` otherwise.
+  late final Dart3DEcsGetInt ecsGetPhysicsEnabled;
+
+  /// Applies a 3D velocity impulse `(vx, vy, vz)` to an ECS entity.
+  late final Dart3DEcsApplyImpulse ecsApplyImpulse;
+
+  /// Steps the C++ rigid-body physics simulation by `dtSec`.
+  late final Dart3DEcsStepFloat ecsStepPhysics;
+
+  /// Partitions a triangle mesh into 128-triangle Nanite meshlet clusters in C++.
+  late final Dart3DEcsBuildMeshlets ecsBuildMeshletsFromTriangles;
+
+  /// Generates a high-poly 3D mesh and partitions it into 128-triangle Nanite meshlets.
+  late final Dart3DEcsBuildProcMeshlets ecsBuildProceduralMeshlets;
+
+  /// Returns the number of Nanite meshlet clusters built by the C++ meshlet builder.
+  late final Dart3DEcsGetInt ecsGetBuiltMeshletCount;
+
   /// Packs normalized depth, cluster ID, and triangle ID into a 64-bit Visibility Buffer pixel.
   late final Dart3DPackVisBuffer64 packVisBuffer64;
 
@@ -551,6 +655,11 @@ class Zero3DEngineNativeBindings {
     setCameraTarget =
         _dylib.lookupFunction<_NativeSetCameraTarget, Dart3DSetCameraTarget>(
       'zero_3d_set_camera_target',
+      isLeaf: true,
+    );
+    moveCameraLocal =
+        _dylib.lookupFunction<_NativeSetCameraTarget, Dart3DSetCameraTarget>(
+      'zero_3d_move_camera_local',
       isLeaf: true,
     );
     setLightAngles =
@@ -631,6 +740,61 @@ class Zero3DEngineNativeBindings {
     ecsRaycastPick =
         _dylib.lookupFunction<_NativeEcsRaycastPick, Dart3DEcsRaycastPick>(
       'zero_3d_ecs_raycast_pick',
+      isLeaf: true,
+    );
+    ecsSetPbrMaterial =
+        _dylib.lookupFunction<_NativeEcsSetPbr, Dart3DEcsSetPbr>(
+      'zero_3d_ecs_set_pbr_material',
+      isLeaf: true,
+    );
+    ecsGetPbrMetallic =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_pbr_metallic',
+      isLeaf: true,
+    );
+    ecsGetPbrRoughness =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_pbr_roughness',
+      isLeaf: true,
+    );
+    ecsGetPbrEmissive =
+        _dylib.lookupFunction<_NativeEcsGetFloat, Dart3DEcsGetFloat>(
+      'zero_3d_ecs_get_pbr_emissive',
+      isLeaf: true,
+    );
+    ecsSetPhysicsEnabled =
+        _dylib.lookupFunction<_NativeEcsSetInt, Dart3DEcsSetInt>(
+      'zero_3d_ecs_set_physics_enabled',
+      isLeaf: true,
+    );
+    ecsGetPhysicsEnabled =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_physics_enabled',
+      isLeaf: true,
+    );
+    ecsApplyImpulse =
+        _dylib.lookupFunction<_NativeEcsApplyImpulse, Dart3DEcsApplyImpulse>(
+      'zero_3d_ecs_apply_impulse',
+      isLeaf: true,
+    );
+    ecsStepPhysics =
+        _dylib.lookupFunction<_NativeEcsStepFloat, Dart3DEcsStepFloat>(
+      'zero_3d_ecs_step_physics',
+      isLeaf: true,
+    );
+    ecsBuildMeshletsFromTriangles = _dylib
+        .lookupFunction<_NativeEcsBuildMeshlets, Dart3DEcsBuildMeshlets>(
+      'zero_3d_ecs_build_meshlets_from_triangles',
+      isLeaf: true,
+    );
+    ecsBuildProceduralMeshlets = _dylib
+        .lookupFunction<_NativeEcsBuildProcMeshlets, Dart3DEcsBuildProcMeshlets>(
+      'zero_3d_ecs_build_procedural_meshlets',
+      isLeaf: true,
+    );
+    ecsGetBuiltMeshletCount =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_built_meshlet_count',
       isLeaf: true,
     );
     packVisBuffer64 =

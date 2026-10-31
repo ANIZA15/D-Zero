@@ -338,6 +338,22 @@ class Zero3DEngineController implements Listenable {
     );
   }
 
+  /// Moves the 3D camera in local 6DOF coordinates (`forward`, `right`, `up`).
+  void moveCameraLocal({
+    double forward = 0.0,
+    double right = 0.0,
+    double up = 0.0,
+  }) {
+    if (_isDisposed || !_view.isValid) return;
+    Zero3DEngineNativeBindings.instance.moveCameraLocal(
+      statePointer,
+      forward,
+      right,
+      up,
+    );
+    _revision.add(1);
+  }
+
   /// Sets directional light azimuth and elevation angles in radians.
   void setLightAngles(double azimuth, double elevation) {
     if (_isDisposed || !_view.isValid) return;
@@ -386,6 +402,10 @@ class Zero3DEngineController implements Listenable {
   void stepSimulation({double dtMs = 6.94, int totalDagClusters = 4096}) {
     if (_isDisposed || !_view.isValid) return;
     if (ecsWorldPointer.address != 0 && _spawnedEntityCount > 0) {
+      Zero3DEngineNativeBindings.instance.ecsStepPhysics(
+        ecsWorldPointer,
+        dtMs * 0.001,
+      );
       Zero3DEngineNativeBindings.instance.ecsCullAndUpdateState(
         ecsWorldPointer,
         statePointer,
@@ -399,6 +419,101 @@ class Zero3DEngineController implements Listenable {
       );
     }
     _revision.add(1);
+  }
+
+  /// PBR Metallic parameter (`0.0 .. 1.0`).
+  double get pbrMetallic {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.75;
+    return Zero3DEngineNativeBindings.instance.ecsGetPbrMetallic(
+      ecsWorldPointer,
+    );
+  }
+
+  /// PBR Roughness parameter (`0.04 .. 1.0`).
+  double get pbrRoughness {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.18;
+    return Zero3DEngineNativeBindings.instance.ecsGetPbrRoughness(
+      ecsWorldPointer,
+    );
+  }
+
+  /// PBR Emissive intensity (`0.0 .. 5.0`).
+  double get pbrEmissive {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.25;
+    return Zero3DEngineNativeBindings.instance.ecsGetPbrEmissive(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Updates Cook-Torrance GGX PBR material parameters (`metallic`, `roughness`, `emissive`).
+  void setPbrMaterial({
+    double? metallic,
+    double? roughness,
+    double? emissive,
+  }) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    Zero3DEngineNativeBindings.instance.ecsSetPbrMaterial(
+      ecsWorldPointer,
+      metallic ?? pbrMetallic,
+      roughness ?? pbrRoughness,
+      emissive ?? pbrEmissive,
+    );
+    _revision.add(1);
+  }
+
+  /// Whether C++ rigid-body gravity & collision physics is active.
+  bool get isPhysicsEnabled {
+    if (_isDisposed || ecsWorldPointer.address == 0) return false;
+    return Zero3DEngineNativeBindings.instance.ecsGetPhysicsEnabled(
+          ecsWorldPointer,
+        ) !=
+        0;
+  }
+
+  /// Enables or disables C++ rigid-body physics simulation.
+  void setPhysicsEnabled(bool enabled) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    Zero3DEngineNativeBindings.instance.ecsSetPhysicsEnabled(
+      ecsWorldPointer,
+      enabled ? 1 : 0,
+    );
+    _revision.add(1);
+  }
+
+  /// Applies a 3D velocity impulse `(vx, vy, vz)` to `[entityId]` (defaults to selected entity).
+  void applyEntityImpulse({
+    int? entityId,
+    double vx = 0.0,
+    double vy = 5.2,
+    double vz = 0.0,
+  }) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    final int id = entityId ?? (selectedEntityId >= 0 ? selectedEntityId : 0);
+    Zero3DEngineNativeBindings.instance.ecsApplyImpulse(
+      ecsWorldPointer,
+      id,
+      vx,
+      vy,
+      vz,
+    );
+    _revision.add(1);
+  }
+
+  /// Number of 128-triangle Nanite meshlet clusters built by the C++ Meshlet Builder.
+  int get builtMeshletCount {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    return Zero3DEngineNativeBindings.instance.ecsGetBuiltMeshletCount(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Builds 128-triangle Nanite meshlet clusters from a high-poly 3D mesh of `[triangleCount]` triangles in C++.
+  int buildProceduralMeshlets({int triangleCount = 4096}) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    final int count = Zero3DEngineNativeBindings.instance
+        .ecsBuildProceduralMeshlets(ecsWorldPointer, triangleCount);
+    _revision.add(1);
+    return count;
   }
 
   /// Number of 3D entities spawned in the C++ SoA ECS world.

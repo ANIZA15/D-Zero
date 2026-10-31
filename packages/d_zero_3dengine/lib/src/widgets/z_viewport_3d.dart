@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:d_zero_core/d_zero_core.dart';
 import '../controller.dart';
@@ -50,32 +51,61 @@ class ZViewport3D extends StatelessWidget implements ZWidget {
     this.overlay,
   });
 
+  static final Map<LogicalKeyboardKey, (double, double, double)> _wasdVectors =
+      <LogicalKeyboardKey, (double, double, double)>{
+    LogicalKeyboardKey.keyW: (0.18, 0.0, 0.0),
+    LogicalKeyboardKey.keyS: (-0.18, 0.0, 0.0),
+    LogicalKeyboardKey.keyD: (0.0, 0.18, 0.0),
+    LogicalKeyboardKey.keyA: (0.0, -0.18, 0.0),
+    LogicalKeyboardKey.keyE: (0.0, 0.0, 0.16),
+    LogicalKeyboardKey.keyQ: (0.0, 0.0, -0.16),
+  };
+
   @override
   bool get isZeroAllocation => true;
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space) {
+      controller.setPhysicsEnabled(true);
+      controller.applyEntityImpulse(vy: 5.5);
+      return KeyEventResult.handled;
+    }
+    final (double, double, double)? vec = _wasdVectors[event.logicalKey];
+    if (vec == null) return KeyEventResult.ignored;
+    controller.moveCameraLocal(forward: vec.$1, right: vec.$2, up: vec.$3);
+    return KeyEventResult.handled;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size.width,
-      height: size.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (controller.textureId != -1)
-            Texture(textureId: controller.textureId),
-          _ZDirect3DCanvas(
-            controller: controller,
-            size: size,
-            autoOrbit: autoOrbit,
-          ),
-          if (overlay != null) overlay!,
-          if (showTelemetryHud)
-            Positioned(
-              left: 12.0,
-              top: 12.0,
-              child: ZEngineTelemetryHud(controller: controller),
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (controller.textureId != -1)
+              Texture(textureId: controller.textureId),
+            _ZDirect3DCanvas(
+              controller: controller,
+              size: size,
+              autoOrbit: autoOrbit,
             ),
-        ],
+            if (overlay != null) overlay!,
+            if (showTelemetryHud)
+              Positioned(
+                left: 12.0,
+                top: 12.0,
+                child: ZEngineTelemetryHud(controller: controller),
+              ),
+          ],
+        ),
       ),
     );
   }

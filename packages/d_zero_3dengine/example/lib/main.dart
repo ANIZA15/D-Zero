@@ -104,6 +104,11 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
                           child: ZTransformGizmo3D(controller: _controller),
                         ),
                         Positioned(
+                          right: 294.0,
+                          bottom: 14.0,
+                          child: ZMaterialEditor3D(controller: _controller),
+                        ),
+                        Positioned(
                           right: 14.0,
                           bottom: 14.0,
                           child: ZSceneInspector3D(controller: _controller),
@@ -161,6 +166,20 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
             fpsMode: Zero3DFpsMode.uncapped,
           ),
           child: const Text('Uncapped FPS'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final next = !_controller.isPhysicsEnabled;
+            _controller.setPhysicsEnabled(next);
+            if (next) _controller.applyEntityImpulse(vy: 5.8);
+          },
+          child: const Text('Physics Bounce (Space)'),
+        ),
+        ElevatedButton(
+          onPressed: () => _controller.buildProceduralMeshlets(
+            triangleCount: 8192,
+          ),
+          child: const Text('Build 8K Nanite Meshlets'),
         ),
       ],
     );

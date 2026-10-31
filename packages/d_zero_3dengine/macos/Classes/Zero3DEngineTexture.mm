@@ -27,6 +27,7 @@ typedef struct {
     int32_t maxRayBounces;
     float heroPosScale[4];
     float cameraTarget[4];
+    float pbrParams[4];
 } Zero3DGpuUniforms;
 
 static NSString *const kZero3DMetalShaderSource = @R"(
@@ -47,6 +48,7 @@ struct Uniforms {
     int maxRayBounces;
     float4 heroPosScale;
     float4 cameraTarget;
+    float4 pbrParams; // x: metallic, y: roughness, z: emissive, w: physicsEnabled
 };
 
 float sdOctahedron(float3 p, float s) {
@@ -139,6 +141,45 @@ float3 materialColorForId(float matId, float3 pos, int renderMode, float lodStep
     return float3(0.12, 0.72, 0.98);
 }
 
+// Cook-Torrance Microfacet GGX BRDF (UE5-style PBR Shading)
+float3 evalCookTorranceGGX(
+    float3 N,
+    float3 V,
+    float3 L,
+    float3 albedo,
+    float metallic,
+    float roughness,
+    float shadow,
+    float ao,
+    float emissive
+) {
+    float3 H = normalize(V + L);
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.001);
+    float NdotH = max(dot(N, H), 0.0);
+    float VdotH = max(dot(V, H), 0.0);
+
+    float a = max(roughness * roughness, 0.002);
+    float a2 = a * a;
+    float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
+    float D = a2 / max(3.14159265 * denom * denom, 0.0001);
+
+    float k = ((roughness + 1.0) * (roughness + 1.0)) * 0.125;
+    float G_V = NdotV / (NdotV * (1.0 - k) + k);
+    float G_L = NdotL / (NdotL * (1.0 - k) + k);
+    float G = G_V * G_L;
+
+    float3 F0 = mix(float3(0.04), albedo, metallic);
+    float3 F = F0 + (1.0 - F0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
+
+    float3 spec = (D * G * F) / max(4.0 * NdotV * NdotL, 0.001);
+    float3 kD = (float3(1.0) - F) * (1.0 - metallic);
+    float3 diffuse = kD * albedo / 3.14159265;
+
+    float3 radiance = float3(2.8, 2.7, 2.5) * shadow;
+    return albedo * (0.18 * ao) + (diffuse + spec) * radiance * NdotL + albedo * emissive;
+}
+
 kernel void zero3d_render_kernel(
     texture2d<half, access::write> outTex [[texture(0)]],
     constant Uniforms& u [[buffer(0)]],
@@ -190,17 +231,20 @@ kernel void zero3d_render_kernel(
 
         float3 pos = ro + rd * t;
         float3 nor = calcNormal(pos, u.timeSec, u.heroPosScale);
-        float diff = max(dot(nor, lightDir), 0.0);
         float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec, u.heroPosScale) : 1.0;
         float ao = calcAmbientOcclusion(pos, nor, u.timeSec, u.heroPosScale);
 
         float3 baseCol = materialColorForId(matId, pos, u.renderMode, u.lodThreshold, t);
-        float3 halfV = normalize(lightDir - rd);
-        float spec = pow(max(dot(nor, halfV), 0.0), 48.0) * shadow;
-        float3 direct = baseCol * (0.22 * ao + 0.85 * diff * shadow) + float3(0.9, 0.95, 1.0) * spec * 0.65;
+        float metallic = (matId == 1.0) ? 0.25 : clamp(u.pbrParams.x, 0.0, 1.0);
+        float roughness = (matId == 1.0) ? 0.35 : clamp(u.pbrParams.y, 0.04, 1.0);
+        float emissive = (matId == 3.0) ? clamp(u.pbrParams.z, 0.0, 5.0) : 0.0;
+
+        float3 direct = evalCookTorranceGGX(
+            nor, -rd, lightDir, baseCol, metallic, roughness, shadow, ao, emissive
+        );
 
         accumCol += throughput * direct;
-        throughput *= 0.38;
+        throughput *= mix(0.18, 0.65, metallic) * (1.0 - roughness * 0.6);
         ro = pos + nor * 0.012;
         rd = reflect(rd, nor);
     }
@@ -455,6 +499,10 @@ kernel void zero3d_render_kernel(
     u.cameraTarget[1] = _engineState->target_y.load(std::memory_order_relaxed);
     u.cameraTarget[2] = _engineState->target_z.load(std::memory_order_relaxed);
     u.cameraTarget[3] = 0.0f;
+    u.pbrParams[0] = _ecsWorld ? zero_3d_ecs_get_pbr_metallic(_ecsWorld) : 0.75f;
+    u.pbrParams[1] = _ecsWorld ? zero_3d_ecs_get_pbr_roughness(_ecsWorld) : 0.18f;
+    u.pbrParams[2] = _ecsWorld ? zero_3d_ecs_get_pbr_emissive(_ecsWorld) : 0.25f;
+    u.pbrParams[3] = _ecsWorld ? (float)zero_3d_ecs_get_physics_enabled(_ecsWorld) : 0.0f;
 
     id<MTLCommandBuffer> cmdBuf = [_commandQueue commandBuffer];
     id<MTLComputeCommandEncoder> enc = [cmdBuf computeCommandEncoder];
@@ -480,6 +528,7 @@ kernel void zero3d_render_kernel(
     _engineState->display_refresh_hz.store(monitorHz, std::memory_order_relaxed);
     if (_ecsWorld) {
         zero_3d_ecs_step_transforms(_ecsWorld, dtMs * 0.001f);
+        zero_3d_ecs_step_physics(_ecsWorld, dtMs * 0.001f);
         zero_3d_ecs_cull_and_update_state(_ecsWorld, _engineState, dtMs);
     } else {
         zero_3d_simulate_frame_step(_engineState, 4096, dtMs);

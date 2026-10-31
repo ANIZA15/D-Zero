@@ -87,6 +87,23 @@ void main() {
       expect(controller.getEntityScale(0), closeTo(1.4, 0.01));
       final hitId = controller.raycastPick(0.0, 0.0);
       expect(hitId, greaterThanOrEqualTo(0));
+
+      controller.setPbrMaterial(metallic: 0.88, roughness: 0.12, emissive: 1.8);
+      expect(controller.pbrMetallic, closeTo(0.88, 0.01));
+      expect(controller.pbrRoughness, closeTo(0.12, 0.01));
+      expect(controller.pbrEmissive, closeTo(1.8, 0.01));
+
+      controller.setPhysicsEnabled(true);
+      expect(controller.isPhysicsEnabled, isTrue);
+      controller.applyEntityImpulse(entityId: 0, vy: 4.5);
+      controller.stepSimulation(dtMs: 16.0);
+
+      final meshlets = controller.buildProceduralMeshlets(triangleCount: 4096);
+      expect(meshlets, equals(32));
+      expect(controller.builtMeshletCount, equals(32));
+
+      controller.moveCameraLocal(forward: 0.5, right: -0.2, up: 0.1);
+      expect(controller.targetY, closeTo(0.1, 0.25));
     });
   });
 
@@ -303,6 +320,46 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
 
         expect(ctrl.getEntityScale(0), greaterThan(0.3));
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(ctrl.hasListeners, isFalse);
+
+        await ctrl.dispose();
+      },
+    );
+
+    testWidgets(
+      'ZMaterialEditor3D (ZPbrMaterialPanel) の PBR / 物理操作および WASD キー入力が機能すること',
+      (tester) async {
+        final ctrl = Zero3DEngineController.simulated();
+
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              children: [
+                ZViewport3D(
+                  controller: ctrl,
+                  size: const Size(320.0, 200.0),
+                ),
+                ZMaterialEditor3D(controller: ctrl),
+              ],
+            ),
+          ),
+        );
+
+        expect(find.byType(ZMaterialEditor3D), findsOneWidget);
+
+        final matTopLeft = tester.getTopLeft(find.byType(ZMaterialEditor3D));
+        await tester.tapAt(matTopLeft + const Offset(160.0, 20.0));
+        await tester.tapAt(matTopLeft + const Offset(140.0, 62.0));
+        await tester.tapAt(matTopLeft + const Offset(180.0, 104.0));
+        await tester.tapAt(matTopLeft + const Offset(120.0, 146.0));
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pump();
+
+        expect(ctrl.isPhysicsEnabled, isTrue);
 
         await tester.pumpWidget(const SizedBox.shrink());
         expect(ctrl.hasListeners, isFalse);

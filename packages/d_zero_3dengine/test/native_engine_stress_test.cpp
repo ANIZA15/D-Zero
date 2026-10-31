@@ -239,6 +239,26 @@ void test_ecs_world_and_visbuffer64() {
     TEST_ASSERT(picked >= 0, "中央レイキャストで原点エンティティがヒットすること");
     TEST_ASSERT(zero_3d_ecs_get_selected_entity(world) == picked, "ヒットしたエンティティが選択状態になること");
 
+    // 6. PBR マテリアル & C++ 剛体物理 & Nanite Meshlet Builder 検証
+    zero_3d_ecs_set_pbr_material(world, 0.92f, 0.08f, 2.5f);
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_pbr_metallic(world) - 0.92f) < 0.01f, "PBR Metallic が反映されること");
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_pbr_roughness(world) - 0.08f) < 0.01f, "PBR Roughness が反映されること");
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_pbr_emissive(world) - 2.5f) < 0.01f, "PBR Emissive が反映されること");
+
+    zero_3d_ecs_set_physics_enabled(world, 1);
+    TEST_ASSERT(zero_3d_ecs_get_physics_enabled(world) == 1, "剛体物理が有効化されること");
+    zero_3d_ecs_apply_impulse(world, 0, 1.0f, 5.0f, -1.0f);
+    zero_3d_ecs_step_physics(world, 0.016f);
+    TEST_ASSERT(std::isfinite(zero_3d_ecs_get_entity_y(world, 0)), "物理ステップ後の座標が有限であること");
+
+    int32_t built_clusters = zero_3d_ecs_build_procedural_meshlets(world, 4096);
+    TEST_ASSERT(built_clusters == 32, "4096 三角形が 32 個の 128-tri Nanite Meshlet に分割されること");
+    TEST_ASSERT(zero_3d_ecs_get_built_meshlet_count(world) == 32, "built_meshlet_count が 32 であること");
+    TEST_ASSERT(zero_3d_ecs_build_meshlets_from_triangles(world, nullptr, 0, nullptr, 0) == 0,
+                "nullptr メッシュ入力を安全に拒絶すること");
+
+    zero_3d_move_camera_local(state, 1.0f, -0.5f, 0.25f);
+
     zero_3d_ecs_destroy_world(world);
     zero_3d_ecs_destroy_world(nullptr);
     zero_3d_destroy_state(state);

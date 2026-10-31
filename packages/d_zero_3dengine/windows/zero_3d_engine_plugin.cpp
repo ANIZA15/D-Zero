@@ -104,6 +104,7 @@ private:
             const float hz = DetectWindowsMonitorRefreshHz();
             state_->display_refresh_hz.store(hz, std::memory_order_relaxed);
             zero_3d_ecs_step_transforms(ecs_world_, dt_ms * 0.001f);
+            zero_3d_ecs_step_physics(ecs_world_, dt_ms * 0.001f);
             zero_3d_ecs_cull_and_update_state(ecs_world_, state_, dt_ms);
 
             const int next_slot = (ready_slot_.load(std::memory_order_relaxed) + 1) % 3;

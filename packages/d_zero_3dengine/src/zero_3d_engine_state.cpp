@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <new>
+#include <vector>
 
 namespace {
 
@@ -198,6 +199,32 @@ void zero_3d_set_camera_target(
     cmd_seq_end(state);
 }
 
+void zero_3d_move_camera_local(
+    Zero3DEngineState* state,
+    float forward_delta,
+    float right_delta,
+    float up_delta
+) {
+    if (!is_valid_alive(state)) return;
+    const float fwd = sanitize_float(forward_delta, 0.0f, -500.0f, 500.0f);
+    const float rgt = sanitize_float(right_delta, 0.0f, -500.0f, 500.0f);
+    const float up  = sanitize_float(up_delta, 0.0f, -500.0f, 500.0f);
+
+    const float yaw = state->camera_yaw.load(std::memory_order_relaxed);
+    const float pitch = state->camera_pitch.load(std::memory_order_relaxed);
+    const float cy = std::cos(yaw), sy = std::sin(yaw);
+    const float cp = std::cos(pitch), sp = std::sin(pitch);
+
+    const float dx = (-sy * cp) * fwd + cy * rgt;
+    const float dy = (-sp) * fwd + up;
+    const float dz = (-cy * cp) * fwd + (-sy) * rgt;
+
+    const float nx = state->target_x.load(std::memory_order_relaxed) + dx;
+    const float ny = state->target_y.load(std::memory_order_relaxed) + dy;
+    const float nz = state->target_z.load(std::memory_order_relaxed) + dz;
+    zero_3d_set_camera_target(state, nx, ny, nz);
+}
+
 void zero_3d_set_light_angles(
     Zero3DEngineState* state,
     float azimuth,
@@ -381,15 +408,24 @@ Zero3DEcsWorld* zero_3d_ecs_create_world(void) {
 
     world->entity_count.store(0, std::memory_order_relaxed);
     world->selected_entity.store(0, std::memory_order_relaxed);
+    world->physics_enabled.store(0, std::memory_order_relaxed);
+    world->built_meshlet_count.store(0, std::memory_order_relaxed);
+    world->pbr_metallic.store(0.75f, std::memory_order_relaxed);
+    world->pbr_roughness.store(0.18f, std::memory_order_relaxed);
+    world->pbr_emissive.store(0.25f, std::memory_order_relaxed);
     for (int i = 0; i < ZERO_3D_ECS_MAX_ENTITIES; ++i) {
         world->pos_x[i] = 0.0f;
         world->pos_y[i] = 0.0f;
         world->pos_z[i] = 0.0f;
+        world->vel_x[i] = 0.0f;
+        world->vel_y[i] = 0.0f;
+        world->vel_z[i] = 0.0f;
         world->rot_yaw[i] = 0.0f;
         world->scale[i] = 1.0f;
         world->bound_radius[i] = 0.5f;
         world->cluster_count[i] = 16;
         world->visible_mask[i] = 1u;
+        world->meshlets[i] = {0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f};
     }
     world->magic_guard.store(ZERO_3D_ECS_MAGIC_ALIVE, std::memory_order_release);
     return world;
@@ -623,6 +659,182 @@ uint32_t zero_3d_unpack_visbuffer_cluster(uint64_t vis_pixel) {
 
 uint32_t zero_3d_unpack_visbuffer_triangle(uint64_t vis_pixel) {
     return static_cast<uint32_t>(vis_pixel & 0xFFu);
+}
+
+void zero_3d_ecs_set_pbr_material(
+    Zero3DEcsWorld* world,
+    float metallic,
+    float roughness,
+    float emissive
+) {
+    if (!is_ecs_valid_alive(world)) return;
+    world->pbr_metallic.store(sanitize_float(metallic, 0.75f, 0.0f, 1.0f), std::memory_order_relaxed);
+    world->pbr_roughness.store(sanitize_float(roughness, 0.18f, 0.04f, 1.0f), std::memory_order_relaxed);
+    world->pbr_emissive.store(sanitize_float(emissive, 0.25f, 0.0f, 5.0f), std::memory_order_relaxed);
+}
+
+float zero_3d_ecs_get_pbr_metallic(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->pbr_metallic.load(std::memory_order_relaxed) : 0.75f;
+}
+
+float zero_3d_ecs_get_pbr_roughness(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->pbr_roughness.load(std::memory_order_relaxed) : 0.18f;
+}
+
+float zero_3d_ecs_get_pbr_emissive(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->pbr_emissive.load(std::memory_order_relaxed) : 0.25f;
+}
+
+void zero_3d_ecs_set_physics_enabled(Zero3DEcsWorld* world, int32_t enabled) {
+    if (!is_ecs_valid_alive(world)) return;
+    world->physics_enabled.store(enabled != 0 ? 1 : 0, std::memory_order_release);
+}
+
+int32_t zero_3d_ecs_get_physics_enabled(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->physics_enabled.load(std::memory_order_acquire) : 0;
+}
+
+void zero_3d_ecs_apply_impulse(
+    Zero3DEcsWorld* world,
+    int32_t entity_id,
+    float vx,
+    float vy,
+    float vz
+) {
+    if (!is_entity_index_valid(world, entity_id)) return;
+    world->vel_x[entity_id] += sanitize_float(vx, 0.0f, -50.0f, 50.0f);
+    world->vel_y[entity_id] += sanitize_float(vy, 0.0f, -50.0f, 50.0f);
+    world->vel_z[entity_id] += sanitize_float(vz, 0.0f, -50.0f, 50.0f);
+}
+
+static inline void step_single_entity_physics(Zero3DEcsWorld* world, int32_t i, float dt) {
+    float vx = world->vel_x[i];
+    float vy = world->vel_y[i] - 9.81f * dt;
+    float vz = world->vel_z[i];
+
+    float px = world->pos_x[i] + vx * dt;
+    float py = world->pos_y[i] + vy * dt;
+    float pz = world->pos_z[i] + vz * dt;
+
+    const float floor_y = -0.55f + world->bound_radius[i] * world->scale[i] * 0.4f;
+    if (py < floor_y) {
+        py = floor_y;
+        vy = std::abs(vy) * 0.78f;
+        if (vy < 0.35f) vy = 3.8f; // 持続的なバウンス演出
+    }
+    if (std::abs(px) > 2.2f) vx = -vx * 0.85f;
+    if (std::abs(pz) > 2.2f) vz = -vz * 0.85f;
+
+    world->pos_x[i] = px;
+    world->pos_y[i] = py;
+    world->pos_z[i] = pz;
+    world->vel_x[i] = vx * 0.998f;
+    world->vel_y[i] = vy;
+    world->vel_z[i] = vz * 0.998f;
+}
+
+void zero_3d_ecs_step_physics(Zero3DEcsWorld* world, float dt_sec) {
+    if (!is_ecs_valid_alive(world)) return;
+    if (world->physics_enabled.load(std::memory_order_acquire) == 0) return;
+
+    const float safe_dt = sanitize_float(dt_sec, 0.00694f, 0.0002f, 0.05f);
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+    for (int32_t i = 0; i < count; ++i) {
+        step_single_entity_physics(world, i, safe_dt);
+    }
+}
+
+static inline void compute_meshlet_bounds(
+    const float* vertices_xyz,
+    int32_t vertex_count,
+    const uint32_t* indices,
+    int32_t start_idx,
+    int32_t end_idx,
+    Zero3DNaniteCluster* out_cluster
+) {
+    float cx = 0.0f, cy = 0.0f, cz = 0.0f;
+    int32_t valid_verts = 0;
+    for (int32_t k = start_idx; k < end_idx; ++k) {
+        const uint32_t v_id = indices[k];
+        if (v_id < static_cast<uint32_t>(vertex_count)) {
+            cx += vertices_xyz[v_id * 3];
+            cy += vertices_xyz[v_id * 3 + 1];
+            cz += vertices_xyz[v_id * 3 + 2];
+            ++valid_verts;
+        }
+    }
+    if (valid_verts > 0) {
+        const float inv = 1.0f / static_cast<float>(valid_verts);
+        cx *= inv; cy *= inv; cz *= inv;
+    }
+    float max_r_sq = 0.01f;
+    for (int32_t k = start_idx; k < end_idx; ++k) {
+        const uint32_t v_id = indices[k];
+        if (v_id < static_cast<uint32_t>(vertex_count)) {
+            const float dx = vertices_xyz[v_id * 3] - cx;
+            const float dy = vertices_xyz[v_id * 3 + 1] - cy;
+            const float dz = vertices_xyz[v_id * 3 + 2] - cz;
+            max_r_sq = std::max(max_r_sq, dx * dx + dy * dy + dz * dz);
+        }
+    }
+    const float r = std::sqrt(max_r_sq);
+    *out_cluster = {cx, cy, cz, r, 0.0f, 1.0f, 0.0f, r * 0.5f};
+}
+
+int32_t zero_3d_ecs_build_meshlets_from_triangles(
+    Zero3DEcsWorld* world,
+    const float* vertices_xyz,
+    int32_t vertex_count,
+    const uint32_t* indices,
+    int32_t index_count
+) {
+    if (!is_ecs_valid_alive(world) || !vertices_xyz || !indices) return 0;
+    if (vertex_count <= 0 || index_count < 3) return 0;
+
+    constexpr int32_t kIndicesPerMeshlet = 128 * 3; // 128 triangles per Nanite meshlet
+    int32_t cluster_idx = 0;
+
+    for (int32_t base = 0; base < index_count && cluster_idx < ZERO_3D_ECS_MAX_ENTITIES; base += kIndicesPerMeshlet) {
+        const int32_t end = std::min(base + kIndicesPerMeshlet, index_count);
+        compute_meshlet_bounds(
+            vertices_xyz, vertex_count, indices, base, end, &world->meshlets[cluster_idx]
+        );
+        ++cluster_idx;
+    }
+    world->built_meshlet_count.store(cluster_idx, std::memory_order_release);
+    return cluster_idx;
+}
+
+int32_t zero_3d_ecs_build_procedural_meshlets(
+    Zero3DEcsWorld* world,
+    int32_t triangle_count
+) {
+    if (!is_ecs_valid_alive(world)) return 0;
+    const int32_t safe_tris = clamp_i32(triangle_count, 128, 32768);
+    const int32_t vert_count = safe_tris + 2;
+
+    std::vector<float> verts(static_cast<size_t>(vert_count) * 3u);
+    std::vector<uint32_t> indices(static_cast<size_t>(safe_tris) * 3u);
+
+    for (int32_t v = 0; v < vert_count; ++v) {
+        const float theta = static_cast<float>(v) * 0.137f;
+        const float phi = static_cast<float>(v) * 0.073f;
+        verts[v * 3]     = std::cos(theta) * std::sin(phi);
+        verts[v * 3 + 1] = std::cos(phi);
+        verts[v * 3 + 2] = std::sin(theta) * std::sin(phi);
+    }
+    for (int32_t t = 0; t < safe_tris; ++t) {
+        indices[t * 3]     = static_cast<uint32_t>(t);
+        indices[t * 3 + 1] = static_cast<uint32_t>(t + 1);
+        indices[t * 3 + 2] = static_cast<uint32_t>(t + 2);
+    }
+    return zero_3d_ecs_build_meshlets_from_triangles(
+        world, verts.data(), vert_count, indices.data(), safe_tris * 3
+    );
+}
+
+int32_t zero_3d_ecs_get_built_meshlet_count(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->built_meshlet_count.load(std::memory_order_acquire) : 0;
 }
 
 } // extern "C"

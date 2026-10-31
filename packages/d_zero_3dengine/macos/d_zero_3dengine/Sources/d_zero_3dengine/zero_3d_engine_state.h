@@ -124,17 +124,26 @@ typedef struct Zero3DNaniteCluster Zero3DNaniteCluster;
 
 #ifdef __cplusplus
 struct alignas(64) Zero3DEcsWorld {
-    std::atomic<uint32_t> magic_guard;     // 生存確認カナリア ("ZECS")
-    std::atomic<int32_t> entity_count;     // アクティブエンティティ数 (0..1024)
-    std::atomic<int32_t> selected_entity;  // 選択中エンティティ ID (-1 = 未選択)
+    std::atomic<uint32_t> magic_guard;         // 生存確認カナリア ("ZECS")
+    std::atomic<int32_t> entity_count;         // アクティブエンティティ数 (0..1024)
+    std::atomic<int32_t> selected_entity;      // 選択中エンティティ ID (-1 = 未選択)
+    std::atomic<int32_t> physics_enabled;      // 剛体物理シミュレーション有効フラグ (0 or 1)
+    std::atomic<int32_t> built_meshlet_count;  // C++ Meshlet Builder で構築されたクラスタ数
+    std::atomic<float> pbr_metallic;           // PBR 金属度 (0.0 .. 1.0)
+    std::atomic<float> pbr_roughness;          // PBR 粗さ (0.04 .. 1.0)
+    std::atomic<float> pbr_emissive;           // PBR 自己発光強度 (0.0 .. 5.0)
     alignas(64) float pos_x[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_y[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_z[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float vel_x[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float vel_y[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float vel_z[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float rot_yaw[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float scale[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float bound_radius[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) int32_t cluster_count[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) uint8_t visible_mask[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(32) Zero3DNaniteCluster meshlets[ZERO_3D_ECS_MAX_ENTITIES];
 };
 #else
 typedef struct Zero3DEcsWorld Zero3DEcsWorld;
@@ -159,6 +168,12 @@ ZERO_3D_EXPORT void zero_3d_set_camera_target(
     float tx,
     float ty,
     float tz
+);
+ZERO_3D_EXPORT void zero_3d_move_camera_local(
+    Zero3DEngineState* state,
+    float forward_delta,
+    float right_delta,
+    float up_delta
 );
 ZERO_3D_EXPORT void zero_3d_set_light_angles(
     Zero3DEngineState* state,
@@ -254,6 +269,48 @@ ZERO_3D_EXPORT int32_t zero_3d_ecs_raycast_pick(
     float ndc_x,
     float ndc_y
 );
+
+// 6. PBR マテリアル (Cook-Torrance GGX) & C++ 剛体物理 & Nanite Meshlet 自動分割ビルダー
+ZERO_3D_EXPORT void zero_3d_ecs_set_pbr_material(
+    Zero3DEcsWorld* world,
+    float metallic,
+    float roughness,
+    float emissive
+);
+ZERO_3D_EXPORT float zero_3d_ecs_get_pbr_metallic(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT float zero_3d_ecs_get_pbr_roughness(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT float zero_3d_ecs_get_pbr_emissive(const Zero3DEcsWorld* world);
+
+ZERO_3D_EXPORT void zero_3d_ecs_set_physics_enabled(
+    Zero3DEcsWorld* world,
+    int32_t enabled
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_physics_enabled(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT void zero_3d_ecs_apply_impulse(
+    Zero3DEcsWorld* world,
+    int32_t entity_id,
+    float vx,
+    float vy,
+    float vz
+);
+ZERO_3D_EXPORT void zero_3d_ecs_step_physics(
+    Zero3DEcsWorld* world,
+    float dt_sec
+);
+
+// 任意の 3D 頂点・インデックス配列を 128 三角形単位の Nanite Meshlet クラスタへ自動分割
+ZERO_3D_EXPORT int32_t zero_3d_ecs_build_meshlets_from_triangles(
+    Zero3DEcsWorld* world,
+    const float* vertices_xyz,
+    int32_t vertex_count,
+    const uint32_t* indices,
+    int32_t index_count
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_build_procedural_meshlets(
+    Zero3DEcsWorld* world,
+    int32_t triangle_count
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_built_meshlet_count(const Zero3DEcsWorld* world);
 
 // 64-bit Visibility Buffer パック/アンパック ((uint64_t)DepthBits << 32 | (ClusterID << 8) | TriID)
 ZERO_3D_EXPORT uint64_t zero_3d_pack_visbuffer64(
