@@ -98,7 +98,8 @@ D-Zero/
     ├── d_zero_particles/       # SIMD SoA パーティクル & 紙吹雪シミュレーション (+ example ベンチマーク App)
     ├── d_zero_fx/              # saveLayerフリー視覚効果・GLSL 460 シェーダー・3Dメタボール・3D傾き (+ example)
     ├── d_zero_canvas/          # 大量要素キャンバス・3Dメッシュ球体・弾幕・リボン (+ example ベンチマーク App)
-    └── d_zero_sensor/          # 3D LiDAR点群・カメラ枠オーバーレイ・コンパス・水準器 (+ example ベンチマーク App)
+    ├── d_zero_sensor/          # 3D LiDAR点群・カメラ枠オーバーレイ・コンパス・水準器 (+ example ベンチマーク App)
+    └── d_zero_3dengine/        # 3Dゲームエンジン・Naniteクラスタカリング・Ray Tracing・144Hz/240Hz/Uncapped (+ example)
 ```
 
 ### 🔗 各パッケージと公開 `Z` Widget 一覧（3D / GLSL 460 シェーダー対応）
@@ -115,6 +116,7 @@ D-Zero/
 | **`d_zero_fx`** | `0.1.3` | **【3D・GLSL 460 シェーダー・視覚効果】** `ZShaderSurface` (`ZRuntimeShader`), `ZMetaballs3D` (`ZRaymarchSurface`), `ZMeshGradient` (`ZFluidGradient`), `Z3DTilt` (`ZParallaxContainer`), `ZSwipeDeck` (`ZTinderCards`), `ZScratchCard` (`ZScratchOff`), `ZBeforeAfterSlider` (`ZImageComparison`), `ZShimmer` (`ZSkeleton`), `ZBlur` (`ZGlassContainer`), `ZRipple` (`ZInkWell`), `ZLiquidProgress` (`ZWaveFilter`) | [📦 README](packages/d_zero_fx/README.md) | [📱 Benchmark](packages/d_zero_fx/example) |
 | **`d_zero_canvas`** | `0.1.3` | **【3Dメッシュ球体・大量要素キャンバス】** `Z3DMesh` (`Z3DGlobe`), `ZRibbon` (`ZLowLatencyInk`), `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas` | [📦 README](packages/d_zero_canvas/README.md) | [📱 Benchmark](packages/d_zero_canvas/example) |
 | **`d_zero_sensor`** | `0.1.3` | **【3D点群 LiDAR・センサー直結 UI】** `Z3DPointCloud` (`ZLidarView`), `ZBarcodeScanner` (`ZCameraPreview`), `ZQRGenerator` (`ZMatrixCode`), `ZCompass`, `ZLeveler` | [📦 README](packages/d_zero_sensor/README.md) | [📱 Benchmark](packages/d_zero_sensor/example) |
+| **`d_zero_3dengine`** | `0.1.4` | **【3Dゲームエンジン・Nanite・Ray Tracing】** `ZViewport3D` (`ZScene3D`), `ZEngineTelemetryHud` (`Z3DStatsOverlay`), `Zero3DEngineController`, `zero_3d_raytrace.frag` | [📦 README](packages/d_zero_3dengine/README.md) | [📱 Benchmark](packages/d_zero_3dengine/example) |
 
 ---
 

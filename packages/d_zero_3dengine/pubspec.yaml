@@ -1,0 +1,38 @@
+name: d_zero_3dengine
+description: "Zero-allocation 3D Game Engine viewport with Nanite-style meshlet cluster culling, Ray Tracing, and 144Hz/240Hz/Uncapped FFI shared memory for Flutter Impeller."
+version: 0.1.4
+homepage: https://github.com/ANIZA15/D-Zero
+repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_3dengine
+issue_tracker: https://github.com/ANIZA15/D-Zero/issues
+topics:
+  - 3d
+  - game-engine
+  - raytracing
+  - impeller
+  - ffi
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.2
+  d_zero_core: ^0.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  plugin:
+    platforms:
+      macos:
+        pluginClass: Zero3DEnginePlugin
+
+  shaders:
+    - shaders/zero_3d_raytrace.frag

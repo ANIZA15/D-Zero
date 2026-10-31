@@ -1,0 +1,372 @@
+#include "zero_3d_engine_state.h"
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <new>
+
+namespace {
+
+constexpr int kMaxSeqlockRetries = 64;
+constexpr float kPi = 3.14159265358979323846f;
+constexpr float kMaxPitchRad = 1.50f; // ~86 degrees (Gimbal lock prevention)
+
+inline bool is_valid_alive(const Zero3DEngineState* state) {
+    if (!state) return false;
+    // アドレスが 64-byte 境界に揃っているか検証
+    if ((reinterpret_cast<uintptr_t>(state) & 63u) != 0u) return false;
+    return state->magic_guard.load(std::memory_order_acquire) == ZERO_3D_MAGIC_ALIVE;
+}
+
+inline float sanitize_float(float val, float fallback, float min_v, float max_v) {
+    if (!std::isfinite(val)) return fallback;
+    if (val < min_v) return min_v;
+    if (val > max_v) return max_v;
+    return val;
+}
+
+inline float wrap_angle(float rad) {
+    if (!std::isfinite(rad)) return 0.0f;
+    float wrapped = std::fmod(rad, 2.0f * kPi);
+    if (wrapped < -kPi) wrapped += 2.0f * kPi;
+    if (wrapped > kPi) wrapped -= 2.0f * kPi;
+    return wrapped;
+}
+
+inline int32_t clamp_i32(int32_t val, int32_t min_v, int32_t max_v) {
+    if (val < min_v) return min_v;
+    if (val > max_v) return max_v;
+    return val;
+}
+
+inline void cmd_seq_begin(Zero3DEngineState* state) {
+    state->cmd_seq.fetch_add(1u, std::memory_order_acq_rel);
+    std::atomic_thread_fence(std::memory_order_release);
+}
+
+inline void cmd_seq_end(Zero3DEngineState* state) {
+    state->cmd_seq.fetch_add(1u, std::memory_order_release);
+}
+
+inline void telemetry_seq_begin(Zero3DEngineState* state) {
+    state->telemetry_seq.fetch_add(1u, std::memory_order_acq_rel);
+    std::atomic_thread_fence(std::memory_order_release);
+}
+
+inline void telemetry_seq_end(Zero3DEngineState* state) {
+    state->telemetry_seq.fetch_add(1u, std::memory_order_release);
+}
+
+struct TelemetrySnapshot {
+    float render_fps;
+    float frame_time_ms;
+    float display_hz;
+    int32_t active_clusters;
+    int32_t visible_triangles;
+    int32_t culled_clusters;
+    int32_t rays_traced_k;
+};
+
+inline TelemetrySnapshot read_telemetry_snapshot(const Zero3DEngineState* state) {
+    TelemetrySnapshot snap{0.0f, 0.0f, 60.0f, 0, 0, 0, 0};
+    for (int i = 0; i < kMaxSeqlockRetries; ++i) {
+        const uint32_t s1 = state->telemetry_seq.load(std::memory_order_acquire);
+        snap.render_fps = state->render_fps.load(std::memory_order_relaxed);
+        snap.frame_time_ms = state->frame_time_ms.load(std::memory_order_relaxed);
+        snap.display_hz = state->display_refresh_hz.load(std::memory_order_relaxed);
+        snap.active_clusters = state->active_clusters.load(std::memory_order_relaxed);
+        snap.visible_triangles = state->visible_triangles.load(std::memory_order_relaxed);
+        snap.culled_clusters = state->culled_clusters.load(std::memory_order_relaxed);
+        snap.rays_traced_k = state->rays_traced_k.load(std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_acquire);
+        const uint32_t s2 = state->telemetry_seq.load(std::memory_order_relaxed);
+        if ((s1 & 1u) == 0u && s1 == s2) break;
+    }
+    return snap;
+}
+
+} // namespace
+
+extern "C" {
+
+Zero3DEngineState* zero_3d_create_state(void) {
+    auto* state = new (std::nothrow) Zero3DEngineState();
+    if (!state) return nullptr;
+
+    // Cache Line 0: Camera & Pipeline Defaults
+    state->camera_yaw.store(0.45f, std::memory_order_relaxed);
+    state->camera_pitch.store(0.32f, std::memory_order_relaxed);
+    state->camera_distance.store(3.8f, std::memory_order_relaxed);
+    state->camera_fov_deg.store(60.0f, std::memory_order_relaxed);
+    state->target_x.store(0.0f, std::memory_order_relaxed);
+    state->target_y.store(0.0f, std::memory_order_relaxed);
+    state->target_z.store(0.0f, std::memory_order_relaxed);
+    state->light_azimuth.store(0.78f, std::memory_order_relaxed);
+    state->light_elevation.store(0.85f, std::memory_order_relaxed);
+    state->lod_error_threshold.store(1.0f, std::memory_order_relaxed);
+    state->render_mode.store(ZERO_3D_MODE_HYBRID_NANITE_RT, std::memory_order_relaxed);
+    state->fps_mode.store(ZERO_3D_FPS_VSYNC_NATIVE, std::memory_order_relaxed);
+    state->target_fps_limit.store(0, std::memory_order_relaxed);
+    state->max_ray_bounces.store(2, std::memory_order_relaxed);
+    state->cmd_seq.store(0u, std::memory_order_relaxed);
+    state->magic_guard.store(ZERO_3D_MAGIC_ALIVE, std::memory_order_relaxed);
+
+    // Cache Line 1: Telemetry Defaults
+    state->frame_count.store(0u, std::memory_order_relaxed);
+    state->last_frame_time_us.store(zero_3d_now_us(), std::memory_order_relaxed);
+    state->render_fps.store(120.0f, std::memory_order_relaxed);
+    state->frame_time_ms.store(8.33f, std::memory_order_relaxed);
+    state->display_refresh_hz.store(120.0f, std::memory_order_relaxed);
+    state->status.store(ZERO_3D_STATUS_IDLE, std::memory_order_relaxed);
+    state->viewport_width.store(1280, std::memory_order_relaxed);
+    state->viewport_height.store(720, std::memory_order_relaxed);
+    state->active_clusters.store(0, std::memory_order_relaxed);
+    state->visible_triangles.store(0, std::memory_order_relaxed);
+    state->culled_clusters.store(0, std::memory_order_relaxed);
+    state->rays_traced_k.store(0, std::memory_order_relaxed);
+    state->telemetry_seq.store(0u, std::memory_order_relaxed);
+    state->reserved_pad = 0u;
+
+    std::atomic_thread_fence(std::memory_order_release);
+    return state;
+}
+
+void zero_3d_destroy_state(Zero3DEngineState* state) {
+    if (!state) return;
+    if ((reinterpret_cast<uintptr_t>(state) & 63u) != 0u) return;
+
+    // すでに破棄済みの場合は Double-Free を防止する
+    uint32_t expected = ZERO_3D_MAGIC_ALIVE;
+    if (!state->magic_guard.compare_exchange_strong(
+            expected, ZERO_3D_MAGIC_FREED, std::memory_order_acq_rel)) {
+        return;
+    }
+    delete state;
+}
+
+bool zero_3d_is_state_valid(const Zero3DEngineState* state) {
+    return is_valid_alive(state);
+}
+
+int64_t zero_3d_now_us(void) {
+    using namespace std::chrono;
+    return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+void zero_3d_set_camera_orbit(
+    Zero3DEngineState* state,
+    float yaw,
+    float pitch,
+    float distance,
+    float fov_deg
+) {
+    if (!is_valid_alive(state)) return;
+    const float safe_yaw = wrap_angle(yaw);
+    const float safe_pitch = sanitize_float(pitch, 0.32f, -kMaxPitchRad, kMaxPitchRad);
+    const float safe_dist = sanitize_float(distance, 3.8f, 0.5f, 500.0f);
+    const float safe_fov = sanitize_float(fov_deg, 60.0f, 20.0f, 120.0f);
+
+    cmd_seq_begin(state);
+    state->camera_yaw.store(safe_yaw, std::memory_order_relaxed);
+    state->camera_pitch.store(safe_pitch, std::memory_order_relaxed);
+    state->camera_distance.store(safe_dist, std::memory_order_relaxed);
+    state->camera_fov_deg.store(safe_fov, std::memory_order_relaxed);
+    cmd_seq_end(state);
+}
+
+void zero_3d_set_camera_target(
+    Zero3DEngineState* state,
+    float tx,
+    float ty,
+    float tz
+) {
+    if (!is_valid_alive(state)) return;
+    const float sx = sanitize_float(tx, 0.0f, -10000.0f, 10000.0f);
+    const float sy = sanitize_float(ty, 0.0f, -10000.0f, 10000.0f);
+    const float sz = sanitize_float(tz, 0.0f, -10000.0f, 10000.0f);
+
+    cmd_seq_begin(state);
+    state->target_x.store(sx, std::memory_order_relaxed);
+    state->target_y.store(sy, std::memory_order_relaxed);
+    state->target_z.store(sz, std::memory_order_relaxed);
+    cmd_seq_end(state);
+}
+
+void zero_3d_set_light_angles(
+    Zero3DEngineState* state,
+    float azimuth,
+    float elevation
+) {
+    if (!is_valid_alive(state)) return;
+    const float sa = wrap_angle(azimuth);
+    const float se = sanitize_float(elevation, 0.85f, 0.05f, 1.55f);
+
+    cmd_seq_begin(state);
+    state->light_azimuth.store(sa, std::memory_order_relaxed);
+    state->light_elevation.store(se, std::memory_order_relaxed);
+    cmd_seq_end(state);
+}
+
+void zero_3d_set_pipeline_config(
+    Zero3DEngineState* state,
+    int32_t render_mode,
+    int32_t fps_mode,
+    int32_t target_fps_limit,
+    float lod_error_threshold,
+    int32_t max_ray_bounces
+) {
+    if (!is_valid_alive(state)) return;
+    const int32_t safe_mode = clamp_i32(render_mode, 0, 3);
+    const int32_t safe_fps_mode = clamp_i32(fps_mode, 0, 4);
+    const int32_t safe_fps_limit = clamp_i32(target_fps_limit, 0, 2000);
+    const float safe_lod = sanitize_float(lod_error_threshold, 1.0f, 0.25f, 8.0f);
+    const int32_t safe_bounces = clamp_i32(max_ray_bounces, 1, 8);
+
+    cmd_seq_begin(state);
+    state->render_mode.store(safe_mode, std::memory_order_relaxed);
+    state->fps_mode.store(safe_fps_mode, std::memory_order_relaxed);
+    state->target_fps_limit.store(safe_fps_limit, std::memory_order_relaxed);
+    state->lod_error_threshold.store(safe_lod, std::memory_order_relaxed);
+    state->max_ray_bounces.store(safe_bounces, std::memory_order_relaxed);
+    cmd_seq_end(state);
+}
+
+void zero_3d_set_status(Zero3DEngineState* state, int32_t status) {
+    if (!is_valid_alive(state)) return;
+    state->status.store(clamp_i32(status, 0, 3), std::memory_order_release);
+}
+
+void zero_3d_record_frame_telemetry(
+    Zero3DEngineState* state,
+    float render_fps,
+    float frame_time_ms,
+    float display_refresh_hz,
+    int32_t width,
+    int32_t height,
+    int32_t active_clusters,
+    int32_t visible_triangles,
+    int32_t culled_clusters,
+    int32_t rays_traced_k
+) {
+    if (!is_valid_alive(state)) return;
+    const float safe_fps = sanitize_float(render_fps, 0.0f, 0.0f, 10000.0f);
+    const float safe_ms = sanitize_float(frame_time_ms, 0.0f, 0.0f, 10000.0f);
+    const float safe_hz = sanitize_float(display_refresh_hz, 60.0f, 24.0f, 1000.0f);
+    const int32_t safe_w = clamp_i32(width, 0, 16384);
+    const int32_t safe_h = clamp_i32(height, 0, 16384);
+    const int32_t safe_active = clamp_i32(active_clusters, 0, 100000000);
+    const int32_t safe_tris = clamp_i32(visible_triangles, 0, 500000000);
+    const int32_t safe_culled = clamp_i32(culled_clusters, 0, 100000000);
+    const int32_t safe_rays = clamp_i32(rays_traced_k, 0, 100000000);
+
+    telemetry_seq_begin(state);
+    state->frame_count.fetch_add(1u, std::memory_order_relaxed);
+    state->last_frame_time_us.store(zero_3d_now_us(), std::memory_order_relaxed);
+    state->render_fps.store(safe_fps, std::memory_order_relaxed);
+    state->frame_time_ms.store(safe_ms, std::memory_order_relaxed);
+    state->display_refresh_hz.store(safe_hz, std::memory_order_relaxed);
+    state->viewport_width.store(safe_w, std::memory_order_relaxed);
+    state->viewport_height.store(safe_h, std::memory_order_relaxed);
+    state->active_clusters.store(safe_active, std::memory_order_relaxed);
+    state->visible_triangles.store(safe_tris, std::memory_order_relaxed);
+    state->culled_clusters.store(safe_culled, std::memory_order_relaxed);
+    state->rays_traced_k.store(safe_rays, std::memory_order_relaxed);
+    telemetry_seq_end(state);
+}
+
+void zero_3d_simulate_frame_step(
+    Zero3DEngineState* state,
+    int32_t total_dag_clusters,
+    float dt_ms
+) {
+    if (!is_valid_alive(state)) return;
+    const int32_t safe_total = clamp_i32(total_dag_clusters, 64, 1000000);
+    const float safe_dt = sanitize_float(dt_ms, 6.94f, 0.1f, 500.0f);
+
+    const float dist = state->camera_distance.load(std::memory_order_relaxed);
+    const float lod_err = state->lod_error_threshold.load(std::memory_order_relaxed);
+    const int32_t mode = state->render_mode.load(std::memory_order_relaxed);
+    const int32_t fps_mode = state->fps_mode.load(std::memory_order_relaxed);
+    const int32_t bounces = state->max_ray_bounces.load(std::memory_order_relaxed);
+    const int32_t w = state->viewport_width.load(std::memory_order_relaxed);
+    const int32_t h = state->viewport_height.load(std::memory_order_relaxed);
+
+    // カメラ距離と画面許容誤差に応じた Nanite DAG カット選択比率
+    const float dist_factor = 3.2f / (dist > 0.5f ? dist : 0.5f);
+    const float lod_factor = 1.0f / (lod_err > 0.25f ? lod_err : 0.25f);
+    const float select_ratio = sanitize_float(0.32f * dist_factor * lod_factor, 0.25f, 0.04f, 0.85f);
+
+    const int32_t active = static_cast<int32_t>(safe_total * select_ratio);
+    const int32_t culled = safe_total - active;
+    const int32_t tris = active * 128; // 1 Nanite Meshlet = 128 triangles
+
+    // FPS モードに応じたリフレッシュレート / FPS 算出
+    float hz = state->display_refresh_hz.load(std::memory_order_relaxed);
+    if (fps_mode == ZERO_3D_FPS_CAP_120) hz = 120.0f;
+    if (fps_mode == ZERO_3D_FPS_CAP_144) hz = 144.0f;
+    if (fps_mode == ZERO_3D_FPS_CAP_240) hz = 240.0f;
+    const float computed_fps = (fps_mode == ZERO_3D_FPS_UNCAPPED)
+        ? (1000.0f / safe_dt)
+        : std::min(1000.0f / safe_dt, fps_mode == ZERO_3D_FPS_VSYNC_NATIVE ? hz : hz);
+
+    // レイトレーシング発射レイ数 (解像度 × バウンス数)
+    const int32_t pixels_k = ((w > 0 ? w : 1280) * (h > 0 ? h : 720)) / 1000;
+    const int32_t rays_k = (mode == ZERO_3D_MODE_RAYTRACING_GI || mode == ZERO_3D_MODE_HYBRID_NANITE_RT)
+        ? pixels_k * (mode == ZERO_3D_MODE_RAYTRACING_GI ? (bounces + 1) : bounces)
+        : 0;
+
+    zero_3d_record_frame_telemetry(
+        state,
+        computed_fps,
+        safe_dt,
+        hz,
+        w > 0 ? w : 1280,
+        h > 0 ? h : 720,
+        active,
+        tris,
+        culled,
+        rays_k
+    );
+}
+
+float zero_3d_get_render_fps(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).render_fps : 0.0f;
+}
+
+float zero_3d_get_frame_time_ms(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).frame_time_ms : 0.0f;
+}
+
+float zero_3d_get_display_hz(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).display_hz : 0.0f;
+}
+
+int32_t zero_3d_get_active_clusters(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).active_clusters : 0;
+}
+
+int32_t zero_3d_get_visible_triangles(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).visible_triangles : 0;
+}
+
+int32_t zero_3d_get_culled_clusters(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).culled_clusters : 0;
+}
+
+int32_t zero_3d_get_rays_traced_k(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? read_telemetry_snapshot(state).rays_traced_k : 0;
+}
+
+uint64_t zero_3d_get_frame_count(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? state->frame_count.load(std::memory_order_acquire) : 0u;
+}
+
+uint32_t zero_3d_get_cmd_seq(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? state->cmd_seq.load(std::memory_order_acquire) : 0u;
+}
+
+uint32_t zero_3d_get_telemetry_seq(const Zero3DEngineState* state) {
+    return is_valid_alive(state) ? state->telemetry_seq.load(std::memory_order_acquire) : 0u;
+}
+
+} // extern "C"
