@@ -30,15 +30,33 @@ class EngineEditorScreen extends StatefulWidget {
 }
 
 class _EngineEditorScreenState extends State<EngineEditorScreen> {
-  late final Zero3DEngineController _controller;
+  Zero3DEngineController _controller = Zero3DEngineController.simulated(
+    renderMode: Zero3DRenderMode.hybridNaniteRt,
+    fpsMode: Zero3DFpsMode.cap144,
+  );
 
   @override
   void initState() {
     super.initState();
-    _controller = Zero3DEngineController.simulated(
+    _initNativeMetalEngine();
+  }
+
+  Future<void> _initNativeMetalEngine() async {
+    final nativeCtrl = await Zero3DEngineController.create(
+      width: 1280,
+      height: 720,
       renderMode: Zero3DRenderMode.hybridNaniteRt,
       fpsMode: Zero3DFpsMode.cap144,
     );
+    if (!mounted) {
+      await nativeCtrl.dispose();
+      return;
+    }
+    final prev = _controller;
+    setState(() {
+      _controller = nativeCtrl;
+    });
+    await prev.dispose();
   }
 
   @override

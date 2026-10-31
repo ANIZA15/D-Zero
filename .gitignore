@@ -212,3 +212,6 @@ dist/
 !packages/d_zero_player/example/.gitignore
 !packages/d_zero_player/example/android/**
 !packages/d_zero_player/example/ios/**
+!packages/d_zero_3dengine/example/.gitignore
+!packages/d_zero_3dengine/example/macos/**
+!packages/d_zero_3dengine/example/windows/**
