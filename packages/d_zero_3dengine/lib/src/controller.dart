@@ -307,6 +307,18 @@ class Zero3DEngineController implements Listenable {
     );
   }
 
+  /// Advances camera yaw in 128-byte FFI shared memory without notifying static UI panels.
+  void stepAutoOrbit(double dYaw) {
+    if (_isDisposed || !_view.isValid || dYaw.isNaN) return;
+    Zero3DEngineNativeBindings.instance.setCameraOrbit(
+      statePointer,
+      _view.cameraYaw + dYaw,
+      _view.cameraPitch,
+      _view.cameraDistance,
+      _view.cameraFovDeg,
+    );
+  }
+
   /// Zooms the camera distance by `[deltaDistance]` meters.
   void zoomBy(double deltaDistance) {
     if (_isDisposed || !_view.isValid || deltaDistance.isNaN) return;

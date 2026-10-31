@@ -284,10 +284,12 @@ class RenderZViewport3D extends ZeroRenderBox {
     if (dtUs <= 0) return false;
     final double dtMs = (dtUs / 1000.0).clamp(0.2, 100.0);
     _elapsedSec = (_elapsedSec + dtMs * 0.001) % (math.pi * 200.0);
-    _controller.orbitBy(dtMs * 0.00045, 0.0);
-    if (_controller.textureId == -1) {
-      _controller.stepSimulation(dtMs: dtMs);
+    if (_controller.textureId != -1) {
+      _controller.stepAutoOrbit(dtMs * 0.00045);
+      return false;
     }
+    _controller.orbitBy(dtMs * 0.00045, 0.0);
+    _controller.stepSimulation(dtMs: dtMs);
     return true;
   }
 

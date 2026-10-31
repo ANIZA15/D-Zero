@@ -11,7 +11,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 
-static const int kTripleBufferCount = 3;
+static const int kTripleBufferCount = 4;
 
 typedef struct {
     float resolution[2];
@@ -155,16 +155,17 @@ float3 evalCookTorranceGGX(
     float ao,
     float emissive
 ) {
-    float3 H = normalize(V + L);
+    float3 sumVL = V + L;
+    float3 H = (dot(sumVL, sumVL) > 1e-6) ? normalize(sumVL) : N;
     float NdotL = max(dot(N, L), 0.0);
-    float NdotV = max(dot(N, V), 0.001);
+    float NdotV = max(dot(N, V), 0.005);
     float NdotH = max(dot(N, H), 0.0);
     float VdotH = max(dot(V, H), 0.0);
 
-    float a = max(roughness * roughness, 0.002);
+    float a = max(roughness * roughness, 0.004);
     float a2 = a * a;
     float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
-    float D = a2 / max(3.14159265 * denom * denom, 0.0001);
+    float D = a2 / max(3.14159265 * denom * denom, 0.001);
 
     float k = ((roughness + 1.0) * (roughness + 1.0)) * 0.125;
     float G_V = NdotV / (NdotV * (1.0 - k) + k);
@@ -174,12 +175,13 @@ float3 evalCookTorranceGGX(
     float3 F0 = mix(float3(0.04), albedo, metallic);
     float3 F = F0 + (1.0 - F0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
 
-    float3 spec = (D * G * F) / max(4.0 * NdotV * NdotL, 0.001);
+    float3 spec = min((D * G * F) / max(4.0 * NdotV * NdotL, 0.005), float3(4.0));
     float3 kD = (float3(1.0) - F) * (1.0 - metallic);
     float3 diffuse = kD * albedo / 3.14159265;
 
     float3 radiance = float3(2.8, 2.7, 2.5) * shadow;
-    return albedo * (0.18 * ao) + (diffuse + spec) * radiance * NdotL + albedo * emissive;
+    float3 direct = albedo * (0.18 * ao) + (diffuse + spec) * radiance * NdotL + albedo * emissive;
+    return clamp(direct, float3(0.0), float3(6.0));
 }
 
 // Volumetric Distance Fog & Mie Sun Scattering (God-Ray Halo)
@@ -243,9 +245,10 @@ kernel void zero3d_render_kernel(
     int bounces = (u.renderMode == 1) ? clamp(u.maxRayBounces, 1, 4) : 1;
 
     for (int bounce = 0; bounce < bounces; ++bounce) {
-        float t = 0.0;
+        float t = (bounce == 0) ? 0.0 : 0.025;
         float matId = -1.0;
-        for (int i = 0; i < 64; ++i) {
+        int maxSteps = (bounce == 0) ? 64 : 32;
+        for (int i = 0; i < maxSteps; ++i) {
             float2 h = mapScene(ro + rd * t, animTime, u.heroPosScale);
             if (h.x < 0.002) {
                 matId = h.y;
@@ -264,8 +267,8 @@ kernel void zero3d_render_kernel(
 
         float3 pos = ro + rd * t;
         float3 nor = calcNormal(pos, animTime, u.heroPosScale);
-        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, animTime, u.heroPosScale) : 1.0;
-        float ao = calcAmbientOcclusion(pos, nor, animTime, u.heroPosScale);
+        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.02, lightDir, animTime, u.heroPosScale) : 1.0;
+        float ao = (bounce == 0) ? calcAmbientOcclusion(pos, nor, animTime, u.heroPosScale) : 0.85;
 
         float3 baseCol = materialColorForId(matId, pos, u.renderMode, u.lodThreshold, t);
         float metallic = (matId == 1.0) ? 0.25 : clamp(u.pbrParams.x, 0.0, 1.0);
@@ -277,8 +280,8 @@ kernel void zero3d_render_kernel(
         );
 
         accumCol += throughput * direct;
-        throughput *= mix(0.18, 0.65, metallic) * (1.0 - roughness * 0.6);
-        ro = pos + nor * 0.012;
+        throughput *= mix(0.18, 0.55, metallic) * (1.0 - roughness * 0.65);
+        ro = pos + nor * 0.025;
         rd = reflect(rd, nor);
     }
 
@@ -303,6 +306,9 @@ kernel void zero3d_render_kernel(
     CVMetalTextureRef _metalTextures[kTripleBufferCount];
     int _writeSlot;
     int _readySlot;
+    int _readingSlot;
+    int _prevReadingSlot;
+    std::atomic<bool> _gpuInFlight;
     os_unfair_lock _bufferLock;
     CADisplayLink *_displayLink;
     dispatch_source_t _uncappedTimer;
@@ -359,6 +365,9 @@ kernel void zero3d_render_kernel(
         _bufferLock = OS_UNFAIR_LOCK_INIT;
         _writeSlot = 0;
         _readySlot = 0;
+        _readingSlot = 0;
+        _prevReadingSlot = 0;
+        _gpuInFlight.store(false, std::memory_order_relaxed);
         _isDisposed = NO;
         _startTime = CACurrentMediaTime();
         _lastFrameTime = _startTime;
@@ -393,7 +402,7 @@ kernel void zero3d_render_kernel(
 
     NSError *err = nil;
     MTLCompileOptions *opts = [[MTLCompileOptions alloc] init];
-    opts.fastMathEnabled = YES;
+    opts.fastMathEnabled = NO;
     id<MTLLibrary> lib = [_device newLibraryWithSource:kZero3DMetalShaderSource options:opts error:&err];
     if (!lib && err) {
         NSLog(@"[d_zero_3dengine] Metal shader compile error: %@", err);
@@ -487,7 +496,13 @@ kernel void zero3d_render_kernel(
         if (!strong || strong->_isDisposed || !strong->_engineState) return;
         int32_t fpsMode = strong->_engineState->fps_mode.load(std::memory_order_relaxed);
         if (fpsMode >= ZERO_3D_FPS_CAP_144 || !strong->_displayLink) {
-            [strong renderSingleFrame];
+            CFTimeInterval elapsed = CACurrentMediaTime() - strong->_lastFrameTime;
+            CFTimeInterval minInterval = (fpsMode == ZERO_3D_FPS_CAP_144) ? (1.0 / 146.0)
+                                       : (fpsMode == ZERO_3D_FPS_CAP_240) ? (1.0 / 244.0)
+                                       : 0.0018;
+            if (elapsed >= minInterval) {
+                [strong renderSingleFrame];
+            }
         }
     });
     dispatch_resume(_uncappedTimer);
@@ -503,16 +518,32 @@ kernel void zero3d_render_kernel(
 - (void)renderSingleFrame {
     if (_isDisposed || !_engineState) return;
     if (!_computePipeline || !_commandQueue) return;
+    if (_gpuInFlight.exchange(true, std::memory_order_acq_rel)) return;
 
     CFTimeInterval now = CACurrentMediaTime();
     float dtMs = (float)((now - _lastFrameTime) * 1000.0);
     _lastFrameTime = now;
     if (dtMs <= 0.05f || dtMs > 500.0f) dtMs = 2.0f;
 
+    os_unfair_lock_lock(&_bufferLock);
     int slot = (_writeSlot + 1) % kTripleBufferCount;
+    for (int i = 0; i < kTripleBufferCount; ++i) {
+        int candidate = (_writeSlot + 1 + i) % kTripleBufferCount;
+        if (candidate != _readySlot &&
+            candidate != _readingSlot &&
+            candidate != _prevReadingSlot) {
+            slot = candidate;
+            break;
+        }
+    }
+    _writeSlot = slot;
     CVMetalTextureRef cvTex = _metalTextures[slot];
     id<MTLTexture> mtlTex = cvTex ? CVMetalTextureGetTexture(cvTex) : nil;
-    if (!mtlTex) return;
+    os_unfair_lock_unlock(&_bufferLock);
+    if (!mtlTex) {
+        _gpuInFlight.store(false, std::memory_order_release);
+        return;
+    }
 
     Zero3DGpuUniforms u;
     u.resolution[0] = (float)_width;
@@ -556,15 +587,6 @@ kernel void zero3d_render_kernel(
     MTLSize gridSize = MTLSizeMake(_width, _height, 1);
     [enc dispatchThreads:gridSize threadsPerThreadgroup:tgSize];
     [enc endEncoding];
-    [cmdBuf commit];
-    if (_engineState->frame_count.load(std::memory_order_relaxed) == 0) {
-        [cmdBuf waitUntilCompleted];
-    }
-
-    os_unfair_lock_lock(&_bufferLock);
-    _writeSlot = slot;
-    _readySlot = slot;
-    os_unfair_lock_unlock(&_bufferLock);
 
     float monitorHz = [self detectNativeMonitorRefreshRate];
     _engineState->display_refresh_hz.store(monitorHz, std::memory_order_relaxed);
@@ -576,12 +598,43 @@ kernel void zero3d_render_kernel(
     } else {
         zero_3d_simulate_frame_step(_engineState, 4096, dtMs);
     }
-    [_registry textureFrameAvailable:_textureId];
+
+    if (_engineState->frame_count.load(std::memory_order_relaxed) <= 1) {
+        [cmdBuf commit];
+        [cmdBuf waitUntilCompleted];
+        os_unfair_lock_lock(&_bufferLock);
+        _readySlot = slot;
+        os_unfair_lock_unlock(&_bufferLock);
+        _gpuInFlight.store(false, std::memory_order_release);
+        [_registry textureFrameAvailable:_textureId];
+        return;
+    }
+
+    __weak Zero3DEngineTexture *weakSelf = self;
+    [cmdBuf addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull buffer) {
+        Zero3DEngineTexture *strong = weakSelf;
+        if (!strong || strong->_isDisposed) return;
+        os_unfair_lock_lock(&strong->_bufferLock);
+        strong->_readySlot = slot;
+        os_unfair_lock_unlock(&strong->_bufferLock);
+        strong->_gpuInFlight.store(false, std::memory_order_release);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            Zero3DEngineTexture *mainStrong = weakSelf;
+            if (mainStrong && !mainStrong->_isDisposed) {
+                [mainStrong->_registry textureFrameAvailable:mainStrong->_textureId];
+            }
+        });
+    }];
+    [cmdBuf commit];
 }
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
     os_unfair_lock_lock(&_bufferLock);
-    CVPixelBufferRef buf = _pixelBuffers[_readySlot];
+    if (_readingSlot != _readySlot) {
+        _prevReadingSlot = _readingSlot;
+        _readingSlot = _readySlot;
+    }
+    CVPixelBufferRef buf = _pixelBuffers[_readingSlot];
     if (buf) {
         CVBufferRetain(buf);
     }
