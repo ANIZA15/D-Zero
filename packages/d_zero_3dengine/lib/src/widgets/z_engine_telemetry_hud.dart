@@ -33,8 +33,8 @@ class ZEngineTelemetryHud extends ZLeafWidget<RenderZEngineTelemetryHud> {
   const ZEngineTelemetryHud({
     super.key,
     required this.controller,
-    this.size = const Size(240.0, 88.0),
-    this.backgroundColor = const Color(0xCC090D16),
+    this.size = const Size(268.0, 114.0),
+    this.backgroundColor = const Color(0xD8090D16),
     this.accentColor = const Color(0xFF00F5D4),
   });
 
@@ -79,6 +79,16 @@ class RenderZEngineTelemetryHud extends ZeroRenderBox {
 
   late ZeroNumberPainter _fpsPainter;
   late ZeroNumberPainter _statPainter;
+  final List<TextPainter> _labels = <TextPainter>[];
+
+  static const List<String> _labelStrings = <String>[
+    'RENDER FPS',
+    'TARGET HZ',
+    'NANITE CLUSTERS',
+    'VISIBLE TRIS',
+    'RAYS/FRAME (K)',
+    'DAG LOD CUT',
+  ];
 
   /// Creates a [RenderZEngineTelemetryHud].
   RenderZEngineTelemetryHud({
@@ -89,11 +99,29 @@ class RenderZEngineTelemetryHud extends ZeroRenderBox {
   })  : _controller = controller,
         _preferredSize = preferredSize,
         _backgroundColor = backgroundColor,
-        _accentColor = accentColor {
+        _accentColor = accentColor,
+        super(animatePerFrame: true) {
     _bgPaint.color = _backgroundColor;
     _borderPaint.color = _accentColor.withValues(alpha: 0.45);
     _barFillPaint.color = _accentColor;
     _initNumberPainters();
+    _initStaticLabels();
+  }
+
+  void _initStaticLabels() {
+    const TextStyle labelStyle = TextStyle(
+      color: Color(0xFF94A3B8),
+      fontSize: 9.0,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.4,
+    );
+    for (int i = 0; i < _labelStrings.length; i++) {
+      final TextPainter tp = TextPainter(
+        text: TextSpan(text: _labelStrings[i], style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      _labels.add(tp);
+    }
   }
 
   void _initNumberPainters() {
@@ -170,8 +198,15 @@ class RenderZEngineTelemetryHud extends ZeroRenderBox {
     _controller.removeListener(markDirty);
     _fpsPainter.dispose();
     _statPainter.dispose();
+    for (int i = 0; i < _labels.length; i++) {
+      _labels[i].dispose();
+    }
+    _labels.clear();
     super.dispose();
   }
+
+  @override
+  bool onFrameTick(Duration elapsed) => !_controller.isDisposed;
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
@@ -195,41 +230,48 @@ class RenderZEngineTelemetryHud extends ZeroRenderBox {
 
     if (_controller.isDisposed) return;
 
-    final double ox = offset.dx + 10.0;
+    final double ox = offset.dx + 12.0;
     final double oy = offset.dy + 8.0;
+    final double col2 = ox + 128.0;
 
     // Row 1: Render FPS & Display Refresh Hz (e.g. 144.0 / 240.0)
+    _labels[0].paint(canvas, Offset(ox, oy));
+    _labels[1].paint(canvas, Offset(col2, oy));
     _fpsPainter.paintDouble(
       canvas,
-      Offset(ox, oy),
+      Offset(ox, oy + 11.0),
       _controller.renderFps,
       fractionDigits: 1,
     );
     _statPainter.paintInt(
       canvas,
-      Offset(ox + 92.0, oy + 2.0),
+      Offset(col2, oy + 13.0),
       _controller.displayRefreshHz.round(),
     );
 
     // Row 2: Active Nanite Clusters & Visible Triangles
+    _labels[2].paint(canvas, Offset(ox, oy + 36.0));
+    _labels[3].paint(canvas, Offset(col2, oy + 36.0));
     _statPainter.paintInt(
       canvas,
-      Offset(ox, oy + 26.0),
+      Offset(ox, oy + 48.0),
       _controller.activeClusters,
     );
     _statPainter.paintInt(
       canvas,
-      Offset(ox + 92.0, oy + 26.0),
+      Offset(col2, oy + 48.0),
       _controller.visibleTriangles,
     );
 
     // Row 3: Rays Traced (K) & Culling Efficiency Bar
+    _labels[4].paint(canvas, Offset(ox, oy + 70.0));
+    _labels[5].paint(canvas, Offset(col2, oy + 70.0));
     _statPainter.paintInt(
       canvas,
-      Offset(ox, oy + 48.0),
+      Offset(ox, oy + 82.0),
       _controller.raysTracedK,
     );
-    _paintCullingRatioBar(canvas, ox + 92.0, oy + 53.0, size.width - 112.0);
+    _paintCullingRatioBar(canvas, col2, oy + 86.0, size.width - 150.0);
   }
 
   void _paintCullingRatioBar(

@@ -62,13 +62,12 @@ class ZViewport3D extends StatelessWidget implements ZWidget {
         fit: StackFit.expand,
         children: [
           if (controller.textureId != -1)
-            Texture(textureId: controller.textureId)
-          else
-            _ZDirect3DCanvas(
-              controller: controller,
-              size: size,
-              autoOrbit: autoOrbit,
-            ),
+            Texture(textureId: controller.textureId),
+          _ZDirect3DCanvas(
+            controller: controller,
+            size: size,
+            autoOrbit: autoOrbit,
+          ),
           if (overlay != null) overlay!,
           if (showTelemetryHud)
             Positioned(
@@ -130,6 +129,10 @@ class RenderZViewport3D extends ZeroRenderBox {
   final Paint _bgPaint = Paint()
     ..style = PaintingStyle.fill
     ..color = const Color(0xFF060A12);
+  final Paint _borderPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = const Color(0x5538BDF8);
   final Paint _shaderPaint = Paint()..style = PaintingStyle.fill;
   final Paint _clusterPaint = Paint()..style = PaintingStyle.fill;
 
@@ -246,8 +249,10 @@ class RenderZViewport3D extends ZeroRenderBox {
     if (dtUs <= 0) return false;
     final double dtMs = (dtUs / 1000.0).clamp(0.2, 100.0);
     _elapsedSec = (_elapsedSec + dtMs * 0.001) % (math.pi * 200.0);
-    _controller.orbitBy(dtMs * 0.0005, 0.0);
-    _controller.stepSimulation(dtMs: dtMs);
+    _controller.orbitBy(dtMs * 0.00045, 0.0);
+    if (_controller.textureId == -1) {
+      _controller.stepSimulation(dtMs: dtMs);
+    }
     return true;
   }
 
@@ -255,9 +260,15 @@ class RenderZViewport3D extends ZeroRenderBox {
   void paintZero(PaintingContext context, Offset offset) {
     final Canvas canvas = context.canvas;
     final Rect bounds = offset & size;
-    canvas.drawRect(bounds, _bgPaint);
     if (_controller.isDisposed) return;
 
+    // Native Metal 3 / DirectX 12 Texture が有効な場合は背面の Texture を透過表示し枠線のみ描画
+    if (_controller.textureId != -1) {
+      canvas.drawRect(bounds.deflate(0.5), _borderPaint);
+      return;
+    }
+
+    canvas.drawRect(bounds, _bgPaint);
     canvas.save();
     canvas.clipRect(bounds);
 
@@ -271,6 +282,7 @@ class RenderZViewport3D extends ZeroRenderBox {
 
     _paintNaniteClusterOverlay(canvas, offset);
     canvas.restore();
+    canvas.drawRect(bounds.deflate(0.5), _borderPaint);
   }
 
   bool _bindRayUniforms(ui.FragmentShader shader, double w, double h) {

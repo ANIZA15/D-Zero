@@ -57,6 +57,26 @@ void main() {
       expect(controller.displayRefreshHz, closeTo(240.0, 0.1));
       expect(controller.maxRayBounces, equals(4));
     });
+
+    test('SoA ECS World エンティティ追加と 64-bit Visibility Buffer パックが機能すること', () {
+      final beforeCount = controller.spawnedEntityCount;
+      expect(beforeCount, greaterThan(0));
+
+      final newId = controller.spawnEcsEntity(
+        x: 1.5,
+        y: 0.2,
+        z: -1.0,
+        scale: 1.2,
+        clusterCount: 16,
+      );
+      expect(newId, equals(beforeCount));
+      expect(controller.spawnedEntityCount, equals(beforeCount + 1));
+
+      final bindings = Zero3DEngineNativeBindings.instance;
+      final packed = bindings.packVisBuffer64(0.75, 4095, 99);
+      expect(bindings.unpackVisBufferCluster(packed), equals(4095));
+      expect(bindings.unpackVisBufferTriangle(packed), equals(99));
+    });
   });
 
   group('【2. メモリ安全性・異常系テスト】Use-After-Free / Double-Free / 不正ポインタ防御', () {
@@ -200,6 +220,42 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
 
         // アンマウント後にリスナーが確実に解除されていること
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(ctrl.hasListeners, isFalse);
+
+        await ctrl.dispose();
+      },
+    );
+
+    testWidgets(
+      'ZSceneInspector3D (ZNaniteLodPanel) のスライダー操作とアンマウント解放が機能すること',
+      (tester) async {
+        final ctrl = Zero3DEngineController.simulated();
+
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: ZSceneInspector3D(
+                controller: ctrl,
+                size: const Size(320.0, 114.0),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ZSceneInspector3D), findsOneWidget);
+
+        // 1段目 (Nanite LOD Threshold), 2段目 (Sun Light Azimuth), 3段目 (Camera FOV) をドラッグ操作
+        final topLeft = tester.getTopLeft(find.byType(ZSceneInspector3D));
+        await tester.tapAt(topLeft + const Offset(200.0, 20.0));
+        await tester.tapAt(topLeft + const Offset(240.0, 56.0));
+        await tester.tapAt(topLeft + const Offset(180.0, 92.0));
+        await tester.pump();
+
+        expect(ctrl.lodErrorThreshold, greaterThan(0.25));
+        expect(ctrl.cameraFovDeg, greaterThanOrEqualTo(20.0));
+
         await tester.pumpWidget(const SizedBox.shrink());
         expect(ctrl.hasListeners, isFalse);
 

@@ -33,6 +33,8 @@ flutter:
     platforms:
       macos:
         pluginClass: Zero3DEnginePlugin
+      windows:
+        pluginClass: Zero3DEnginePluginCApi
 
   shaders:
     - shaders/zero_3d_raytrace.frag

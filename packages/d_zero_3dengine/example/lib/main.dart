@@ -86,11 +86,18 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
             _buildToolbar(),
             const SizedBox(height: 12),
             Expanded(
-              child: Center(
-                child: ZViewport3D(
-                  controller: _controller,
-                  size: const Size(760.0, 420.0),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return ZViewport3D(
+                    controller: _controller,
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    overlay: Positioned(
+                      right: 14.0,
+                      bottom: 14.0,
+                      child: ZSceneInspector3D(controller: _controller),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -109,6 +116,13 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
             renderMode: Zero3DRenderMode.hybridNaniteRt,
           ),
           child: const Text('Hybrid Nanite + RT'),
+        ),
+        ElevatedButton(
+          onPressed: () => _controller.setPipelineConfig(
+            renderMode: Zero3DRenderMode.raytracingGi,
+            maxRayBounces: 3,
+          ),
+          child: const Text('Ray Tracing GI (3-Bounce)'),
         ),
         ElevatedButton(
           onPressed: () => _controller.setPipelineConfig(

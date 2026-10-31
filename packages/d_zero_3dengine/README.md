@@ -27,7 +27,8 @@
 | :--- | :--- | :--- |
 | **`ZViewport3D`** | `ZScene3D` (`ZeroViewport3D`) | Zero-copy 3D game engine viewport with interactive orbit/zoom, Nanite cluster overlay, and Ray Tracing shader pipeline. |
 | **`ZEngineTelemetryHud`** | `Z3DStatsOverlay` (`ZeroEngineTelemetryHud`) | Zero-allocation `ZeroRenderBox` HUD painting live Render FPS, Monitor Refresh Hz (144/240Hz), Active Nanite Clusters, Visible Triangles, and Rays Traced via `ZeroNumberPainter`. |
-| **`Zero3DEngineController`** | - | 128-byte FFI shared-memory controller managing camera, lighting, Nanite LOD threshold, and 144Hz/240Hz/Uncapped scheduling. |
+| **`ZSceneInspector3D`** | `ZNaniteLodPanel` (`ZeroSceneInspector3D`) | Interactive zero-allocation 3D scene & Nanite DAG inspector (LOD error threshold, directional light azimuth, camera FOV). |
+| **`Zero3DEngineController`** | - | 128-byte FFI shared-memory & C++ SoA ECS controller managing camera, lighting, Nanite LOD threshold, and 144Hz/240Hz/Uncapped scheduling. |
 
 ---
 

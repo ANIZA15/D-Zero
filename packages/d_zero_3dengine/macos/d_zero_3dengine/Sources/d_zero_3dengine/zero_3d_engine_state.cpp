@@ -18,6 +18,12 @@ inline bool is_valid_alive(const Zero3DEngineState* state) {
     return state->magic_guard.load(std::memory_order_acquire) == ZERO_3D_MAGIC_ALIVE;
 }
 
+inline bool is_ecs_valid_alive(const Zero3DEcsWorld* world) {
+    if (!world) return false;
+    if ((reinterpret_cast<uintptr_t>(world) & 63u) != 0u) return false;
+    return world->magic_guard.load(std::memory_order_acquire) == ZERO_3D_ECS_MAGIC_ALIVE;
+}
+
 inline float sanitize_float(float val, float fallback, float min_v, float max_v) {
     if (!std::isfinite(val)) return fallback;
     if (val < min_v) return min_v;
@@ -367,6 +373,132 @@ uint32_t zero_3d_get_cmd_seq(const Zero3DEngineState* state) {
 
 uint32_t zero_3d_get_telemetry_seq(const Zero3DEngineState* state) {
     return is_valid_alive(state) ? state->telemetry_seq.load(std::memory_order_acquire) : 0u;
+}
+
+Zero3DEcsWorld* zero_3d_ecs_create_world(void) {
+    auto* world = new (std::nothrow) Zero3DEcsWorld();
+    if (!world) return nullptr;
+
+    world->entity_count.store(0, std::memory_order_relaxed);
+    for (int i = 0; i < ZERO_3D_ECS_MAX_ENTITIES; ++i) {
+        world->pos_x[i] = 0.0f;
+        world->pos_y[i] = 0.0f;
+        world->pos_z[i] = 0.0f;
+        world->rot_yaw[i] = 0.0f;
+        world->scale[i] = 1.0f;
+        world->bound_radius[i] = 0.5f;
+        world->cluster_count[i] = 16;
+        world->visible_mask[i] = 1u;
+    }
+    world->magic_guard.store(ZERO_3D_ECS_MAGIC_ALIVE, std::memory_order_release);
+    return world;
+}
+
+void zero_3d_ecs_destroy_world(Zero3DEcsWorld* world) {
+    if (!world) return;
+    if ((reinterpret_cast<uintptr_t>(world) & 63u) != 0u) return;
+
+    uint32_t expected = ZERO_3D_ECS_MAGIC_ALIVE;
+    if (!world->magic_guard.compare_exchange_strong(
+            expected, ZERO_3D_ECS_MAGIC_FREED, std::memory_order_acq_rel)) {
+        return;
+    }
+    delete world;
+}
+
+bool zero_3d_ecs_is_valid(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world);
+}
+
+int32_t zero_3d_ecs_spawn_entity(
+    Zero3DEcsWorld* world,
+    float x,
+    float y,
+    float z,
+    float scale,
+    float bound_radius,
+    int32_t cluster_count
+) {
+    if (!is_ecs_valid_alive(world)) return -1;
+    const int32_t idx = world->entity_count.load(std::memory_order_acquire);
+    if (idx < 0 || idx >= ZERO_3D_ECS_MAX_ENTITIES) return -1;
+
+    world->pos_x[idx] = sanitize_float(x, 0.0f, -10000.0f, 10000.0f);
+    world->pos_y[idx] = sanitize_float(y, 0.0f, -10000.0f, 10000.0f);
+    world->pos_z[idx] = sanitize_float(z, 0.0f, -10000.0f, 10000.0f);
+    world->rot_yaw[idx] = 0.0f;
+    world->scale[idx] = sanitize_float(scale, 1.0f, 0.01f, 1000.0f);
+    world->bound_radius[idx] = sanitize_float(bound_radius, 0.5f, 0.05f, 500.0f);
+    world->cluster_count[idx] = clamp_i32(cluster_count, 1, 65536);
+    world->visible_mask[idx] = 1u;
+
+    world->entity_count.store(idx + 1, std::memory_order_release);
+    return idx;
+}
+
+void zero_3d_ecs_step_transforms(
+    Zero3DEcsWorld* world,
+    float dt_sec
+) {
+    if (!is_ecs_valid_alive(world)) return;
+    const float safe_dt = sanitize_float(dt_sec, 0.00694f, 0.0f, 1.0f);
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+
+    for (int32_t i = 0; i < count; ++i) {
+        world->rot_yaw[i] = wrap_angle(world->rot_yaw[i] + safe_dt * 1.2f);
+    }
+}
+
+int32_t zero_3d_ecs_cull_and_update_state(
+    Zero3DEcsWorld* world,
+    Zero3DEngineState* state,
+    float dt_ms
+) {
+    if (!is_ecs_valid_alive(world) || !is_valid_alive(state)) return 0;
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+    const float cam_dist = state->camera_distance.load(std::memory_order_relaxed);
+    const float max_cull_dist = cam_dist * 4.5f + 10.0f;
+    const float max_dist_sq = max_cull_dist * max_cull_dist;
+
+    int32_t total_clusters = 0;
+    for (int32_t i = 0; i < count; ++i) {
+        const float px = world->pos_x[i];
+        const float py = world->pos_y[i];
+        const float pz = world->pos_z[i];
+        const float dist_sq = px * px + py * py + pz * pz;
+        const bool visible = dist_sq <= max_dist_sq;
+        world->visible_mask[i] = visible ? 1u : 0u;
+        if (visible) {
+            total_clusters += world->cluster_count[i];
+        }
+    }
+
+    zero_3d_simulate_frame_step(
+        state,
+        total_clusters > 64 ? total_clusters : 64,
+        dt_ms
+    );
+    return total_clusters;
+}
+
+uint64_t zero_3d_pack_visbuffer64(
+    float normalized_depth,
+    uint32_t cluster_id,
+    uint32_t triangle_id
+) {
+    const float clamped_d = sanitize_float(normalized_depth, 0.0f, 0.0f, 1.0f);
+    const uint64_t depth_bits = static_cast<uint64_t>(clamped_d * 4294967295.0);
+    const uint64_t payload = ((static_cast<uint64_t>(cluster_id & 0x00FFFFFFu) << 8u) |
+                              static_cast<uint64_t>(triangle_id & 0xFFu));
+    return (depth_bits << 32u) | payload;
+}
+
+uint32_t zero_3d_unpack_visbuffer_cluster(uint64_t vis_pixel) {
+    return static_cast<uint32_t>((vis_pixel >> 8u) & 0x00FFFFFFu);
+}
+
+uint32_t zero_3d_unpack_visbuffer_triangle(uint64_t vis_pixel) {
+    return static_cast<uint32_t>(vis_pixel & 0xFFu);
 }
 
 } // extern "C"

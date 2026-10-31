@@ -105,6 +105,35 @@ float3 clusterHashColor(float3 p, float lodStep) {
     return 0.35 + 0.65 * cos(6.28318 * (h + float3(0.0, 0.33, 0.67)));
 }
 
+float calcAmbientOcclusion(float3 pos, float3 nor, float tSec) {
+    float occ = 0.0;
+    float sca = 1.0;
+    for (int i = 0; i < 5; ++i) {
+        float h = 0.02 + 0.11 * float(i) / 4.0;
+        float d = mapScene(pos + h * nor, tSec).x;
+        occ += (h - d) * sca;
+        sca *= 0.92;
+    }
+    return clamp(1.0 - 2.6 * occ, 0.0, 1.0);
+}
+
+float3 materialColorForId(float matId, float3 pos, int renderMode, float lodStep, float rayDist) {
+    if (renderMode == 2) {
+        return clusterHashColor(pos, lodStep);
+    }
+    if (matId == 1.0) {
+        float2 coord = pos.xz * 2.0;
+        float2 grid = abs(fract(coord - 0.5) - 0.5) / max(0.015 * rayDist, 0.008);
+        float line = min(grid.x, grid.y);
+        float checker = fmod(floor(coord.x) + floor(coord.y), 2.0);
+        float3 tileCol = (checker != 0.0) ? float3(0.07, 0.11, 0.18) : float3(0.04, 0.07, 0.12);
+        return mix(float3(0.0, 0.85, 0.95), tileCol, clamp(line, 0.0, 1.0));
+    }
+    if (matId == 3.0) return float3(0.98, 0.42, 0.16);
+    if (matId >= 4.0) return float3(0.60, 0.28, 0.96);
+    return float3(0.12, 0.72, 0.98);
+}
+
 kernel void zero3d_render_kernel(
     texture2d<half, access::write> outTex [[texture(0)]],
     constant Uniforms& u [[buffer(0)]],
@@ -130,51 +159,50 @@ kernel void zero3d_render_kernel(
         cos(u.lightElevation) * cos(u.lightAzimuth)
     ));
 
-    float t = 0.0;
-    float matId = -1.0;
-    for (int i = 0; i < 64; ++i) {
-        float2 h = mapScene(ro + rd * t, u.timeSec);
-        if (h.x < 0.002) {
-            matId = h.y;
+    float3 accumCol = float3(0.0);
+    float3 throughput = float3(1.0);
+    int bounces = (u.renderMode == 1) ? clamp(u.maxRayBounces, 1, 4) : 1;
+
+    for (int bounce = 0; bounce < bounces; ++bounce) {
+        float t = 0.0;
+        float matId = -1.0;
+        for (int i = 0; i < 64; ++i) {
+            float2 h = mapScene(ro + rd * t, u.timeSec);
+            if (h.x < 0.002) {
+                matId = h.y;
+                break;
+            }
+            t += h.x;
+            if (t > 16.0) break;
+        }
+
+        float3 sky = mix(float3(0.03, 0.05, 0.10), float3(0.07, 0.14, 0.26), clamp(rd.y + 0.5, 0.0, 1.0));
+        if (matId < 0.0) {
+            accumCol += throughput * sky;
             break;
         }
-        t += h.x;
-        if (t > 16.0) break;
+
+        float3 pos = ro + rd * t;
+        float3 nor = calcNormal(pos, u.timeSec);
+        float diff = max(dot(nor, lightDir), 0.0);
+        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec) : 1.0;
+        float ao = calcAmbientOcclusion(pos, nor, u.timeSec);
+
+        float3 baseCol = materialColorForId(matId, pos, u.renderMode, u.lodThreshold, t);
+        float3 halfV = normalize(lightDir - rd);
+        float spec = pow(max(dot(nor, halfV), 0.0), 48.0) * shadow;
+        float3 direct = baseCol * (0.22 * ao + 0.85 * diff * shadow) + float3(0.9, 0.95, 1.0) * spec * 0.65;
+
+        accumCol += throughput * direct;
+        throughput *= 0.38;
+        ro = pos + nor * 0.012;
+        rd = reflect(rd, nor);
     }
 
-    float3 sky = mix(float3(0.03, 0.05, 0.10), float3(0.07, 0.14, 0.26), clamp(uv.y + 0.5, 0.0, 1.0));
-    if (matId < 0.0) {
-        outTex.write(half4(half3(sky), 1.0h), gid);
-        return;
-    }
-
-    float3 pos = ro + rd * t;
-    float3 nor = calcNormal(pos, u.timeSec);
-    float diff = max(dot(nor, lightDir), 0.0);
-    float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec) : 1.0;
-
-    float3 baseCol = float3(0.15, 0.65, 0.95);
-    if (matId == 1.0) {
-        float2 grid = abs(fract(pos.xz * 2.0 - 0.5) - 0.5) / fwidth(pos.xz * 2.0);
-        float line = min(grid.x, grid.y);
-        baseCol = mix(float3(0.08, 0.22, 0.35), float3(0.04, 0.06, 0.10), clamp(line, 0.0, 1.0));
-    } else if (matId == 3.0) {
-        baseCol = float3(0.95, 0.38, 0.18);
-    } else if (matId >= 4.0) {
-        baseCol = float3(0.55, 0.25, 0.92);
-    }
-
-    if (u.renderMode == 2) {
-        // Nanite Cluster ID visualization mode
-        baseCol = clusterHashColor(pos, u.lodThreshold);
-    }
-
-    float3 col = baseCol * (0.18 + 0.82 * diff * shadow);
-    float3 halfV = normalize(lightDir - rd);
-    float spec = pow(max(dot(nor, halfV), 0.0), 48.0) * shadow;
-    col += float3(0.9, 0.95, 1.0) * spec * 0.65;
-
-    outTex.write(half4(half3(clamp(col, 0.0, 1.0)), 1.0h), gid);
+    // Tone mapping & gamma curve for vivid HDR presentation
+    float3 mapped = accumCol / (accumCol + float3(0.65));
+    mapped = pow(clamp(mapped * 1.35, 0.0, 1.0), float3(0.85));
+    outTex.write(half4(half3(mapped), 1.0h), gid);
 }
 )";
 
@@ -190,7 +218,9 @@ kernel void zero3d_render_kernel(
     int _readySlot;
     os_unfair_lock _bufferLock;
     CADisplayLink *_displayLink;
+    dispatch_source_t _uncappedTimer;
     Zero3DEngineState *_engineState;
+    Zero3DEcsWorld *_ecsWorld;
     int64_t _textureId;
     int32_t _width;
     int32_t _height;
@@ -199,6 +229,7 @@ kernel void zero3d_render_kernel(
     BOOL _isDisposed;
 }
 - (void)onDisplayLink:(CADisplayLink *)link;
+- (void)renderSingleFrame;
 @end
 
 @interface _Zero3DDisplayLinkProxy : NSObject {
@@ -245,12 +276,19 @@ kernel void zero3d_render_kernel(
         _lastFrameTime = _startTime;
 
         _engineState = zero_3d_create_state();
+        _ecsWorld = zero_3d_ecs_create_world();
+        for (int i = 0; i < 64; ++i) {
+            float x = (float)((i % 8) - 3.5f) * 1.2f;
+            float z = (float)((i / 8) - 3.5f) * 1.2f;
+            zero_3d_ecs_spawn_entity(_ecsWorld, x, 0.0f, z, 1.0f, 0.6f, 64);
+        }
         zero_3d_set_status(_engineState, ZERO_3D_STATUS_RENDERING);
 
         [self setupMetalPipeline];
         [self allocateTripleBufferedIOSurfacesWidth:_width height:_height];
 
         _textureId = [_registry registerTexture:self];
+        [self renderSingleFrame];
         [self setupHighRefreshDisplayLink];
     }
     return self;
@@ -266,6 +304,10 @@ kernel void zero3d_render_kernel(
     MTLCompileOptions *opts = [[MTLCompileOptions alloc] init];
     opts.fastMathEnabled = YES;
     id<MTLLibrary> lib = [_device newLibraryWithSource:kZero3DMetalShaderSource options:opts error:&err];
+    if (!lib && err) {
+        NSLog(@"[d_zero_3dengine] Metal shader compile error: %@", err);
+        return;
+    }
     if (lib) {
         id<MTLFunction> fn = [lib newFunctionWithName:@"zero3d_render_kernel"];
         if (fn) {
@@ -344,16 +386,37 @@ kernel void zero3d_render_kernel(
         _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60.0f, maxTarget, maxTarget);
     }
     [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+
+    // Uncapped / High-Refresh (144Hz / 240Hz / 500Hz) タイマー駆動
+    __weak Zero3DEngineTexture *weakSelf = self;
+    _uncappedTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, DISPATCH_TIMER_STRICT, dispatch_get_main_queue());
+    dispatch_source_set_timer(_uncappedTimer, DISPATCH_TIME_NOW, 2000000ull, 100000ull);
+    dispatch_source_set_event_handler(_uncappedTimer, ^{
+        Zero3DEngineTexture *strong = weakSelf;
+        if (!strong || strong->_isDisposed || !strong->_engineState) return;
+        int32_t fpsMode = strong->_engineState->fps_mode.load(std::memory_order_relaxed);
+        if (fpsMode >= ZERO_3D_FPS_CAP_144 || !strong->_displayLink) {
+            [strong renderSingleFrame];
+        }
+    });
+    dispatch_resume(_uncappedTimer);
 }
 
 - (void)onDisplayLink:(CADisplayLink *)link {
+    if (_isDisposed || !_engineState) return;
+    int32_t fpsMode = _engineState->fps_mode.load(std::memory_order_relaxed);
+    if (fpsMode >= ZERO_3D_FPS_CAP_144) return;
+    [self renderSingleFrame];
+}
+
+- (void)renderSingleFrame {
     if (_isDisposed || !_engineState) return;
     if (!_computePipeline || !_commandQueue) return;
 
     CFTimeInterval now = CACurrentMediaTime();
     float dtMs = (float)((now - _lastFrameTime) * 1000.0);
     _lastFrameTime = now;
-    if (dtMs <= 0.05f || dtMs > 500.0f) dtMs = 6.94f;
+    if (dtMs <= 0.05f || dtMs > 500.0f) dtMs = 2.0f;
 
     int slot = (_writeSlot + 1) % kTripleBufferCount;
     CVMetalTextureRef cvTex = _metalTextures[slot];
@@ -385,6 +448,9 @@ kernel void zero3d_render_kernel(
     [enc dispatchThreads:gridSize threadsPerThreadgroup:tgSize];
     [enc endEncoding];
     [cmdBuf commit];
+    if (_engineState->frame_count.load(std::memory_order_relaxed) == 0) {
+        [cmdBuf waitUntilCompleted];
+    }
 
     os_unfair_lock_lock(&_bufferLock);
     _writeSlot = slot;
@@ -393,7 +459,12 @@ kernel void zero3d_render_kernel(
 
     float monitorHz = [self detectNativeMonitorRefreshRate];
     _engineState->display_refresh_hz.store(monitorHz, std::memory_order_relaxed);
-    zero_3d_simulate_frame_step(_engineState, 4096, dtMs);
+    if (_ecsWorld) {
+        zero_3d_ecs_step_transforms(_ecsWorld, dtMs * 0.001f);
+        zero_3d_ecs_cull_and_update_state(_ecsWorld, _engineState, dtMs);
+    } else {
+        zero_3d_simulate_frame_step(_engineState, 4096, dtMs);
+    }
     [_registry textureFrameAvailable:_textureId];
 }
 
@@ -433,6 +504,10 @@ kernel void zero3d_render_kernel(
     if (_isDisposed) return;
     _isDisposed = YES;
 
+    if (_uncappedTimer) {
+        dispatch_source_cancel(_uncappedTimer);
+        _uncappedTimer = nil;
+    }
     [_displayLink invalidate];
     _displayLink = nil;
 
@@ -446,6 +521,10 @@ kernel void zero3d_render_kernel(
 
     [_registry unregisterTexture:_textureId];
 
+    if (_ecsWorld) {
+        zero_3d_ecs_destroy_world(_ecsWorld);
+        _ecsWorld = nullptr;
+    }
     if (_engineState) {
         zero_3d_destroy_state(_engineState);
         _engineState = nullptr;

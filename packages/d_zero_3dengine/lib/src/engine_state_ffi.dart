@@ -322,6 +322,59 @@ typedef Dart3DSimulateStep = void Function(
   double,
 );
 
+/// Opaque FFI handle to C++ `Zero3DEcsWorld`.
+final class Zero3DEcsWorldNative extends ffi.Opaque {}
+
+typedef _NativeEcsCreateWorld = ffi.Pointer<Zero3DEcsWorldNative> Function();
+typedef Dart3DEcsCreateWorld = ffi.Pointer<Zero3DEcsWorldNative> Function();
+
+typedef _NativeEcsDestroyWorld = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+typedef Dart3DEcsDestroyWorld = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+
+typedef _NativeEcsSpawnEntity = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+  ffi.Int32,
+);
+typedef Dart3DEcsSpawnEntity = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  double,
+  double,
+  double,
+  double,
+  double,
+  int,
+);
+
+typedef _NativeEcsCullAndUpdate = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<Zero3DEngineStateNative>,
+  ffi.Float,
+);
+typedef Dart3DEcsCullAndUpdate = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<Zero3DEngineStateNative>,
+  double,
+);
+
+typedef _NativePackVisBuffer64 = ffi.Uint64 Function(
+  ffi.Float,
+  ffi.Uint32,
+  ffi.Uint32,
+);
+typedef Dart3DPackVisBuffer64 = int Function(double, int, int);
+
+typedef _NativeUnpackVisBuffer32 = ffi.Uint32 Function(ffi.Uint64);
+typedef Dart3DUnpackVisBuffer32 = int Function(int);
+
 /// Low-overhead `isLeaf: true` FFI bindings for `d_zero_3dengine`.
 class Zero3DEngineNativeBindings {
   /// Singleton binding instance.
@@ -347,6 +400,27 @@ class Zero3DEngineNativeBindings {
 
   /// Runs a deterministic Nanite DAG culling and telemetry step in C++.
   late final Dart3DSimulateStep simulateFrameStep;
+
+  /// Allocates a 64-byte aligned C++ SoA `Zero3DEcsWorld`.
+  late final Dart3DEcsCreateWorld ecsCreateWorld;
+
+  /// Safely destroys a `Zero3DEcsWorld` (idempotent via magic canary).
+  late final Dart3DEcsDestroyWorld ecsDestroyWorld;
+
+  /// Spawns a 3D entity in the C++ SoA ECS world and returns its entity index.
+  late final Dart3DEcsSpawnEntity ecsSpawnEntity;
+
+  /// Performs SIMD-friendly distance/frustum culling across ECS entities and updates state.
+  late final Dart3DEcsCullAndUpdate ecsCullAndUpdateState;
+
+  /// Packs normalized depth, cluster ID, and triangle ID into a 64-bit Visibility Buffer pixel.
+  late final Dart3DPackVisBuffer64 packVisBuffer64;
+
+  /// Unpacks the 24-bit Nanite Cluster ID from a 64-bit Visibility Buffer pixel.
+  late final Dart3DUnpackVisBuffer32 unpackVisBufferCluster;
+
+  /// Unpacks the 8-bit Triangle ID from a 64-bit Visibility Buffer pixel.
+  late final Dart3DUnpackVisBuffer32 unpackVisBufferTriangle;
 
   Zero3DEngineNativeBindings._() {
     _dylib = _loadLibrary();
@@ -377,6 +451,41 @@ class Zero3DEngineNativeBindings {
     simulateFrameStep =
         _dylib.lookupFunction<_NativeSimulateStep, Dart3DSimulateStep>(
       'zero_3d_simulate_frame_step',
+      isLeaf: true,
+    );
+    ecsCreateWorld =
+        _dylib.lookupFunction<_NativeEcsCreateWorld, Dart3DEcsCreateWorld>(
+      'zero_3d_ecs_create_world',
+      isLeaf: true,
+    );
+    ecsDestroyWorld =
+        _dylib.lookupFunction<_NativeEcsDestroyWorld, Dart3DEcsDestroyWorld>(
+      'zero_3d_ecs_destroy_world',
+      isLeaf: true,
+    );
+    ecsSpawnEntity =
+        _dylib.lookupFunction<_NativeEcsSpawnEntity, Dart3DEcsSpawnEntity>(
+      'zero_3d_ecs_spawn_entity',
+      isLeaf: true,
+    );
+    ecsCullAndUpdateState = _dylib
+        .lookupFunction<_NativeEcsCullAndUpdate, Dart3DEcsCullAndUpdate>(
+      'zero_3d_ecs_cull_and_update_state',
+      isLeaf: true,
+    );
+    packVisBuffer64 =
+        _dylib.lookupFunction<_NativePackVisBuffer64, Dart3DPackVisBuffer64>(
+      'zero_3d_pack_visbuffer64',
+      isLeaf: true,
+    );
+    unpackVisBufferCluster = _dylib
+        .lookupFunction<_NativeUnpackVisBuffer32, Dart3DUnpackVisBuffer32>(
+      'zero_3d_unpack_visbuffer_cluster',
+      isLeaf: true,
+    );
+    unpackVisBufferTriangle = _dylib
+        .lookupFunction<_NativeUnpackVisBuffer32, Dart3DUnpackVisBuffer32>(
+      'zero_3d_unpack_visbuffer_triangle',
       isLeaf: true,
     );
   }

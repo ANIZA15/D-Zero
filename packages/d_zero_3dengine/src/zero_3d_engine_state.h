@@ -94,6 +94,51 @@ typedef struct Zero3DEngineState Zero3DEngineState;
 #define ZERO_3D_MAGIC_ALIVE 0x5A334445u
 #define ZERO_3D_MAGIC_FREED 0xDEAD3344u
 
+// =========================================================================================
+// Nanite Meshlet Cluster Descriptor (32 bytes, 32-byte aligned)
+// 1 Cluster = 64 Vertices / 128 Triangles の境界球・法線コーン・LOD 階層誤差を表す
+// =========================================================================================
+#ifdef __cplusplus
+struct alignas(32) Zero3DNaniteCluster {
+    float center_x;       // offset  0: バウンディングスフィア中心 X
+    float center_y;       // offset  4: バウンディングスフィア中心 Y
+    float center_z;       // offset  8: バウンディングスフィア中心 Z
+    float radius;         // offset 12: バウンディングスフィア半径 (> 0)
+    float cone_axis_x;    // offset 16: 法線コーン軸 X (背面クラスタ一括棄却用)
+    float cone_axis_y;    // offset 20: 法線コーン軸 Y
+    float cone_axis_z;    // offset 24: 法線コーン軸 Z
+    float lod_error;      // offset 28: 画面空間投影誤差基準値 (pixels at 1m)
+};
+static_assert(sizeof(Zero3DNaniteCluster) == 32, "Zero3DNaniteCluster must be 32 bytes");
+#else
+typedef struct Zero3DNaniteCluster Zero3DNaniteCluster;
+#endif
+
+// =========================================================================================
+// Zero-Allocation SoA Entity Component System (ECS) World
+// 最大 1,024 エンティティの Transform / Bounding Radius / Meshlet Cluster 範囲を連続配列で保持
+// =========================================================================================
+#define ZERO_3D_ECS_MAX_ENTITIES 1024
+#define ZERO_3D_ECS_MAGIC_ALIVE 0x5A454353u // "ZECS"
+#define ZERO_3D_ECS_MAGIC_FREED 0xDEAD4543u
+
+#ifdef __cplusplus
+struct alignas(64) Zero3DEcsWorld {
+    std::atomic<uint32_t> magic_guard;   // 生存確認カナリア ("ZECS")
+    std::atomic<int32_t> entity_count;   // アクティブエンティティ数 (0..1024)
+    alignas(64) float pos_x[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float pos_y[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float pos_z[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float rot_yaw[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float scale[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) float bound_radius[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) int32_t cluster_count[ZERO_3D_ECS_MAX_ENTITIES];
+    alignas(64) uint8_t visible_mask[ZERO_3D_ECS_MAX_ENTITIES];
+};
+#else
+typedef struct Zero3DEcsWorld Zero3DEcsWorld;
+#endif
+
 // 1. 共有メモリライフサイクル (作成・破棄・生存検証)
 ZERO_3D_EXPORT Zero3DEngineState* zero_3d_create_state(void);
 ZERO_3D_EXPORT void zero_3d_destroy_state(Zero3DEngineState* state);
@@ -161,6 +206,38 @@ ZERO_3D_EXPORT int32_t zero_3d_get_rays_traced_k(const Zero3DEngineState* state)
 ZERO_3D_EXPORT uint64_t zero_3d_get_frame_count(const Zero3DEngineState* state);
 ZERO_3D_EXPORT uint32_t zero_3d_get_cmd_seq(const Zero3DEngineState* state);
 ZERO_3D_EXPORT uint32_t zero_3d_get_telemetry_seq(const Zero3DEngineState* state);
+
+// 5. SoA ECS World & 64-bit Visibility Buffer / Nanite Culling Pipeline API
+ZERO_3D_EXPORT Zero3DEcsWorld* zero_3d_ecs_create_world(void);
+ZERO_3D_EXPORT void zero_3d_ecs_destroy_world(Zero3DEcsWorld* world);
+ZERO_3D_EXPORT bool zero_3d_ecs_is_valid(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_spawn_entity(
+    Zero3DEcsWorld* world,
+    float x,
+    float y,
+    float z,
+    float scale,
+    float bound_radius,
+    int32_t cluster_count
+);
+ZERO_3D_EXPORT void zero_3d_ecs_step_transforms(
+    Zero3DEcsWorld* world,
+    float dt_sec
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_cull_and_update_state(
+    Zero3DEcsWorld* world,
+    Zero3DEngineState* state,
+    float dt_ms
+);
+
+// 64-bit Visibility Buffer パック/アンパック ((uint64_t)DepthBits << 32 | (ClusterID << 8) | TriID)
+ZERO_3D_EXPORT uint64_t zero_3d_pack_visbuffer64(
+    float normalized_depth,
+    uint32_t cluster_id,
+    uint32_t triangle_id
+);
+ZERO_3D_EXPORT uint32_t zero_3d_unpack_visbuffer_cluster(uint64_t vis_pixel);
+ZERO_3D_EXPORT uint32_t zero_3d_unpack_visbuffer_triangle(uint64_t vis_pixel);
 
 #ifdef __cplusplus
 }

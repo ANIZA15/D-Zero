@@ -190,6 +190,49 @@ void test_mass_allocation_deallocation() {
     TEST_PASS("10,000 個の連続確保・解放でヒープ破損・メモリリークなし");
 }
 
+// =========================================================================
+// 5. SoA ECS World (1024 エンティティ) & 64-bit Visibility Buffer 検証
+// =========================================================================
+void test_ecs_world_and_visbuffer64() {
+    std::cout << "\n--- [5. SoA ECS World & 64-bit Visibility Buffer 検証] ---" << std::endl;
+
+    TEST_ASSERT(sizeof(Zero3DNaniteCluster) == 32, "Zero3DNaniteCluster は 32 bytes であること");
+    TEST_ASSERT(alignof(Zero3DEcsWorld) == 64, "Zero3DEcsWorld は 64-byte アライメントであること");
+
+    Zero3DEcsWorld* world = zero_3d_ecs_create_world();
+    Zero3DEngineState* state = zero_3d_create_state();
+    TEST_ASSERT(world != nullptr && zero_3d_ecs_is_valid(world), "ECS World が 64-byte 境界で確保されること");
+    TEST_ASSERT(!zero_3d_ecs_is_valid(nullptr), "nullptr ECS World は invalid であること");
+
+    // 1024 エンティティ上限までスポーン + 上限超過時の安全な拒絶 (-1)
+    for (int i = 0; i < ZERO_3D_ECS_MAX_ENTITIES; ++i) {
+        int32_t id = zero_3d_ecs_spawn_entity(
+            world, static_cast<float>(i) * 0.1f, 0.0f, 0.0f, 1.0f, 0.5f, 4
+        );
+        TEST_ASSERT(id == i, "エンティティ ID が連番で割り当てられること");
+    }
+    TEST_ASSERT(world->entity_count.load() == ZERO_3D_ECS_MAX_ENTITIES, "1024 エンティティ登録完了");
+    TEST_ASSERT(zero_3d_ecs_spawn_entity(world, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, 4) == -1,
+                "上限超過スポーン時にバッファオーバーフローせず -1 を返すこと");
+
+    // Transform 更新と Nanite クラスタカリング -> EngineState への反映
+    zero_3d_ecs_step_transforms(world, 0.016f);
+    int32_t visible_clusters = zero_3d_ecs_cull_and_update_state(world, state, 6.94f);
+    TEST_ASSERT(visible_clusters > 0, "ECS 視錐台/LOD カリングで可視クラスタが算出されること");
+    TEST_ASSERT(zero_3d_get_active_clusters(state) > 0 && zero_3d_get_active_clusters(state) <= visible_clusters,
+                "EngineState に Nanite DAG LOD カット後のアクティブクラスタ数が同期されること");
+
+    // 64-bit Visibility Buffer パッキング / アンパッキング検証
+    uint64_t packed = zero_3d_pack_visbuffer64(0.5f, 0x123456u, 127u);
+    TEST_ASSERT(zero_3d_unpack_visbuffer_cluster(packed) == 0x123456u, "24-bit ClusterID が正確に復元されること");
+    TEST_ASSERT(zero_3d_unpack_visbuffer_triangle(packed) == 127u, "8-bit TriangleID が正確に復元されること");
+
+    zero_3d_ecs_destroy_world(world);
+    zero_3d_ecs_destroy_world(nullptr);
+    zero_3d_destroy_state(state);
+    TEST_PASS("SoA ECS World 1024 エンティティ境界防御 & 64-bit Visibility Buffer 検証");
+}
+
 int main() {
     std::cout << "==========================================================" << std::endl;
     std::cout << "   d_zero_3dengine Native C++ メモリ安全性・競合テスト" << std::endl;
@@ -201,6 +244,7 @@ int main() {
     test_memory_safety_and_edge_cases();
     test_concurrency_seqlock_stress();
     test_mass_allocation_deallocation();
+    test_ecs_world_and_visbuffer64();
 
     auto t1 = std::chrono::high_resolution_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();

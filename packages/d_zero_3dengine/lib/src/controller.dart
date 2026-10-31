@@ -24,9 +24,13 @@ class Zero3DEngineController implements Listenable {
   final ffi.Pointer<Zero3DEngineStateNative> statePointer;
   final Zero3DEngineStateView _view;
 
+  /// Direct FFI pointer to the C++ SoA `Zero3DEcsWorld` (when locally owned).
+  final ffi.Pointer<Zero3DEcsWorldNative> ecsWorldPointer;
+
   /// Native GPU zero-copy texture ID (`-1` when using Impeller Shader / SoA fallback).
   final int textureId;
   final bool _ownsState;
+  int _spawnedEntityCount = 0;
 
   // Pre-allocated SoA buffers for Nanite Cluster Bounding Spheres & LOD errors
   late final Float32List _clusterCenterX;
@@ -41,6 +45,7 @@ class Zero3DEngineController implements Listenable {
 
   Zero3DEngineController._({
     required this.statePointer,
+    required this.ecsWorldPointer,
     required this.textureId,
     required bool ownsState,
   })  : _ownsState = ownsState,
@@ -75,6 +80,7 @@ class Zero3DEngineController implements Listenable {
         final ptr = ffi.Pointer<Zero3DEngineStateNative>.fromAddress(addr);
         final ctrl = Zero3DEngineController._(
           statePointer: ptr,
+          ecsWorldPointer: ffi.nullptr,
           textureId: texId,
           ownsState: false,
         );
@@ -96,12 +102,22 @@ class Zero3DEngineController implements Listenable {
     Zero3DFpsMode fpsMode = Zero3DFpsMode.vsyncNative,
   }) {
     final ptr = Zero3DEngineNativeBindings.instance.createState();
+    final ecsPtr = Zero3DEngineNativeBindings.instance.ecsCreateWorld();
     final ctrl = Zero3DEngineController._(
       statePointer: ptr,
+      ecsWorldPointer: ecsPtr,
       textureId: -1,
       ownsState: true,
     );
     ctrl.setPipelineConfig(renderMode: renderMode, fpsMode: fpsMode);
+    for (int i = 0; i < 64; i++) {
+      ctrl.spawnEcsEntity(
+        x: ((i % 8) - 3.5) * 1.2,
+        y: 0.0,
+        z: ((i ~/ 8) - 3.5) * 1.2,
+        clusterCount: 64,
+      );
+    }
     ctrl.stepSimulation(dtMs: 6.94);
     return ctrl;
   }
@@ -115,6 +131,7 @@ class Zero3DEngineController implements Listenable {
     final ptr = ffi.Pointer<Zero3DEngineStateNative>.fromAddress(stateAddress);
     return Zero3DEngineController._(
       statePointer: ptr,
+      ecsWorldPointer: ffi.nullptr,
       textureId: textureId,
       ownsState: ownsState,
     );
@@ -321,12 +338,49 @@ class Zero3DEngineController implements Listenable {
   /// Advances the C++ Nanite DAG culling and telemetry simulation by `[dtMs]` milliseconds.
   void stepSimulation({double dtMs = 6.94, int totalDagClusters = 4096}) {
     if (_isDisposed || !_view.isValid) return;
-    Zero3DEngineNativeBindings.instance.simulateFrameStep(
-      statePointer,
-      totalDagClusters,
-      dtMs,
-    );
+    if (ecsWorldPointer.address != 0 && _spawnedEntityCount > 0) {
+      Zero3DEngineNativeBindings.instance.ecsCullAndUpdateState(
+        ecsWorldPointer,
+        statePointer,
+        dtMs,
+      );
+    } else {
+      Zero3DEngineNativeBindings.instance.simulateFrameStep(
+        statePointer,
+        totalDagClusters,
+        dtMs,
+      );
+    }
     _revision.add(1);
+  }
+
+  /// Number of 3D entities spawned in the local C++ SoA ECS world.
+  int get spawnedEntityCount => _isDisposed ? 0 : _spawnedEntityCount;
+
+  /// Spawns a 3D entity in the C++ SoA ECS world (`Zero3DEcsWorld`).
+  int spawnEcsEntity({
+    required double x,
+    required double y,
+    required double z,
+    double scale = 1.0,
+    double boundRadius = 0.6,
+    int clusterCount = 64,
+  }) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return -1;
+    final int id = Zero3DEngineNativeBindings.instance.ecsSpawnEntity(
+      ecsWorldPointer,
+      x,
+      y,
+      z,
+      scale,
+      boundRadius,
+      clusterCount,
+    );
+    if (id >= 0) {
+      _spawnedEntityCount = id + 1;
+      _revision.add(1);
+    }
+    return id;
   }
 
   /// Evaluates Nanite cluster culling and projects visible meshlets into pre-allocated
@@ -449,6 +503,9 @@ class Zero3DEngineController implements Listenable {
     if (_isDisposed) return;
     _isDisposed = true;
     _revision.dispose();
+    if (_ownsState && ecsWorldPointer.address != 0) {
+      Zero3DEngineNativeBindings.instance.ecsDestroyWorld(ecsWorldPointer);
+    }
     if (_ownsState && statePointer.address != 0) {
       Zero3DEngineNativeBindings.instance.destroyState(statePointer);
     }
