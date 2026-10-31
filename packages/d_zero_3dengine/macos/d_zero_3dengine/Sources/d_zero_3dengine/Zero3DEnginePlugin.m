@@ -38,9 +38,11 @@
         _engines[@(engine.textureId)] = engine;
 
         int64_t stateAddress = (int64_t)engine.engineState;
+        int64_t ecsAddress = (int64_t)engine.ecsWorld;
         result(@{
             @"textureId": @(engine.textureId),
-            @"stateAddress": @(stateAddress)
+            @"stateAddress": @(stateAddress),
+            @"ecsAddress": @(ecsAddress)
         });
     } else if ([@"resize" isEqualToString:call.method]) {
         int64_t textureId = [call.arguments[@"textureId"] longLongValue];

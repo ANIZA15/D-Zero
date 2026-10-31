@@ -154,6 +154,9 @@ final class Zero3DEngineStateView {
   static const int _idxCameraPitch = 1;
   static const int _idxCameraDist = 2;
   static const int _idxCameraFov = 3;
+  static const int _idxTargetX = 4;
+  static const int _idxTargetY = 5;
+  static const int _idxTargetZ = 6;
   static const int _idxLightAzimuth = 7;
   static const int _idxLightElevation = 8;
   static const int _idxLodError = 9;
@@ -207,6 +210,15 @@ final class Zero3DEngineStateView {
 
   @pragma('vm:prefer-inline')
   double get cameraFovDeg => isValid ? _f32[_idxCameraFov] : 60.0;
+
+  @pragma('vm:prefer-inline')
+  double get targetX => isValid ? _f32[_idxTargetX] : 0.0;
+
+  @pragma('vm:prefer-inline')
+  double get targetY => isValid ? _f32[_idxTargetY] : 0.0;
+
+  @pragma('vm:prefer-inline')
+  double get targetZ => isValid ? _f32[_idxTargetZ] : 0.0;
 
   @pragma('vm:prefer-inline')
   double get lightAzimuth => isValid ? _f32[_idxLightAzimuth] : 0.78;
@@ -278,6 +290,19 @@ typedef _NativeSetCameraOrbit = ffi.Void Function(
 typedef Dart3DSetCameraOrbit = void Function(
   ffi.Pointer<Zero3DEngineStateNative>,
   double,
+  double,
+  double,
+  double,
+);
+
+typedef _NativeSetCameraTarget = ffi.Void Function(
+  ffi.Pointer<Zero3DEngineStateNative>,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+);
+typedef Dart3DSetCameraTarget = void Function(
+  ffi.Pointer<Zero3DEngineStateNative>,
   double,
   double,
   double,
@@ -365,6 +390,61 @@ typedef Dart3DEcsCullAndUpdate = int Function(
   double,
 );
 
+typedef _NativeEcsGetInt = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+typedef Dart3DEcsGetInt = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+);
+
+typedef _NativeEcsSetInt = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Int32,
+);
+typedef Dart3DEcsSetInt = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  int,
+);
+
+typedef _NativeEcsSetTransform = ffi.Void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Int32,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+  ffi.Float,
+);
+typedef Dart3DEcsSetTransform = void Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  int,
+  double,
+  double,
+  double,
+  double,
+);
+
+typedef _NativeEcsGetEntityFloat = ffi.Float Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Int32,
+);
+typedef Dart3DEcsGetEntityFloat = double Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  int,
+);
+
+typedef _NativeEcsRaycastPick = ffi.Int32 Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<Zero3DEngineStateNative>,
+  ffi.Float,
+  ffi.Float,
+);
+typedef Dart3DEcsRaycastPick = int Function(
+  ffi.Pointer<Zero3DEcsWorldNative>,
+  ffi.Pointer<Zero3DEngineStateNative>,
+  double,
+  double,
+);
+
 typedef _NativePackVisBuffer64 = ffi.Uint64 Function(
   ffi.Float,
   ffi.Uint32,
@@ -392,6 +472,9 @@ class Zero3DEngineNativeBindings {
   /// Updates camera orbit angles and FOV atomically via seqlock.
   late final Dart3DSetCameraOrbit setCameraOrbit;
 
+  /// Updates 3D camera target position (`tx, ty, tz`) atomically via seqlock.
+  late final Dart3DSetCameraTarget setCameraTarget;
+
   /// Updates directional light angles atomically via seqlock.
   late final Dart3DSetLightAngles setLightAngles;
 
@@ -412,6 +495,33 @@ class Zero3DEngineNativeBindings {
 
   /// Performs SIMD-friendly distance/frustum culling across ECS entities and updates state.
   late final Dart3DEcsCullAndUpdate ecsCullAndUpdateState;
+
+  /// Returns active entity count in `Zero3DEcsWorld`.
+  late final Dart3DEcsGetInt ecsGetEntityCount;
+
+  /// Returns currently selected entity ID (`-1` if none).
+  late final Dart3DEcsGetInt ecsGetSelectedEntity;
+
+  /// Sets currently selected entity ID.
+  late final Dart3DEcsSetInt ecsSetSelectedEntity;
+
+  /// Updates an entity's 3D world position `(x, y, z)` and `scale`.
+  late final Dart3DEcsSetTransform ecsSetEntityTransform;
+
+  /// Reads an entity's X coordinate.
+  late final Dart3DEcsGetEntityFloat ecsGetEntityX;
+
+  /// Reads an entity's Y coordinate.
+  late final Dart3DEcsGetEntityFloat ecsGetEntityY;
+
+  /// Reads an entity's Z coordinate.
+  late final Dart3DEcsGetEntityFloat ecsGetEntityZ;
+
+  /// Reads an entity's uniform scale.
+  late final Dart3DEcsGetEntityFloat ecsGetEntityScale;
+
+  /// Performs a 3D ray-sphere intersection pick test against all ECS entities.
+  late final Dart3DEcsRaycastPick ecsRaycastPick;
 
   /// Packs normalized depth, cluster ID, and triangle ID into a 64-bit Visibility Buffer pixel.
   late final Dart3DPackVisBuffer64 packVisBuffer64;
@@ -436,6 +546,11 @@ class Zero3DEngineNativeBindings {
     setCameraOrbit =
         _dylib.lookupFunction<_NativeSetCameraOrbit, Dart3DSetCameraOrbit>(
       'zero_3d_set_camera_orbit',
+      isLeaf: true,
+    );
+    setCameraTarget =
+        _dylib.lookupFunction<_NativeSetCameraTarget, Dart3DSetCameraTarget>(
+      'zero_3d_set_camera_target',
       isLeaf: true,
     );
     setLightAngles =
@@ -471,6 +586,51 @@ class Zero3DEngineNativeBindings {
     ecsCullAndUpdateState = _dylib
         .lookupFunction<_NativeEcsCullAndUpdate, Dart3DEcsCullAndUpdate>(
       'zero_3d_ecs_cull_and_update_state',
+      isLeaf: true,
+    );
+    ecsGetEntityCount =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_entity_count',
+      isLeaf: true,
+    );
+    ecsGetSelectedEntity =
+        _dylib.lookupFunction<_NativeEcsGetInt, Dart3DEcsGetInt>(
+      'zero_3d_ecs_get_selected_entity',
+      isLeaf: true,
+    );
+    ecsSetSelectedEntity =
+        _dylib.lookupFunction<_NativeEcsSetInt, Dart3DEcsSetInt>(
+      'zero_3d_ecs_set_selected_entity',
+      isLeaf: true,
+    );
+    ecsSetEntityTransform =
+        _dylib.lookupFunction<_NativeEcsSetTransform, Dart3DEcsSetTransform>(
+      'zero_3d_ecs_set_entity_transform',
+      isLeaf: true,
+    );
+    ecsGetEntityX = _dylib
+        .lookupFunction<_NativeEcsGetEntityFloat, Dart3DEcsGetEntityFloat>(
+      'zero_3d_ecs_get_entity_x',
+      isLeaf: true,
+    );
+    ecsGetEntityY = _dylib
+        .lookupFunction<_NativeEcsGetEntityFloat, Dart3DEcsGetEntityFloat>(
+      'zero_3d_ecs_get_entity_y',
+      isLeaf: true,
+    );
+    ecsGetEntityZ = _dylib
+        .lookupFunction<_NativeEcsGetEntityFloat, Dart3DEcsGetEntityFloat>(
+      'zero_3d_ecs_get_entity_z',
+      isLeaf: true,
+    );
+    ecsGetEntityScale = _dylib
+        .lookupFunction<_NativeEcsGetEntityFloat, Dart3DEcsGetEntityFloat>(
+      'zero_3d_ecs_get_entity_scale',
+      isLeaf: true,
+    );
+    ecsRaycastPick =
+        _dylib.lookupFunction<_NativeEcsRaycastPick, Dart3DEcsRaycastPick>(
+      'zero_3d_ecs_raycast_pick',
       isLeaf: true,
     );
     packVisBuffer64 =

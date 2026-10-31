@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, readonly) int64_t textureId;
 @property (nonatomic, readonly, nullable) Zero3DEngineState *engineState;
+@property (nonatomic, readonly, nullable) Zero3DEcsWorld *ecsWorld;
 
 - (instancetype)initWithWidth:(int32_t)width
                        height:(int32_t)height

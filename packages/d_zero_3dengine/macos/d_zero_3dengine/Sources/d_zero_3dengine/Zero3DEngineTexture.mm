@@ -25,6 +25,8 @@ typedef struct {
     float lodThreshold;
     int32_t renderMode;
     int32_t maxRayBounces;
+    float heroPosScale[4];
+    float cameraTarget[4];
 } Zero3DGpuUniforms;
 
 static NSString *const kZero3DMetalShaderSource = @R"(
@@ -43,6 +45,8 @@ struct Uniforms {
     float lodThreshold;
     int renderMode;
     int maxRayBounces;
+    float4 heroPosScale;
+    float4 cameraTarget;
 };
 
 float sdOctahedron(float3 p, float s) {
@@ -56,7 +60,7 @@ float sdTorus(float3 p, float2 t) {
 }
 
 // Scene SDF with Material / Cluster ID
-float2 mapScene(float3 p, float t) {
+float2 mapScene(float3 p, float t, float4 heroPosScale) {
     float dFloor = p.y + 1.05;
     float2 res = float2(dFloor, 1.0);
 
@@ -64,7 +68,8 @@ float2 mapScene(float3 p, float t) {
     float dCore = sdTorus(q, float2(0.82, 0.26));
     if (dCore < res.x) res = float2(dCore, 2.0);
 
-    float dOct = sdOctahedron(p - float3(0.0, 0.25, 0.0), 0.55);
+    float heroScale = max(heroPosScale.w, 0.2);
+    float dOct = sdOctahedron(p - heroPosScale.xyz, 0.55 * heroScale);
     if (dOct < res.x) res = float2(dOct, 3.0);
 
     for (int i = 0; i < 4; ++i) {
@@ -76,21 +81,21 @@ float2 mapScene(float3 p, float t) {
     return res;
 }
 
-float3 calcNormal(float3 p, float t) {
+float3 calcNormal(float3 p, float t, float4 hero) {
     const float2 e = float2(0.0015, -0.0015);
     return normalize(
-        e.xyy * mapScene(p + e.xyy, t).x +
-        e.yyx * mapScene(p + e.yyx, t).x +
-        e.yxy * mapScene(p + e.yxy, t).x +
-        e.xxx * mapScene(p + e.xxx, t).x
+        e.xyy * mapScene(p + e.xyy, t, hero).x +
+        e.yyx * mapScene(p + e.yyx, t, hero).x +
+        e.yxy * mapScene(p + e.yxy, t, hero).x +
+        e.xxx * mapScene(p + e.xxx, t, hero).x
     );
 }
 
-float calcSoftShadow(float3 ro, float3 rd, float tSec) {
+float calcSoftShadow(float3 ro, float3 rd, float tSec, float4 hero) {
     float res = 1.0;
     float t = 0.04;
     for (int i = 0; i < 24; ++i) {
-        float h = mapScene(ro + rd * t, tSec).x;
+        float h = mapScene(ro + rd * t, tSec, hero).x;
         if (h < 0.001) return 0.0;
         res = min(res, 12.0 * h / t);
         t += clamp(h, 0.02, 0.25);
@@ -105,12 +110,12 @@ float3 clusterHashColor(float3 p, float lodStep) {
     return 0.35 + 0.65 * cos(6.28318 * (h + float3(0.0, 0.33, 0.67)));
 }
 
-float calcAmbientOcclusion(float3 pos, float3 nor, float tSec) {
+float calcAmbientOcclusion(float3 pos, float3 nor, float tSec, float4 hero) {
     float occ = 0.0;
     float sca = 1.0;
     for (int i = 0; i < 5; ++i) {
         float h = 0.02 + 0.11 * float(i) / 4.0;
-        float d = mapScene(pos + h * nor, tSec).x;
+        float d = mapScene(pos + h * nor, tSec, hero).x;
         occ += (h - d) * sca;
         sca *= 0.92;
     }
@@ -146,8 +151,9 @@ kernel void zero3d_render_kernel(
 
     float cy = cos(u.cameraYaw), sy = sin(u.cameraYaw);
     float cp = cos(u.cameraPitch), sp = sin(u.cameraPitch);
-    float3 ro = float3(sy * cp, sp, cy * cp) * max(u.cameraDist, 1.2);
-    float3 fwd = normalize(-ro);
+    float3 camOffset = float3(sy * cp, sp, cy * cp) * max(u.cameraDist, 1.2);
+    float3 ro = u.cameraTarget.xyz + camOffset;
+    float3 fwd = normalize(-camOffset);
     float3 right = normalize(cross(fwd, float3(0.0, 1.0, 0.0)));
     float3 up = cross(right, fwd);
     float fovScale = tan(u.cameraFov * 0.5 * 0.01745329);
@@ -167,7 +173,7 @@ kernel void zero3d_render_kernel(
         float t = 0.0;
         float matId = -1.0;
         for (int i = 0; i < 64; ++i) {
-            float2 h = mapScene(ro + rd * t, u.timeSec);
+            float2 h = mapScene(ro + rd * t, u.timeSec, u.heroPosScale);
             if (h.x < 0.002) {
                 matId = h.y;
                 break;
@@ -183,10 +189,10 @@ kernel void zero3d_render_kernel(
         }
 
         float3 pos = ro + rd * t;
-        float3 nor = calcNormal(pos, u.timeSec);
+        float3 nor = calcNormal(pos, u.timeSec, u.heroPosScale);
         float diff = max(dot(nor, lightDir), 0.0);
-        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec) : 1.0;
-        float ao = calcAmbientOcclusion(pos, nor, u.timeSec);
+        float shadow = (u.renderMode <= 1) ? calcSoftShadow(pos + nor * 0.01, lightDir, u.timeSec, u.heroPosScale) : 1.0;
+        float ao = calcAmbientOcclusion(pos, nor, u.timeSec, u.heroPosScale);
 
         float3 baseCol = materialColorForId(matId, pos, u.renderMode, u.lodThreshold, t);
         float3 halfV = normalize(lightDir - rd);
@@ -259,6 +265,7 @@ kernel void zero3d_render_kernel(
 
 @synthesize textureId = _textureId;
 @synthesize engineState = _engineState;
+@synthesize ecsWorld = _ecsWorld;
 
 - (instancetype)initWithWidth:(int32_t)width
                        height:(int32_t)height
@@ -277,7 +284,9 @@ kernel void zero3d_render_kernel(
 
         _engineState = zero_3d_create_state();
         _ecsWorld = zero_3d_ecs_create_world();
-        for (int i = 0; i < 64; ++i) {
+        // Entity #0: 中央のメイン Octahedron (Gizmo で 3D 移動・スケール操作可能)
+        zero_3d_ecs_spawn_entity(_ecsWorld, 0.0f, 0.25f, 0.0f, 1.0f, 0.65f, 128);
+        for (int i = 1; i < 64; ++i) {
             float x = (float)((i % 8) - 3.5f) * 1.2f;
             float z = (float)((i / 8) - 3.5f) * 1.2f;
             zero_3d_ecs_spawn_entity(_ecsWorld, x, 0.0f, z, 1.0f, 0.6f, 64);
@@ -436,6 +445,16 @@ kernel void zero3d_render_kernel(
     u.lodThreshold = _engineState->lod_error_threshold.load(std::memory_order_relaxed);
     u.renderMode = _engineState->render_mode.load(std::memory_order_relaxed);
     u.maxRayBounces = _engineState->max_ray_bounces.load(std::memory_order_relaxed);
+    int32_t selId = _ecsWorld ? zero_3d_ecs_get_selected_entity(_ecsWorld) : 0;
+    if (selId < 0) selId = 0;
+    u.heroPosScale[0] = _ecsWorld ? zero_3d_ecs_get_entity_x(_ecsWorld, selId) : 0.0f;
+    u.heroPosScale[1] = _ecsWorld ? zero_3d_ecs_get_entity_y(_ecsWorld, selId) : 0.25f;
+    u.heroPosScale[2] = _ecsWorld ? zero_3d_ecs_get_entity_z(_ecsWorld, selId) : 0.0f;
+    u.heroPosScale[3] = _ecsWorld ? zero_3d_ecs_get_entity_scale(_ecsWorld, selId) : 1.0f;
+    u.cameraTarget[0] = _engineState->target_x.load(std::memory_order_relaxed);
+    u.cameraTarget[1] = _engineState->target_y.load(std::memory_order_relaxed);
+    u.cameraTarget[2] = _engineState->target_z.load(std::memory_order_relaxed);
+    u.cameraTarget[3] = 0.0f;
 
     id<MTLCommandBuffer> cmdBuf = [_commandQueue commandBuffer];
     id<MTLComputeCommandEncoder> enc = [cmdBuf computeCommandEncoder];

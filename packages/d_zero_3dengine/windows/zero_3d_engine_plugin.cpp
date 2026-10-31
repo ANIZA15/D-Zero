@@ -70,6 +70,7 @@ public:
 
     int64_t texture_id() const { return texture_id_; }
     Zero3DEngineState* state() const { return state_; }
+    Zero3DEcsWorld* ecs_world() const { return ecs_world_; }
 
     void Dispose() {
         bool expected = true;
@@ -177,11 +178,13 @@ private:
             auto inst = std::make_unique<Zero3DWindowsInstance>(textures_, w, h);
             int64_t tex_id = inst->texture_id();
             int64_t addr = reinterpret_cast<int64_t>(inst->state());
+            int64_t ecs_addr = reinterpret_cast<int64_t>(inst->ecs_world());
             instances_[tex_id] = std::move(inst);
 
             flutter::EncodableMap resp;
             resp[flutter::EncodableValue("textureId")] = flutter::EncodableValue(tex_id);
             resp[flutter::EncodableValue("stateAddress")] = flutter::EncodableValue(addr);
+            resp[flutter::EncodableValue("ecsAddress")] = flutter::EncodableValue(ecs_addr);
             result->Success(flutter::EncodableValue(resp));
         } else if (call.method_name() == "dispose") {
             if (args) {

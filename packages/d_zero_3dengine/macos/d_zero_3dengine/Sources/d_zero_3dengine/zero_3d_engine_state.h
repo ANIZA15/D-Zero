@@ -124,8 +124,9 @@ typedef struct Zero3DNaniteCluster Zero3DNaniteCluster;
 
 #ifdef __cplusplus
 struct alignas(64) Zero3DEcsWorld {
-    std::atomic<uint32_t> magic_guard;   // 生存確認カナリア ("ZECS")
-    std::atomic<int32_t> entity_count;   // アクティブエンティティ数 (0..1024)
+    std::atomic<uint32_t> magic_guard;     // 生存確認カナリア ("ZECS")
+    std::atomic<int32_t> entity_count;     // アクティブエンティティ数 (0..1024)
+    std::atomic<int32_t> selected_entity;  // 選択中エンティティ ID (-1 = 未選択)
     alignas(64) float pos_x[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_y[ZERO_3D_ECS_MAX_ENTITIES];
     alignas(64) float pos_z[ZERO_3D_ECS_MAX_ENTITIES];
@@ -228,6 +229,30 @@ ZERO_3D_EXPORT int32_t zero_3d_ecs_cull_and_update_state(
     Zero3DEcsWorld* world,
     Zero3DEngineState* state,
     float dt_ms
+);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_entity_count(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_get_selected_entity(const Zero3DEcsWorld* world);
+ZERO_3D_EXPORT void zero_3d_ecs_set_selected_entity(
+    Zero3DEcsWorld* world,
+    int32_t entity_id
+);
+ZERO_3D_EXPORT void zero_3d_ecs_set_entity_transform(
+    Zero3DEcsWorld* world,
+    int32_t entity_id,
+    float x,
+    float y,
+    float z,
+    float scale
+);
+ZERO_3D_EXPORT float zero_3d_ecs_get_entity_x(const Zero3DEcsWorld* world, int32_t entity_id);
+ZERO_3D_EXPORT float zero_3d_ecs_get_entity_y(const Zero3DEcsWorld* world, int32_t entity_id);
+ZERO_3D_EXPORT float zero_3d_ecs_get_entity_z(const Zero3DEcsWorld* world, int32_t entity_id);
+ZERO_3D_EXPORT float zero_3d_ecs_get_entity_scale(const Zero3DEcsWorld* world, int32_t entity_id);
+ZERO_3D_EXPORT int32_t zero_3d_ecs_raycast_pick(
+    Zero3DEcsWorld* world,
+    const Zero3DEngineState* state,
+    float ndc_x,
+    float ndc_y
 );
 
 // 64-bit Visibility Buffer パック/アンパック ((uint64_t)DepthBits << 32 | (ClusterID << 8) | TriID)

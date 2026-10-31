@@ -227,6 +227,18 @@ void test_ecs_world_and_visbuffer64() {
     TEST_ASSERT(zero_3d_unpack_visbuffer_cluster(packed) == 0x123456u, "24-bit ClusterID が正確に復元されること");
     TEST_ASSERT(zero_3d_unpack_visbuffer_triangle(packed) == 127u, "8-bit TriangleID が正確に復元されること");
 
+    // 3D Entity Transform 更新 & Raycast Picking & 境界外アクセス防御
+    zero_3d_ecs_set_entity_transform(world, 0, 0.0f, 0.0f, 0.0f, 1.5f);
+    TEST_ASSERT(std::abs(zero_3d_ecs_get_entity_scale(world, 0) - 1.5f) < 0.01f, "Scale が更新されること");
+    zero_3d_ecs_set_entity_transform(world, -99, 1.0f, 2.0f, 3.0f, 1.0f);
+    zero_3d_ecs_set_entity_transform(world, 99999, 1.0f, 2.0f, 3.0f, 1.0f);
+    TEST_ASSERT(zero_3d_ecs_get_entity_x(world, -1) == 0.0f, "負の ID 参照で境界外アクセスしないこと");
+    TEST_ASSERT(zero_3d_ecs_get_entity_x(world, 99999) == 0.0f, "上限超過 ID 参照で境界外アクセスしないこと");
+
+    int32_t picked = zero_3d_ecs_raycast_pick(world, state, 0.0f, 0.0f);
+    TEST_ASSERT(picked >= 0, "中央レイキャストで原点エンティティがヒットすること");
+    TEST_ASSERT(zero_3d_ecs_get_selected_entity(world) == picked, "ヒットしたエンティティが選択状態になること");
+
     zero_3d_ecs_destroy_world(world);
     zero_3d_ecs_destroy_world(nullptr);
     zero_3d_destroy_state(state);

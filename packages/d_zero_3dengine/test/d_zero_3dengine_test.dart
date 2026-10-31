@@ -76,6 +76,17 @@ void main() {
       final packed = bindings.packVisBuffer64(0.75, 4095, 99);
       expect(bindings.unpackVisBufferCluster(packed), equals(4095));
       expect(bindings.unpackVisBufferTriangle(packed), equals(99));
+
+      controller.setEntityTransform(
+        entityId: 0,
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        scale: 1.4,
+      );
+      expect(controller.getEntityScale(0), closeTo(1.4, 0.01));
+      final hitId = controller.raycastPick(0.0, 0.0);
+      expect(hitId, greaterThanOrEqualTo(0));
     });
   });
 
@@ -255,6 +266,43 @@ void main() {
 
         expect(ctrl.lodErrorThreshold, greaterThan(0.25));
         expect(ctrl.cameraFovDeg, greaterThanOrEqualTo(20.0));
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(ctrl.hasListeners, isFalse);
+
+        await ctrl.dispose();
+      },
+    );
+
+    testWidgets(
+      'ZTransformGizmo3D (Z3DGizmoOverlay) と ZOutliner3D (ZEntityOutliner3D) の操作と解放が機能すること',
+      (tester) async {
+        final ctrl = Zero3DEngineController.simulated();
+
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              children: [
+                ZTransformGizmo3D(controller: ctrl),
+                ZOutliner3D(controller: ctrl),
+              ],
+            ),
+          ),
+        );
+
+        expect(find.byType(ZTransformGizmo3D), findsOneWidget);
+        expect(find.byType(ZOutliner3D), findsOneWidget);
+
+        final gizmoTopLeft = tester.getTopLeft(find.byType(ZTransformGizmo3D));
+        await tester.tapAt(gizmoTopLeft + const Offset(150.0, 20.0));
+        await tester.tapAt(gizmoTopLeft + const Offset(160.0, 62.0));
+        await tester.tapAt(gizmoTopLeft + const Offset(170.0, 104.0));
+        await tester.tapAt(gizmoTopLeft + const Offset(180.0, 146.0));
+        await tester.tap(find.byType(ZOutliner3D));
+        await tester.pump(const Duration(milliseconds: 16));
+
+        expect(ctrl.getEntityScale(0), greaterThan(0.3));
 
         await tester.pumpWidget(const SizedBox.shrink());
         expect(ctrl.hasListeners, isFalse);

@@ -77,10 +77,14 @@ class Zero3DEngineController implements Listenable {
       if (result != null) {
         final int texId = result['textureId'] as int;
         final int addr = result['stateAddress'] as int;
+        final int ecsAddr = (result['ecsAddress'] as int?) ?? 0;
         final ptr = ffi.Pointer<Zero3DEngineStateNative>.fromAddress(addr);
+        final ecsPtr = ecsAddr != 0
+            ? ffi.Pointer<Zero3DEcsWorldNative>.fromAddress(ecsAddr)
+            : ffi.nullptr;
         final ctrl = Zero3DEngineController._(
           statePointer: ptr,
-          ecsWorldPointer: ffi.nullptr,
+          ecsWorldPointer: ecsPtr,
           textureId: texId,
           ownsState: false,
         );
@@ -110,7 +114,15 @@ class Zero3DEngineController implements Listenable {
       ownsState: true,
     );
     ctrl.setPipelineConfig(renderMode: renderMode, fpsMode: fpsMode);
-    for (int i = 0; i < 64; i++) {
+    ctrl.spawnEcsEntity(
+      x: 0.0,
+      y: 0.25,
+      z: 0.0,
+      scale: 1.0,
+      boundRadius: 0.65,
+      clusterCount: 128,
+    );
+    for (int i = 1; i < 64; i++) {
       ctrl.spawnEcsEntity(
         x: ((i % 8) - 3.5) * 1.2,
         y: 0.0,
@@ -173,6 +185,18 @@ class Zero3DEngineController implements Listenable {
   /// Camera vertical field-of-view in degrees.
   @pragma('vm:prefer-inline')
   double get cameraFovDeg => _isDisposed ? 60.0 : _view.cameraFovDeg;
+
+  /// Camera target X coordinate in meters.
+  @pragma('vm:prefer-inline')
+  double get targetX => _isDisposed ? 0.0 : _view.targetX;
+
+  /// Camera target Y coordinate in meters.
+  @pragma('vm:prefer-inline')
+  double get targetY => _isDisposed ? 0.0 : _view.targetY;
+
+  /// Camera target Z coordinate in meters.
+  @pragma('vm:prefer-inline')
+  double get targetZ => _isDisposed ? 0.0 : _view.targetZ;
 
   /// Directional light azimuth angle in radians.
   @pragma('vm:prefer-inline')
@@ -291,6 +315,29 @@ class Zero3DEngineController implements Listenable {
     );
   }
 
+  /// Sets the 3D camera target position (`tx, ty, tz`) in shared memory.
+  void setCameraTarget(double tx, double ty, double tz) {
+    if (_isDisposed || !_view.isValid) return;
+    Zero3DEngineNativeBindings.instance.setCameraTarget(
+      statePointer,
+      tx,
+      ty,
+      tz,
+    );
+    _revision.add(1);
+  }
+
+  /// Pans the 3D camera target by `(dx, dy, dz)` in world space.
+  void panCameraBy(double dx, double dy, double dz) {
+    if (_isDisposed || !_view.isValid) return;
+    if (dx.isNaN || dy.isNaN || dz.isNaN) return;
+    setCameraTarget(
+      _view.targetX + dx,
+      _view.targetY + dy,
+      _view.targetZ + dz,
+    );
+  }
+
   /// Sets directional light azimuth and elevation angles in radians.
   void setLightAngles(double azimuth, double elevation) {
     if (_isDisposed || !_view.isValid) return;
@@ -354,8 +401,110 @@ class Zero3DEngineController implements Listenable {
     _revision.add(1);
   }
 
-  /// Number of 3D entities spawned in the local C++ SoA ECS world.
-  int get spawnedEntityCount => _isDisposed ? 0 : _spawnedEntityCount;
+  /// Number of 3D entities spawned in the C++ SoA ECS world.
+  int get spawnedEntityCount {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0;
+    final int c = Zero3DEngineNativeBindings.instance.ecsGetEntityCount(
+      ecsWorldPointer,
+    );
+    return c > 0 ? c : _spawnedEntityCount;
+  }
+
+  /// Currently selected entity ID in `Zero3DEcsWorld` (`-1` if none).
+  int get selectedEntityId {
+    if (_isDisposed || ecsWorldPointer.address == 0) return -1;
+    return Zero3DEngineNativeBindings.instance.ecsGetSelectedEntity(
+      ecsWorldPointer,
+    );
+  }
+
+  /// Selects an entity by ID (`0 .. spawnedEntityCount - 1`, or `-1` to clear).
+  void selectEntity(int entityId) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    Zero3DEngineNativeBindings.instance.ecsSetSelectedEntity(
+      ecsWorldPointer,
+      entityId,
+    );
+    _revision.add(1);
+  }
+
+  /// Reads the X coordinate of `[entityId]` in `Zero3DEcsWorld`.
+  double getEntityX(int entityId) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.0;
+    return Zero3DEngineNativeBindings.instance.ecsGetEntityX(
+      ecsWorldPointer,
+      entityId,
+    );
+  }
+
+  /// Reads the Y coordinate of `[entityId]` in `Zero3DEcsWorld`.
+  double getEntityY(int entityId) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.0;
+    return Zero3DEngineNativeBindings.instance.ecsGetEntityY(
+      ecsWorldPointer,
+      entityId,
+    );
+  }
+
+  /// Reads the Z coordinate of `[entityId]` in `Zero3DEcsWorld`.
+  double getEntityZ(int entityId) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 0.0;
+    return Zero3DEngineNativeBindings.instance.ecsGetEntityZ(
+      ecsWorldPointer,
+      entityId,
+    );
+  }
+
+  /// Reads the uniform scale of `[entityId]` in `Zero3DEcsWorld`.
+  double getEntityScale(int entityId) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return 1.0;
+    return Zero3DEngineNativeBindings.instance.ecsGetEntityScale(
+      ecsWorldPointer,
+      entityId,
+    );
+  }
+
+  /// Updates the 3D transform `(x, y, z, scale)` of `[entityId]` in `Zero3DEcsWorld`.
+  void setEntityTransform({
+    required int entityId,
+    double? x,
+    double? y,
+    double? z,
+    double? scale,
+  }) {
+    if (_isDisposed || ecsWorldPointer.address == 0) return;
+    final double nx = x ?? getEntityX(entityId);
+    final double ny = y ?? getEntityY(entityId);
+    final double nz = z ?? getEntityZ(entityId);
+    final double ns = scale ?? getEntityScale(entityId);
+    Zero3DEngineNativeBindings.instance.ecsSetEntityTransform(
+      ecsWorldPointer,
+      entityId,
+      nx,
+      ny,
+      nz,
+      ns,
+    );
+    _revision.add(1);
+  }
+
+  /// Fires a 3D ray from the camera through normalized device coordinates `(ndcX, ndcY)`
+  /// in `[-1.0 .. 1.0]` and selects the closest intersected ECS entity.
+  int raycastPick(double ndcX, double ndcY) {
+    if (_isDisposed || !_view.isValid || ecsWorldPointer.address == 0) {
+      return -1;
+    }
+    final int hitId = Zero3DEngineNativeBindings.instance.ecsRaycastPick(
+      ecsWorldPointer,
+      statePointer,
+      ndcX,
+      ndcY,
+    );
+    if (hitId >= 0) {
+      _revision.add(1);
+    }
+    return hitId;
+  }
 
   /// Spawns a 3D entity in the C++ SoA ECS world (`Zero3DEcsWorld`).
   int spawnEcsEntity({

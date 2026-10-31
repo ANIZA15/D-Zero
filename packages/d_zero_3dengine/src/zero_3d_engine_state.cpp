@@ -380,6 +380,7 @@ Zero3DEcsWorld* zero_3d_ecs_create_world(void) {
     if (!world) return nullptr;
 
     world->entity_count.store(0, std::memory_order_relaxed);
+    world->selected_entity.store(0, std::memory_order_relaxed);
     for (int i = 0; i < ZERO_3D_ECS_MAX_ENTITIES; ++i) {
         world->pos_x[i] = 0.0f;
         world->pos_y[i] = 0.0f;
@@ -479,6 +480,129 @@ int32_t zero_3d_ecs_cull_and_update_state(
         dt_ms
     );
     return total_clusters;
+}
+
+static inline bool is_entity_index_valid(const Zero3DEcsWorld* world, int32_t entity_id) {
+    if (!is_ecs_valid_alive(world)) return false;
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+    return entity_id >= 0 && entity_id < count;
+}
+
+int32_t zero_3d_ecs_get_entity_count(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->entity_count.load(std::memory_order_acquire) : 0;
+}
+
+int32_t zero_3d_ecs_get_selected_entity(const Zero3DEcsWorld* world) {
+    return is_ecs_valid_alive(world) ? world->selected_entity.load(std::memory_order_acquire) : -1;
+}
+
+void zero_3d_ecs_set_selected_entity(Zero3DEcsWorld* world, int32_t entity_id) {
+    if (!is_ecs_valid_alive(world)) return;
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+    const int32_t safe_id = (entity_id >= -1 && entity_id < count) ? entity_id : -1;
+    world->selected_entity.store(safe_id, std::memory_order_release);
+}
+
+void zero_3d_ecs_set_entity_transform(
+    Zero3DEcsWorld* world,
+    int32_t entity_id,
+    float x,
+    float y,
+    float z,
+    float scale
+) {
+    if (!is_entity_index_valid(world, entity_id)) return;
+    world->pos_x[entity_id] = sanitize_float(x, 0.0f, -10000.0f, 10000.0f);
+    world->pos_y[entity_id] = sanitize_float(y, 0.0f, -10000.0f, 10000.0f);
+    world->pos_z[entity_id] = sanitize_float(z, 0.0f, -10000.0f, 10000.0f);
+    world->scale[entity_id] = sanitize_float(scale, 1.0f, 0.1f, 100.0f);
+}
+
+float zero_3d_ecs_get_entity_x(const Zero3DEcsWorld* world, int32_t entity_id) {
+    return is_entity_index_valid(world, entity_id) ? world->pos_x[entity_id] : 0.0f;
+}
+
+float zero_3d_ecs_get_entity_y(const Zero3DEcsWorld* world, int32_t entity_id) {
+    return is_entity_index_valid(world, entity_id) ? world->pos_y[entity_id] : 0.0f;
+}
+
+float zero_3d_ecs_get_entity_z(const Zero3DEcsWorld* world, int32_t entity_id) {
+    return is_entity_index_valid(world, entity_id) ? world->pos_z[entity_id] : 0.0f;
+}
+
+float zero_3d_ecs_get_entity_scale(const Zero3DEcsWorld* world, int32_t entity_id) {
+    return is_entity_index_valid(world, entity_id) ? world->scale[entity_id] : 1.0f;
+}
+
+static inline float intersect_ray_sphere(
+    float ro_x, float ro_y, float ro_z,
+    float rd_x, float rd_y, float rd_z,
+    float cx, float cy, float cz, float radius
+) {
+    const float oc_x = ro_x - cx;
+    const float oc_y = ro_y - cy;
+    const float oc_z = ro_z - cz;
+    const float b = oc_x * rd_x + oc_y * rd_y + oc_z * rd_z;
+    const float c = (oc_x * oc_x + oc_y * oc_y + oc_z * oc_z) - radius * radius;
+    const float h = b * b - c;
+    if (h < 0.0f) return -1.0f;
+    const float t = -b - std::sqrt(h);
+    return t > 0.01f ? t : -1.0f;
+}
+
+int32_t zero_3d_ecs_raycast_pick(
+    Zero3DEcsWorld* world,
+    const Zero3DEngineState* state,
+    float ndc_x,
+    float ndc_y
+) {
+    if (!is_ecs_valid_alive(world) || !is_valid_alive(state)) return -1;
+    const float sx = sanitize_float(ndc_x, 0.0f, -2.0f, 2.0f);
+    const float sy = sanitize_float(ndc_y, 0.0f, -2.0f, 2.0f);
+
+    const float yaw = state->camera_yaw.load(std::memory_order_relaxed);
+    const float pitch = state->camera_pitch.load(std::memory_order_relaxed);
+    const float dist = state->camera_distance.load(std::memory_order_relaxed);
+    const float fov = state->camera_fov_deg.load(std::memory_order_relaxed);
+    const float tx = state->target_x.load(std::memory_order_relaxed);
+    const float ty = state->target_y.load(std::memory_order_relaxed);
+    const float tz = state->target_z.load(std::memory_order_relaxed);
+
+    const float cy = std::cos(yaw), s_y = std::sin(yaw);
+    const float cp = std::cos(pitch), sp = std::sin(pitch);
+    const float ro_x = tx + s_y * cp * dist;
+    const float ro_y = ty + sp * dist;
+    const float ro_z = tz + cy * cp * dist;
+
+    const float fwd_x = -s_y * cp, fwd_y = -sp, fwd_z = -cy * cp;
+    const float right_x = cy, right_z = -s_y;
+    const float up_x = -s_y * sp, up_y = cp, up_z = -cy * sp;
+    const float fov_scale = std::tan(fov * 0.5f * 0.01745329f);
+
+    float rd_x = fwd_x + (sx * right_x + sy * up_x) * fov_scale;
+    float rd_y = fwd_y + (sy * up_y) * fov_scale;
+    float rd_z = fwd_z + (sx * right_z + sy * up_z) * fov_scale;
+    const float inv_len = 1.0f / std::sqrt(rd_x * rd_x + rd_y * rd_y + rd_z * rd_z);
+    rd_x *= inv_len; rd_y *= inv_len; rd_z *= inv_len;
+
+    const int32_t count = world->entity_count.load(std::memory_order_acquire);
+    int32_t best_id = -1;
+    float best_t = 1e9f;
+    for (int32_t i = 0; i < count; ++i) {
+        const float r = world->bound_radius[i] * world->scale[i];
+        const float hit_t = intersect_ray_sphere(
+            ro_x, ro_y, ro_z, rd_x, rd_y, rd_z,
+            world->pos_x[i], world->pos_y[i], world->pos_z[i], r
+        );
+        if (hit_t > 0.0f && hit_t < best_t) {
+            best_t = hit_t;
+            best_id = i;
+        }
+    }
+    if (best_id >= 0) {
+        world->selected_entity.store(best_id, std::memory_order_release);
+    }
+    return best_id;
 }
 
 uint64_t zero_3d_pack_visbuffer64(

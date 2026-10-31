@@ -91,10 +91,24 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
                   return ZViewport3D(
                     controller: _controller,
                     size: Size(constraints.maxWidth, constraints.maxHeight),
-                    overlay: Positioned(
-                      right: 14.0,
-                      bottom: 14.0,
-                      child: ZSceneInspector3D(controller: _controller),
+                    overlay: Stack(
+                      children: [
+                        Positioned(
+                          right: 14.0,
+                          top: 14.0,
+                          child: ZOutliner3D(controller: _controller),
+                        ),
+                        Positioned(
+                          left: 14.0,
+                          bottom: 14.0,
+                          child: ZTransformGizmo3D(controller: _controller),
+                        ),
+                        Positioned(
+                          right: 14.0,
+                          bottom: 14.0,
+                          child: ZSceneInspector3D(controller: _controller),
+                        ),
+                      ],
                     ),
                   );
                 },

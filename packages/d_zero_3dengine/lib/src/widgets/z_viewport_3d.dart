@@ -232,7 +232,12 @@ class RenderZViewport3D extends ZeroRenderBox {
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
     if (_controller.isDisposed) return;
-    if (event is PointerMoveEvent) {
+    if (event is PointerDownEvent && size.height > 1.0) {
+      final double halfH = size.height * 0.5;
+      final double ndcX = (event.localPosition.dx - size.width * 0.5) / halfH;
+      final double ndcY = -(event.localPosition.dy - halfH) / halfH;
+      _controller.raycastPick(ndcX, ndcY);
+    } else if (event is PointerMoveEvent) {
       _controller.orbitBy(event.delta.dx * 0.01, event.delta.dy * 0.008);
     } else if (event is PointerScrollEvent) {
       _controller.zoomBy(event.scrollDelta.dy * 0.005);
