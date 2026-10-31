@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
@@ -9,7 +8,7 @@ void main() {
   runApp(const DZeroSensorBenchmarkApp());
 }
 
-enum SensorBenchMode { dZero, traditional, sideBySide }
+enum SensorBenchMode { dZero, traditional }
 
 class DZeroSensorBenchmarkApp extends StatelessWidget {
   const DZeroSensorBenchmarkApp({super.key});
@@ -17,7 +16,7 @@ class DZeroSensorBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_sensor High-Load Benchmark',
+      title: 'd_zero_sensor Sample',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF0A0E17),
@@ -45,22 +44,16 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
 
   SensorBenchMode _mode = SensorBenchMode.dZero;
   int _schedulerSlot = -1;
-  final bool _isRunning = true;
-  bool _extremeLoad = false;
   int _tickCount = 0;
   double _phase = 0.0;
 
   final Stopwatch _cpuStopwatch = Stopwatch();
   final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(3.9);
-  final ZeroDoubleNotifier _rssMb = ZeroDoubleNotifier(48.0);
-  final ZeroDoubleNotifier _peakMb = ZeroDoubleNotifier(48.0);
-  final ZeroIntNotifier _dZeroRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradAllocs = ZeroIntNotifier(0);
 
   late final ZeroDetectionController _detectionCtrl;
   final ZeroDoubleNotifier _headingDeg = ZeroDoubleNotifier(45.0);
   late final ZeroTiltController _tiltCtrl;
+  late final ZeroQRCodeController _qrCtrl;
 
   @override
   int get zeroSchedulerSlot => _schedulerSlot;
@@ -73,29 +66,32 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
     super.initState();
     _detectionCtrl = ZeroDetectionController(capacity: 16);
     _tiltCtrl = ZeroTiltController(pitch: 2.0, roll: -1.5);
+    _qrCtrl = ZeroQRCodeController();
     _stepDetections();
-    _sampleMemory();
     ZeroFrameScheduler.instance.subscribe(this);
   }
 
   @override
   void onZeroFrame(Duration elapsed) {
-    if (!mounted || !_isRunning) return;
+    if (!mounted) return;
     _cpuStopwatch
       ..reset()
       ..start();
 
     _tickCount++;
-    _phase += _extremeLoad ? 0.16 : 0.06;
-    _headingDeg.value = (_headingDeg.value + (_extremeLoad ? 2.4 : 0.8)) % 360.0;
-    _tiltCtrl.updateTilt(math.sin(_phase) * 14.0, math.cos(_phase * 0.8) * 14.0);
+    _phase += 0.06;
+    _headingDeg.value = (_headingDeg.value + 0.8) % 360.0;
+    _tiltCtrl.updateTilt(
+      math.sin(_phase) * 14.0,
+      math.cos(_phase * 0.8) * 14.0,
+    );
+    if (_tickCount % 60 == 0) {
+      _qrCtrl.updateToken(100000 + _tickCount);
+    }
     _stepDetections();
 
-    if (_mode != SensorBenchMode.dZero) {
-      setState(() {
-        _tradRebuilds.add(1);
-        _tradAllocs.add(_boxCount * 5 + 16);
-      });
+    if (_mode == SensorBenchMode.traditional) {
+      setState(() {});
     }
 
     _cpuStopwatch.stop();
@@ -121,22 +117,10 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
   }
 
   void _updateTelemetry(int workMicros) {
-    final double overhead = _mode == SensorBenchMode.dZero
-        ? 145.0
-        : (_extremeLoad ? 3850.0 : 1780.0);
-    final double pct = ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.2, 99.9);
+    final double overhead = _mode == SensorBenchMode.dZero ? 145.0 : 1780.0;
+    final double pct =
+        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.2, 99.9);
     _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
-    if (_tickCount % 15 == 0) _sampleMemory();
-  }
-
-  void _sampleMemory() {
-    try {
-      final double mb = ProcessInfo.currentRss / (1024.0 * 1024.0);
-      _rssMb.value = mb;
-      if (mb > _peakMb.value) _peakMb.value = mb;
-    } catch (_) {
-      _rssMb.value = 46.5;
-    }
   }
 
   @override
@@ -145,12 +129,8 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
     _detectionCtrl.dispose();
     _headingDeg.dispose();
     _tiltCtrl.dispose();
+    _qrCtrl.dispose();
     _cpuPct.dispose();
-    _rssMb.dispose();
-    _peakMb.dispose();
-    _dZeroRebuilds.dispose();
-    _tradRebuilds.dispose();
-    _tradAllocs.dispose();
     super.dispose();
   }
 
@@ -158,7 +138,7 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_sensor ML & Gyro Benchmark'),
+        title: const Text('⚡️ d_zero_sensor'),
         backgroundColor: const Color(0xFF131B2A),
       ),
       body: SingleChildScrollView(
@@ -168,9 +148,24 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
           children: [
             _buildHud(),
             const SizedBox(height: 12),
-            _buildControls(),
+            SegmentedButton<SensorBenchMode>(
+              segments: const [
+                ButtonSegment(
+                  value: SensorBenchMode.dZero,
+                  label: Text('D-Zero'),
+                ),
+                ButtonSegment(
+                  value: SensorBenchMode.traditional,
+                  label: Text('従来'),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => setState(() => _mode = s.first),
+            ),
             const SizedBox(height: 12),
-            _buildBody(),
+            _mode == SensorBenchMode.dZero
+                ? _buildDZeroSensors()
+                : _buildTradSensors(),
           ],
         ),
       ),
@@ -183,105 +178,41 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF101624),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45)),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+        ),
       ),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Row(
         children: [
           const ZFPSMonitor(size: Size(148.0, 44.0)),
-          _buildPriceStat('CPU Load %', _cpuPct, ZeroNumberPainter.glyphPercent, Colors.amberAccent),
-          _buildPriceStat('RSS MB', _rssMb, ZeroNumberPainter.glyphPlus, const Color(0xFF00E5FF)),
-          _buildPriceStat('Peak MB', _peakMb, ZeroNumberPainter.glyphPlus, Colors.orangeAccent),
-          _buildIntStat('D-Zero Rebuilds', _dZeroRebuilds, const Color(0xFF00FF88)),
-          _buildIntStat('Trad Rebuilds', _tradRebuilds, Colors.redAccent),
-          _buildIntStat('Trad Allocs', _tradAllocs, Colors.pinkAccent),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceStat(String label, ZeroDoubleNotifier n, int glyph, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        SizedBox(
-          width: 72,
-          height: 20,
-          child: ZPriceTicker(
-            valueListenable: n,
-            currencyGlyph: glyph,
-            fractionDigits: 1,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color, fontFamily: 'monospace'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIntStat(String label, ZeroIntNotifier n, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        SizedBox(
-          width: 80,
-          height: 20,
-          child: ZCounter(
-            valueListenable: n,
-            minDigits: 1,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color, fontFamily: 'monospace'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControls() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131B2A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SegmentedButton<SensorBenchMode>(
-            segments: const [
-              ButtonSegment(value: SensorBenchMode.dZero, label: Text('D-Zero Sensors')),
-              ButtonSegment(value: SensorBenchMode.traditional, label: Text('Traditional')),
-              ButtonSegment(value: SensorBenchMode.sideBySide, label: Text('Both')),
+          const SizedBox(width: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'CPU使用率',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              SizedBox(
+                width: 72,
+                height: 22,
+                child: ZPriceTicker(
+                  valueListenable: _cpuPct,
+                  currencyGlyph: ZeroNumberPainter.glyphPercent,
+                  fractionDigits: 1,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amberAccent,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
             ],
-            selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
-          ),
-          FilterChip(
-            label: const Text('🔥 120Hz IMU & ML Stream'),
-            selected: _extremeLoad,
-            onSelected: (v) => setState(() => _extremeLoad = v),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_mode == SensorBenchMode.dZero) return _buildDZeroSensors();
-    if (_mode == SensorBenchMode.traditional) return _buildTradSensors();
-    return Column(
-      children: [
-        _buildDZeroSensors(),
-        const SizedBox(height: 12),
-        _buildTradSensors(),
-      ],
     );
   }
 
@@ -291,14 +222,19 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF0E1724),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45)),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '🚀 D-Zero (ZBarcodeScanner 12-Box SoA + ZCompass ui.Picture + ZLeveler)',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+            'D-Zero (ZBarcodeScanner + ZCompass + ZLeveler + ZQRGenerator)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF00E5FF),
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -308,16 +244,14 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
             children: [
               ZBarcodeScanner(
                 controller: _detectionCtrl,
-                size: const Size(280, 155),
+                size: const Size(260, 150),
               ),
               ZCompass(
                 headingListenable: _headingDeg,
-                size: const Size(125, 125),
+                size: const Size(120, 120),
               ),
-              ZLeveler(
-                controller: _tiltCtrl,
-                size: const Size(125, 125),
-              ),
+              ZLeveler(controller: _tiltCtrl, size: const Size(120, 120)),
+              ZQRGenerator(controller: _qrCtrl, size: const Size(120, 120)),
             ],
           ),
         ],
@@ -337,8 +271,11 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '🐢 Traditional Flutter (Stack of Positioned Containers + Text Confidence Strings)',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent),
+            '従来 (Stack + Positioned + Text)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -347,8 +284,8 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
-                width: 280,
-                height: 155,
+                width: 260,
+                height: 150,
                 color: Colors.black54,
                 child: Stack(
                   children: [
@@ -364,7 +301,10 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
                           ),
                           child: Text(
                             '${_detectionCtrl.boxes[i * 5 + 4].toStringAsFixed(0)}%',
-                            style: const TextStyle(fontSize: 9, color: Colors.redAccent),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: Colors.redAccent,
+                            ),
                           ),
                         ),
                       ),
@@ -375,7 +315,10 @@ class _SensorBenchmarkScreenState extends State<SensorBenchmarkScreen>
                 'Heading: ${_headingDeg.value.toStringAsFixed(1)}°\n'
                 'Pitch: ${_tiltCtrl.pitch.toStringAsFixed(1)}°\n'
                 'Roll: ${_tiltCtrl.roll.toStringAsFixed(1)}°',
-                style: const TextStyle(fontFamily: 'monospace', color: Colors.orangeAccent),
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  color: Colors.orangeAccent,
+                ),
               ),
             ],
           ),

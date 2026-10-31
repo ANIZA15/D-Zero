@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_sensor` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZQRGenerator` (`ZMatrixCode`, `ZeroQRCodeController`) for zero-allocation dynamic matrix / TOTP QR code rendering.
 * Synchronized release of `d_zero_sensor` v0.1.3.
 
 ## 0.1.2

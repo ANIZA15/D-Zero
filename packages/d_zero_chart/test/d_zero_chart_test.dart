@@ -311,4 +311,79 @@ void main() {
       expect(controller.hasListeners, isFalse);
     });
   });
+
+  group('ZActivityRings, ZRadarChart, ZDonutChart & ZContributionGraph', () {
+    test('Controllers survive double-dispose and post-dispose access', () {
+      final rings = ZeroActivityRingsController();
+      rings.setRingProgress(0, 0.9);
+      rings.updateRings(move: 0.8, exercise: 0.7, stand: 0.9);
+      expect(rings.overallPercent, greaterThan(0.0));
+      rings.dispose();
+      rings.dispose();
+      expect(rings.progressAt(0), equals(0.0));
+
+      final radar = ZeroRadarChartController(axisCount: 5);
+      radar.setAxis(2, 0.95);
+      radar.updateAll(const [0.2, 0.4, 0.6, 0.8, 1.0]);
+      expect(radar.valueAt(4), closeTo(1.0, 1e-4));
+      radar.dispose();
+      radar.dispose();
+      expect(radar.valueAt(0), equals(0.0));
+
+      final donut = ZeroDonutChartController(sliceCount: 4);
+      donut.setSlice(0, 50.0);
+      donut.selectSlice(1);
+      expect(donut.selectedSlice, equals(1));
+      donut.dispose();
+      donut.dispose();
+      expect(donut.total, equals(0.0));
+
+      final habit = ZeroContributionBuffer(weeks: 8);
+      habit.setLevel(2, 3, 4);
+      expect(habit.activeCount, equals(1));
+      habit.dispose();
+      habit.dispose();
+      expect(habit.activeCount, equals(0));
+    });
+
+    testWidgets('Consumer charts render and detach listeners on unmount', (tester) async {
+      final rings = ZeroActivityRingsController();
+      final radar = ZeroRadarChartController();
+      final donut = ZeroDonutChartController();
+      final habit = ZeroContributionBuffer(weeks: 8)..setLevel(1, 1, 3);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              ZConcentricRings(controller: rings),
+              ZSpiderChart(controller: radar),
+              ZPieChart(controller: donut),
+              ZHabitGrid(buffer: habit),
+            ],
+          ),
+        ),
+      );
+
+      expect(rings.hasListeners, isTrue);
+      expect(radar.hasListeners, isTrue);
+      expect(donut.hasListeners, isTrue);
+      expect(habit.hasListeners, isTrue);
+
+      await tester.tap(find.byType(ZDonutChart));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(rings.hasListeners, isFalse);
+      expect(radar.hasListeners, isFalse);
+      expect(donut.hasListeners, isFalse);
+      expect(habit.hasListeners, isFalse);
+
+      rings.dispose();
+      radar.dispose();
+      donut.dispose();
+      habit.dispose();
+    });
+  });
 }

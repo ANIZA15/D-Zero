@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_particles` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZReactionStream` (`ZFloatingHearts`, `ZeroReactionController`) for zero-allocation live-stream floating reaction fountains.
 * Synchronized release of `d_zero_particles` v0.1.3.
 
 ## 0.1.2

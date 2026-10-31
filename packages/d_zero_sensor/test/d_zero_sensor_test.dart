@@ -154,4 +154,40 @@ void main() {
       expect(controller.hasListeners, isFalse);
     });
   });
+
+  group('ZQRGenerator & ZeroQRCodeController', () {
+    test('ZeroQRCodeController regenerates matrix and survives double-dispose', () {
+      final controller = ZeroQRCodeController(gridSize: 21, initialToken: 123456);
+      expect(controller.moduleAt(0, 0), isTrue);
+      controller.updateToken(654321);
+      expect(controller.tokenValue, equals(654321));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      expect(controller.tokenValue, equals(0));
+      expect(controller.moduleAt(0, 0), isFalse);
+    });
+
+    testWidgets('ZQRGenerator renders matrix code and detaches on unmount', (tester) async {
+      final controller = ZeroQRCodeController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZMatrixCode(controller: controller),
+          ),
+        ),
+      );
+      expect(controller.hasListeners, isTrue);
+
+      controller.updateToken(999999);
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
 }

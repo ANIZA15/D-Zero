@@ -26,6 +26,8 @@ Traditional object-oriented particle engines (`List<Particle>`) suffer from CPU 
 | **`ZeroParticleController`** | Controller | Manages `ZeroParticleBuffer` lifecycle, `ZeroParticleConfig` (gravity, bounce, friction, maxSpeed), and safe post-dispose fallbacks. |
 | **`ZConfetti`** | Widget | Multi-palette celebration confetti overlay rendered in batched point/ribbon passes with zero per-frame object allocations (`legacy: ZeroConfetti`). |
 | **`ZeroConfettiController`** | Controller | Triggers directional/radial confetti bursts (`burst(count: 80)`) backed by SoA `Float32List` buffers. |
+| **`ZReactionStream`** | Widget | Live-stream floating hearts/reactions fountain (`ZFloatingHearts`, `legacy: ZeroReactionStream`) backed by SoA `Float32List` physics and batched `Canvas.drawRawPoints`. |
+| **`ZeroReactionController`** | Controller | Spawns floating reaction particles (`spawn(count)`) and steps upward sine-wave drift in place with zero heap allocations. |
 
 ---
 

@@ -461,4 +461,100 @@ void main() {
       expect(() => controller.writeLine('post-unmount log'), returnsNormally);
     });
   });
+
+  group('Common App UI Widgets (WheelPicker, SegmentedControl, PageIndicator, Rating, PullToRefresh, NumberPad, StoryProgress, StreamingMarkdown)', () {
+    test('Controllers survive double-dispose and post-dispose mutations', () {
+      final wheel = ZeroWheelPickerController(minValue: 0, maxValue: 59, initialValue: 10);
+      wheel.scrollByItems(3.2);
+      wheel.fling(12.0);
+      expect(wheel.stepPhysics(0.016), isTrue);
+      wheel.jumpToValue(42);
+      expect(wheel.selectedValue, equals(42));
+      wheel.dispose();
+      wheel.dispose();
+      expect(wheel.isDisposed, isTrue);
+      wheel.jumpToValue(15);
+      expect(wheel.selectedValue, equals(0));
+
+      final pad = ZeroNumberPadController(maxDigits: 6);
+      pad.inputDigit(1);
+      pad.inputDigit(2);
+      pad.backspace();
+      expect(pad.value, equals(1));
+      pad.clear();
+      expect(pad.digitCount, equals(0));
+      pad.dispose();
+      pad.dispose();
+      pad.inputDigit(9);
+      expect(pad.value, equals(0));
+
+      final story = ZeroStoryProgressController(segmentCount: 4);
+      story.setProgress(1, 0.5);
+      story.advance(0.6);
+      expect(story.activeIndex, equals(2));
+      story.dispose();
+      story.dispose();
+      story.advance(0.5);
+      expect(story.activeIndex, equals(0));
+
+      final stream = ZeroTokenStreamController(maxLines: 4, maxCols: 16);
+      stream.appendToken('# Title\n> Code\nBody\nLine4\nLine5');
+      expect(stream.totalTokens, equals(1));
+      stream.clear();
+      stream.dispose();
+      stream.dispose();
+      stream.appendToken('ignored');
+      expect(stream.totalTokens, equals(0));
+    });
+
+    testWidgets('All 8 new d_zero_ui widgets render, handle gestures, and detach cleanly on unmount', (tester) async {
+      final wheelCtrl = ZeroWheelPickerController(initialValue: 15);
+      final tabPos = ValueNotifier<double>(0.5);
+      final ratingVal = ValueNotifier<double>(3.5);
+      final pullVal = ValueNotifier<double>(0.7);
+      final padCtrl = ZeroNumberPadController();
+      final storyCtrl = ZeroStoryProgressController(segmentCount: 4);
+      final tokenCtrl = ZeroTokenStreamController()..appendToken('# AI\n- fast');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              ZDrumRollPicker(controller: wheelCtrl),
+              ZSlidingTabBar(
+                segments: const ['A', 'B', 'C'],
+                positionListenable: tabPos,
+              ),
+              ZWormIndicator(count: 4, pageListenable: tabPos),
+              ZStarRating(ratingListenable: ratingVal, controller: ratingVal),
+              ZRefreshHeader(pullProgressListenable: pullVal, isRefreshing: true),
+              ZPinPad(controller: padCtrl),
+              ZSegmentedProgress(controller: storyCtrl),
+              ZTokenStream(controller: tokenCtrl),
+            ],
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ZWheelPicker), const Offset(0, -28));
+      await tester.tap(find.byType(ZSegmentedControl));
+      await tester.tap(find.byType(ZRatingBar));
+      await tester.tap(find.byType(ZNumberPad));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(() => tabPos.value = 1.5, returnsNormally);
+      expect(() => ratingVal.value = 5.0, returnsNormally);
+      expect(() => pullVal.value = 1.0, returnsNormally);
+
+      wheelCtrl.dispose();
+      tabPos.dispose();
+      ratingVal.dispose();
+      pullVal.dispose();
+      padCtrl.dispose();
+      storyCtrl.dispose();
+      tokenCtrl.dispose();
+    });
+  });
 }

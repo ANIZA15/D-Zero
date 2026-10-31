@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_player` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZVideoTimeline` (`ZThumbnailScrubber`, `ZeroTimelineController`) for zero-rebuild video editor timeline scrubbing and trim range control.
 * Synchronized release of `d_zero_player` v0.1.3.
 
 ## 0.1.2

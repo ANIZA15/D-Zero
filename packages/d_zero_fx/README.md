@@ -23,6 +23,9 @@ Standard Flutter effects such as `BackdropFilter` and `ShaderMask` force the GPU
 | **`ZBlur`** | `ZGlassContainer` | - | Specular frosted glass card rendered via layered translucent base, top specular highlight, and rim border (`0` `BackdropFilter` offscreen pass). |
 | **`ZRipple`** | `ZInkWell` | `ZeroRippleController` | Multi-touch SoA circular buffer (`_x`, `_y`, `_progress` `Float32List`) with a 16-step alpha `Paint` lut. |
 | **`ZLiquidProgress`** | `ZWaveFilter` | - | Circular wave tank drawn via a pre-allocated `Float32List` sine wave polygon (`Canvas.drawRawPoints`) + `ZeroNumberPainter.paintPercent`. |
+| **`ZSwipeDeck`** | `ZTinderCards` | `ZeroSwipeDeckController` | Physics-driven 3-card stack with 2D drag/rotation transforms and `ZeroNumberPainter` card index readout (`0` widget tree rebuilds). |
+| **`ZScratchCard`** | `ZScratchOff` | `ZeroScratchCardController` | Grid-bitmask scratch-off lottery surface (`Uint8List` revealed cells) with real-time `ZeroNumberPainter.paintPercent` reveal tracking (`0` `saveLayer`). |
+| **`ZBeforeAfterSlider`** | `ZImageComparison` | `ValueListenable<double>` | Interactive split-screen Before/After comparison view using dual `Canvas.clipRect` regions (`0` offscreen buffers). |
 
 ---
 

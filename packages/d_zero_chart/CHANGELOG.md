@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_chart` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZActivityRings` (`ZConcentricRings`, `ZeroActivityRingsController`), `ZRadarChart` (`ZSpiderChart`, `ZeroRadarChartController`), `ZDonutChart` (`ZPieChart`, `ZeroDonutChartController`), and `ZContributionGraph` (`ZHabitGrid`, `ZeroContributionBuffer`).
 * Synchronized release of `d_zero_chart` v0.1.3.
 
 ## 0.1.2

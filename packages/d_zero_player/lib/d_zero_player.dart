@@ -6,4 +6,5 @@ export 'src/controller.dart';
 export 'src/playback_state_ffi.dart' show ZeroPlaybackStatus;
 export 'src/widgets/direct_seek_bar.dart';
 export 'src/widgets/direct_time_label.dart';
+export 'src/widgets/z_video_timeline.dart';
 export 'src/widgets/zero_video_view.dart';

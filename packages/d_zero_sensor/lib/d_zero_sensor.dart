@@ -6,3 +6,4 @@ export 'src/z_3d_point_cloud.dart';
 export 'src/z_barcode_scanner.dart';
 export 'src/z_compass.dart';
 export 'src/z_leveler.dart';
+export 'src/z_qr_generator.dart';

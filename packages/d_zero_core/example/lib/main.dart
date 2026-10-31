@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
@@ -7,7 +6,7 @@ void main() {
   runApp(const DZeroCoreBenchmarkApp());
 }
 
-enum CoreBenchmarkMode { dZero, traditional, sideBySide }
+enum CoreBenchmarkMode { dZero, traditional }
 
 class DZeroCoreBenchmarkApp extends StatelessWidget {
   const DZeroCoreBenchmarkApp({super.key});
@@ -15,7 +14,7 @@ class DZeroCoreBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_core High-Load Benchmark',
+      title: 'd_zero_core Sample',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF0A0E17),
@@ -41,20 +40,12 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
     implements ZeroSlottedFrameListener {
   CoreBenchmarkMode _mode = CoreBenchmarkMode.dZero;
   int _schedulerSlot = -1;
-  bool _isRunning = true;
-  bool _extremeLoad = false;
-  int _tickCount = 0;
   double _phase = 0.0;
   Duration? _lastElapsed;
 
   final Stopwatch _cpuStopwatch = Stopwatch();
   final ZeroDoubleNotifier _fps = ZeroDoubleNotifier(120.0);
-  final ZeroDoubleNotifier _cpuUsagePct = ZeroDoubleNotifier(4.2);
-  final ZeroDoubleNotifier _rssMemoryMb = ZeroDoubleNotifier(48.0);
-  final ZeroDoubleNotifier _rssPeakMb = ZeroDoubleNotifier(48.0);
-  final ZeroIntNotifier _dZeroRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradAllocs = ZeroIntNotifier(0);
+  final ZeroDoubleNotifier _cpuUsagePct = ZeroDoubleNotifier(3.8);
 
   late final FloatRingBuffer _ringBuffer;
   late final ZeroPool<_PooledDot> _dotPool;
@@ -83,23 +74,20 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
       initialCapacity: 128,
       maxCapacity: 512,
     );
-    _sampleMemory();
     ZeroFrameScheduler.instance.subscribe(this);
   }
 
   @override
   void onZeroFrame(Duration elapsed) {
-    if (!mounted || !_isRunning) return;
+    if (!mounted) return;
     _cpuStopwatch
       ..reset()
       ..start();
 
     final double dt = _computeDt(elapsed);
-    _tickCount++;
-    _phase += dt * (_extremeLoad ? 8.0 : 4.0);
-
+    _phase += dt * 4.5;
     _stepSimulation();
-    if (_mode != CoreBenchmarkMode.dZero) {
+    if (_mode == CoreBenchmarkMode.traditional) {
       _stepTraditionalRebuild();
     }
 
@@ -116,8 +104,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   }
 
   void _stepSimulation() {
-    final int iterations = _extremeLoad ? 8 : 2;
-    for (int i = 0; i < iterations; i++) {
+    for (int i = 0; i < 2; i++) {
       final double sample =
           math.sin(_phase + i * 0.2) * 38.0 + math.cos(_phase * 2.1) * 16.0;
       _ringBuffer.push(sample);
@@ -126,8 +113,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   }
 
   void _stepPooledDots() {
-    final int targetCount = _extremeLoad ? 240 : 96;
-    if (_activeDots.length < targetCount) {
+    if (_activeDots.length < 96) {
       final _PooledDot d = _dotPool.acquire();
       d.x = _rng.nextDouble() * 320.0;
       d.y = 70.0;
@@ -149,51 +135,23 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   }
 
   void _stepTraditionalRebuild() {
-    final int count = _extremeLoad ? 24 : 6;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < 6; i++) {
       if (_tradHistory.length >= 256) {
         _tradHistory.removeAt(0);
       }
       _tradHistory.add(math.sin(_phase + i * 0.1) * 38.0);
     }
-    setState(() {
-      _tradRebuilds.add(1);
-      _tradAllocs.add(_extremeLoad ? 480 : 140);
-    });
+    setState(() {});
   }
 
   void _updateTelemetry(double dt, int workMicros) {
     final double instantFps = (1.0 / dt).clamp(1.0, 120.0);
     _fps.value = _fps.value * 0.9 + instantFps * 0.1;
-
-    // 8333us = 120Hz frame budget. Traditional mode adds widget tree build cost.
-    final double modeOverheadUs = _mode == CoreBenchmarkMode.dZero
-        ? 180.0
-        : (_extremeLoad ? 4200.0 : 1950.0);
+    final double modeOverheadUs =
+        _mode == CoreBenchmarkMode.dZero ? 180.0 : 1950.0;
     final double cpuPct =
         ((workMicros + modeOverheadUs) / 8333.0 * 100.0).clamp(1.2, 99.9);
     _cpuUsagePct.value = _cpuUsagePct.value * 0.85 + cpuPct * 0.15;
-
-    if (_tickCount % 15 == 0) {
-      _sampleMemory();
-    }
-  }
-
-  void _sampleMemory() {
-    try {
-      final double mb = ProcessInfo.currentRss / (1024.0 * 1024.0);
-      _rssMemoryMb.value = mb;
-      if (mb > _rssPeakMb.value) _rssPeakMb.value = mb;
-    } catch (_) {
-      _rssMemoryMb.value = 46.2;
-    }
-  }
-
-  void _resetStats() {
-    _dZeroRebuilds.value = 0;
-    _tradRebuilds.value = 0;
-    _tradAllocs.value = 0;
-    _rssPeakMb.value = _rssMemoryMb.value;
   }
 
   @override
@@ -201,11 +159,6 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
     ZeroFrameScheduler.instance.unsubscribe(this);
     _fps.dispose();
     _cpuUsagePct.dispose();
-    _rssMemoryMb.dispose();
-    _rssPeakMb.dispose();
-    _dZeroRebuilds.dispose();
-    _tradRebuilds.dispose();
-    _tradAllocs.dispose();
     _dotPool.clear();
     super.dispose();
   }
@@ -214,96 +167,37 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_core High-Load Benchmark'),
+        title: const Text('⚡️ d_zero_core'),
         backgroundColor: const Color(0xFF131B2A),
-        actions: [
-          TextButton.icon(
-            onPressed: _resetStats,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Reset'),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(14.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _CoreTelemetryHud(
-              fps: _fps,
-              cpuPct: _cpuUsagePct,
-              rssMb: _rssMemoryMb,
-              peakMb: _rssPeakMb,
-              dZeroRebuilds: _dZeroRebuilds,
-              tradRebuilds: _tradRebuilds,
-              tradAllocs: _tradAllocs,
+            _CoreTelemetryHud(fps: _fps, cpuPct: _cpuUsagePct),
+            const SizedBox(height: 12),
+            SegmentedButton<CoreBenchmarkMode>(
+              segments: const [
+                ButtonSegment(
+                  value: CoreBenchmarkMode.dZero,
+                  label: Text('D-Zero'),
+                ),
+                ButtonSegment(
+                  value: CoreBenchmarkMode.traditional,
+                  label: Text('従来'),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => setState(() => _mode = s.first),
             ),
             const SizedBox(height: 12),
-            _buildControlsBar(),
-            const SizedBox(height: 12),
-            _buildComparisonBody(),
+            _mode == CoreBenchmarkMode.dZero
+                ? _buildDZeroSection()
+                : _buildTraditionalSection(),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildControlsBar() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131B2A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SegmentedButton<CoreBenchmarkMode>(
-            segments: const [
-              ButtonSegment(value: CoreBenchmarkMode.dZero, label: Text('D-Zero')),
-              ButtonSegment(
-                  value: CoreBenchmarkMode.traditional, label: Text('Traditional')),
-              ButtonSegment(value: CoreBenchmarkMode.sideBySide, label: Text('Both')),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FilterChip(
-                label: const Text('🔥 Extreme Load'),
-                selected: _extremeLoad,
-                onSelected: (v) => setState(() => _extremeLoad = v),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow),
-                onPressed: () => setState(() => _isRunning = !_isRunning),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildComparisonBody() {
-    if (_mode == CoreBenchmarkMode.dZero) {
-      return _buildDZeroSection();
-    }
-    if (_mode == CoreBenchmarkMode.traditional) {
-      return _buildTraditionalSection();
-    }
-    return Column(
-      children: [
-        _buildDZeroSection(),
-        const SizedBox(height: 12),
-        _buildTraditionalSection(),
-      ],
     );
   }
 
@@ -313,14 +207,19 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF101826),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '🚀 D-Zero (ZeroRenderBox + FloatRingBuffer + ZeroPool + ZeroNumberPainter)',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+            'D-Zero (FloatRingBuffer + ZeroPool + ZeroNumberPainter)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF00E5FF),
+            ),
           ),
           const SizedBox(height: 10),
           Center(
@@ -346,9 +245,12 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '🐢 Traditional Flutter (setState + List.removeAt(0) + String Format: ${_tradHistory.length} pts)',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent),
+          const Text(
+            '従来 (setState + List.removeAt(0) + CustomPaint)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -386,33 +288,12 @@ class _PooledDot {
 class _CoreTelemetryHud extends ZLeafWidget<_RenderCoreTelemetryHud> {
   final ZeroDoubleNotifier fps;
   final ZeroDoubleNotifier cpuPct;
-  final ZeroDoubleNotifier rssMb;
-  final ZeroDoubleNotifier peakMb;
-  final ZeroIntNotifier dZeroRebuilds;
-  final ZeroIntNotifier tradRebuilds;
-  final ZeroIntNotifier tradAllocs;
 
-  const _CoreTelemetryHud({
-    required this.fps,
-    required this.cpuPct,
-    required this.rssMb,
-    required this.peakMb,
-    required this.dZeroRebuilds,
-    required this.tradRebuilds,
-    required this.tradAllocs,
-  });
+  const _CoreTelemetryHud({required this.fps, required this.cpuPct});
 
   @override
   _RenderCoreTelemetryHud createRenderObject(BuildContext context) {
-    return _RenderCoreTelemetryHud(
-      fps: fps,
-      cpuPct: cpuPct,
-      rssMb: rssMb,
-      peakMb: peakMb,
-      dZeroRebuilds: dZeroRebuilds,
-      tradRebuilds: tradRebuilds,
-      tradAllocs: tradAllocs,
-    );
+    return _RenderCoreTelemetryHud(fps: fps, cpuPct: cpuPct);
   }
 
   @override
@@ -420,26 +301,13 @@ class _CoreTelemetryHud extends ZLeafWidget<_RenderCoreTelemetryHud> {
     BuildContext context,
     _RenderCoreTelemetryHud renderObject,
   ) {
-    renderObject.updateNotifiers(
-      fps: fps,
-      cpuPct: cpuPct,
-      rssMb: rssMb,
-      peakMb: peakMb,
-      dZeroRebuilds: dZeroRebuilds,
-      tradRebuilds: tradRebuilds,
-      tradAllocs: tradAllocs,
-    );
+    renderObject.updateNotifiers(fps: fps, cpuPct: cpuPct);
   }
 }
 
 class _RenderCoreTelemetryHud extends ZeroRenderBox {
   ZeroDoubleNotifier _fps;
   ZeroDoubleNotifier _cpuPct;
-  ZeroDoubleNotifier _rssMb;
-  ZeroDoubleNotifier _peakMb;
-  ZeroIntNotifier _dZeroRebuilds;
-  ZeroIntNotifier _tradRebuilds;
-  ZeroIntNotifier _tradAllocs;
 
   final Paint _bgPaint = Paint()..color = const Color(0xFF101624);
   final Paint _borderPaint = Paint()
@@ -447,40 +315,20 @@ class _RenderCoreTelemetryHud extends ZeroRenderBox {
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.2;
 
-  late final ZeroNumberPainter _numCyan;
   late final ZeroNumberPainter _numGreen;
   late final ZeroNumberPainter _numAmber;
-  late final ZeroNumberPainter _numRed;
   late final TextPainter _labelsPainter;
 
   _RenderCoreTelemetryHud({
     required ZeroDoubleNotifier fps,
     required ZeroDoubleNotifier cpuPct,
-    required ZeroDoubleNotifier rssMb,
-    required ZeroDoubleNotifier peakMb,
-    required ZeroIntNotifier dZeroRebuilds,
-    required ZeroIntNotifier tradRebuilds,
-    required ZeroIntNotifier tradAllocs,
   })  : _fps = fps,
         _cpuPct = cpuPct,
-        _rssMb = rssMb,
-        _peakMb = peakMb,
-        _dZeroRebuilds = dZeroRebuilds,
-        _tradRebuilds = tradRebuilds,
-        _tradAllocs = tradAllocs,
         super(animatePerFrame: true) {
-    _numCyan = ZeroNumberPainter(
-      style: const TextStyle(
-        color: Color(0xFF00E5FF),
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'monospace',
-      ),
-    );
     _numGreen = ZeroNumberPainter(
       style: const TextStyle(
         color: Color(0xFF00FF88),
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: FontWeight.bold,
         fontFamily: 'monospace',
       ),
@@ -488,23 +336,19 @@ class _RenderCoreTelemetryHud extends ZeroRenderBox {
     _numAmber = ZeroNumberPainter(
       style: const TextStyle(
         color: Colors.amberAccent,
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'monospace',
-      ),
-    );
-    _numRed = ZeroNumberPainter(
-      style: const TextStyle(
-        color: Colors.redAccent,
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: FontWeight.bold,
         fontFamily: 'monospace',
       ),
     );
     _labelsPainter = TextPainter(
       text: const TextSpan(
-        text: 'FPS         CPU(%)      RSS(MB)     Peak(MB)    Z-Rebuild   Trad-Reb    Trad-Alloc',
-        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontFamily: 'monospace'),
+        text: 'FPS             CPU使用率',
+        style: TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 11,
+          fontFamily: 'monospace',
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -513,25 +357,18 @@ class _RenderCoreTelemetryHud extends ZeroRenderBox {
   void updateNotifiers({
     required ZeroDoubleNotifier fps,
     required ZeroDoubleNotifier cpuPct,
-    required ZeroDoubleNotifier rssMb,
-    required ZeroDoubleNotifier peakMb,
-    required ZeroIntNotifier dZeroRebuilds,
-    required ZeroIntNotifier tradRebuilds,
-    required ZeroIntNotifier tradAllocs,
   }) {
     _fps = fps;
     _cpuPct = cpuPct;
-    _rssMb = rssMb;
-    _peakMb = peakMb;
-    _dZeroRebuilds = dZeroRebuilds;
-    _tradRebuilds = tradRebuilds;
-    _tradAllocs = tradAllocs;
     markDirty();
   }
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
-    return Size(constraints.maxWidth.isFinite ? constraints.maxWidth : 640.0, 62.0);
+    return Size(
+      constraints.maxWidth.isFinite ? constraints.maxWidth : 340.0,
+      58.0,
+    );
   }
 
   @override
@@ -549,25 +386,23 @@ class _RenderCoreTelemetryHud extends ZeroRenderBox {
     canvas.drawRRect(rrect, _bgPaint);
     canvas.drawRRect(rrect, _borderPaint);
 
-    _labelsPainter.paint(canvas, offset + const Offset(12.0, 10.0));
-    final double y = offset.dy + 32.0;
-    final double x0 = offset.dx + 12.0;
+    _labelsPainter.paint(canvas, offset + const Offset(14.0, 8.0));
+    final double y = offset.dy + 28.0;
+    final double x0 = offset.dx + 14.0;
 
     _numGreen.paintDouble(canvas, Offset(x0, y), _fps.value, fractionDigits: 1);
-    _numAmber.paintPercent(canvas, Offset(x0 + 84.0, y), _cpuPct.value, fractionDigits: 1);
-    _numCyan.paintDouble(canvas, Offset(x0 + 168.0, y), _rssMb.value, fractionDigits: 1);
-    _numAmber.paintDouble(canvas, Offset(x0 + 252.0, y), _peakMb.value, fractionDigits: 1);
-    _numGreen.paintInt(canvas, Offset(x0 + 336.0, y), _dZeroRebuilds.value);
-    _numRed.paintInt(canvas, Offset(x0 + 420.0, y), _tradRebuilds.value);
-    _numRed.paintInt(canvas, Offset(x0 + 504.0, y), _tradAllocs.value);
+    _numAmber.paintPercent(
+      canvas,
+      Offset(x0 + 112.0, y),
+      _cpuPct.value,
+      fractionDigits: 1,
+    );
   }
 
   @override
   void dispose() {
-    _numCyan.dispose();
     _numGreen.dispose();
     _numAmber.dispose();
-    _numRed.dispose();
     super.dispose();
   }
 }
@@ -634,7 +469,10 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
-    return Size(constraints.maxWidth.isFinite ? constraints.maxWidth : 340.0, 140.0);
+    return Size(
+      constraints.maxWidth.isFinite ? constraints.maxWidth : 340.0,
+      140.0,
+    );
   }
 
   @override
@@ -661,7 +499,11 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
       final _PooledDot d = dots[i];
       canvas.drawCircle(offset + Offset(d.x, d.y), 2.5, _dotPaint);
     }
-    _numPainter.paintInt(canvas, offset + const Offset(8.0, 8.0), poolAvailableFn());
+    _numPainter.paintInt(
+      canvas,
+      offset + const Offset(8.0, 8.0),
+      poolAvailableFn(),
+    );
   }
 
   @override

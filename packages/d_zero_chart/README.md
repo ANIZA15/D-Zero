@@ -17,6 +17,10 @@
 | **`ZCandlestickChart`** | - | `ZeroCandlestickBuffer` | Structure-of-Arrays (SoA) `Float32List` ring buffer storing `open, high, low, close` (`4` floats/candle) with zero `Candle` object allocations. |
 | **`ZHeatmap`** | - | `ZeroHeatmapBuffer` | Contiguous `rows × cols` `Float32List` matrix rendered with a pre-baked 32-bucket quantized `Paint` palette (`0` `Color.lerp` or `Paint` allocations in `paintZero`). |
 | **`ZOrderBook`** | `ZDataGrid` | `ZeroOrderBookController` | L2 market depth Bid/Ask ladder rendered inside a single `ZeroRenderBox` using `ZeroNumberPainter` (`0` `Row`/`Column`/`Text` widget rebuilds). |
+| **`ZActivityRings`** | `ZConcentricRings` | `ZeroActivityRingsController` | Concentric fitness activity rings (`Float32List(3)`) with centered average `ZeroNumberPainter.paintPercent` readout. |
+| **`ZRadarChart`** | `ZSpiderChart` | `ZeroRadarChartController` | Multi-axis spider/radar polygon chart (`Float32List` axes + precomputed trig tables) flushed via `Canvas.drawRawPoints`. |
+| **`ZDonutChart`** | `ZPieChart` | `ZeroDonutChartController` | Multi-segment ring/pie chart (`Float32List` values) with centered `ZeroNumberPainter.paintDouble` total readout. |
+| **`ZContributionGraph`** | `ZHabitGrid` | `ZeroContributionBuffer` | GitHub-style `rows × cols` (`Uint8List`) contribution heatmap grid rendered with a 5-level quantized `Paint` LUT (`0` cell widgets). |
 
 ---
 

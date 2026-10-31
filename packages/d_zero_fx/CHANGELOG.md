@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_fx` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZSwipeDeck` (`ZTinderCards`, `ZeroSwipeDeckController`), `ZScratchCard` (`ZScratchOff`, `ZeroScratchCardController`), and `ZBeforeAfterSlider` (`ZImageComparison`).
 * Synchronized release of `d_zero_fx` v0.1.3.
 
 ## 0.1.2

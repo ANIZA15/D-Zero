@@ -68,6 +68,8 @@ Conventional Flutter video players (`video_player`), however, incur significant 
   An ultra-efficient seek bar widget without a `build()` method. Reads position directly from atomic memory and draws via `Canvas.drawLine`. Fully interactive with drag and tap support.
 * **`ZDirectTimeLabel`** (or `ZTimeLabel`, legacy: `DirectTimeLabel`):
   A zero-rebuild timecode widget that updates time text locally only when seconds transition.
+* **`ZVideoTimeline`** (or `ZThumbnailScrubber`, legacy: `ZeroVideoTimeline`):
+  A video editor timeline & thumbnail scrubber (`ZeroTimelineController`) with trim handles, playhead, waveform bars, and `ZeroNumberPainter` timecode readout.
 * **`shaders/zero_blur.frag`**:
   Impeller-optimized single-pass Kawase blur shader preventing expensive off-screen buffer flushes.
 

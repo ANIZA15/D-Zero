@@ -7,11 +7,19 @@
 
 ---
 
-## 📦 Distributed `Z` Widgets (14 Widgets + 9 Active Aliases)
+## 📦 Distributed `Z` Widgets (22 Widgets + 17 Active Aliases)
 
 | Widget | Active `Z` Alias | Key Zero-Allocation Mechanism |
 | :--- | :--- | :--- |
 | **`ZTerminal`** | `ZLogStream` | Single-pass GPU glyph atlas (`Canvas.drawRawAtlas`) monospace terminal / log viewer backed by a circular `Uint16List` ring buffer (`0` `String` / `TextPainter` allocations per frame). |
+| **`ZWheelPicker`** | `ZDrumRollPicker` | 3D cylindrical drum-roll picker (`ZeroWheelPickerController`) using cosine depth scaling and `ZeroNumberPainter` with `0` `ListWheelScrollView` child rebuilds. |
+| **`ZSegmentedControl`** | `ZSlidingTabBar` | Continuous spring-interpolated sliding pill indicator (`ValueListenable<double>`) with pre-laid-out label painters (`0` `TabBar` rebuilds). |
+| **`ZPageIndicator`** | `ZWormIndicator` | Expanding worm-style carousel page indicator rendered directly in `ZeroRenderBox` (`0` dot widget allocations). |
+| **`ZRatingBar`** | `ZStarRating` | Fractional 5-star rating bar using a single cached star path and `Canvas.clipRect` partial fill (`0` icon rebuilds). |
+| **`ZPullToRefresh`** | `ZRefreshHeader` | Interactive pull-to-refresh header arc (`ValueListenable<double>`) with `ZeroNumberPainter.paintPercent` readout. |
+| **`ZNumberPad`** | `ZPinPad` | Zero-rebuild 4x3 numeric keypad + PIN indicator dots (`ZeroNumberPadController`) using `ZeroNumberPainter` (`0` button widgets). |
+| **`ZStoryProgressBar`** | `ZSegmentedProgress` | Multi-segment story progress bar (`ZeroStoryProgressController`) with 120fps active segment fill (`0` `Row`/`LinearProgressIndicator` rebuilds). |
+| **`ZStreamingMarkdown`** | `ZTokenStream` | AI LLM streaming token view (`ZeroTokenStreamController`) backed by a circular `Uint16List` glyph ring buffer and `Canvas.drawRawAtlas` (`0` `String` concatenations per token). |
 | **`ZCard`** | `ZSurfaceCard` | Single-`RenderBox` surface container with pre-baked elevation bands, border, and pointer highlight (`0` `saveLayer`). |
 | **`ZBadge`** | `ZNotificationBadge` | Renders `1..99` and `99+` notification counts via `ZeroNumberPainter` with `0` `String` allocations. |
 | **`ZButton`** | `ZActionButton` | Direct pointer hit-testing and `ZeroFrameScheduler` splash animation with reactive `enabledListenable`. |

@@ -1,5 +1,10 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_ui` v0.1.4.
+
 ## 0.1.3
 
+* Added `ZWheelPicker` (`ZDrumRollPicker`, `ZeroWheelPickerController`), `ZSegmentedControl` (`ZSlidingTabBar`), `ZPageIndicator` (`ZWormIndicator`), `ZRatingBar` (`ZStarRating`), `ZPullToRefresh` (`ZRefreshHeader`), `ZNumberPad` (`ZPinPad`, `ZeroNumberPadController`), `ZStoryProgressBar` (`ZSegmentedProgress`, `ZeroStoryProgressController`), and `ZStreamingMarkdown` (`ZTokenStream`, `ZeroTokenStreamController`).
 * Synchronized release of `d_zero_ui` v0.1.3.
 
 ## 0.1.2

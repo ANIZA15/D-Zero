@@ -15,6 +15,7 @@
 | **`ZBarcodeScanner`** | `ZCameraPreview` | `ZeroDetectionController` | Stores up to `capacity` ML/barcode bounding boxes in a flat `Float32List` (`[left, top, right, bottom, confidence]`) and renders corner reticles, animated laser scan line, and `ZeroNumberPainter.paintPercent` confidence tags with `0` per-box widgets or strings. |
 | **`ZCompass`** | - | `ValueListenable<double>` | Pre-records 72 compass dial ticks into a GPU `ui.Picture` once on layout, rotates the canvas directly on heading updates, and renders center degrees (`°`) via `ZeroNumberPainter.paintWithSuffix`. |
 | **`ZLeveler`** | - | `ZeroTiltController` | 2D spirit bubble leveler storing `(pitch, roll)` in a `Float32List(2)`, caching crosshair rings in a `ui.Picture`, and drawing pitch/roll degrees via `ZeroNumberPainter`. |
+| **`ZQRGenerator`** | `ZMatrixCode` | `ZeroQRCodeController` | Dynamic TOTP / ticket matrix code generator backed by a flat `Uint8List(size * size)` bitset, finder patterns, and a `ZeroNumberPainter` countdown footer (`0` `Container` grid cells). |
 
 ---
 

@@ -281,4 +281,40 @@ void main() {
       controller.dispose();
     });
   });
+
+  group('【4. ZReactionStream & ZeroReactionController 検証】', () {
+    test('ZeroReactionController emits, steps, and survives double-dispose', () {
+      final controller = ZeroReactionController(capacity: 64);
+      controller.emit(count: 10);
+      expect(controller.activeCount, equals(10));
+      controller.step(0.016);
+      expect(controller.activeCount, greaterThan(0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      controller.emit(count: 5);
+      expect(controller.activeCount, equals(0));
+    });
+
+    testWidgets('ZReactionStream renders floating reactions and stops on unmount', (tester) async {
+      final controller = ZeroReactionController(capacity: 64)..emit(count: 8);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZFloatingHearts(controller: controller),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(ZReactionStream));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+      controller.dispose();
+    });
+  });
 }

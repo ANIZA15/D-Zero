@@ -1,6 +1,6 @@
 name: d_zero_fx
-description: "Zero-allocation Impeller GLSL 460 shaders, 3D metaballs, 3D tilt, fluid mesh gradients, and zero-saveLayer visual effects for Flutter."
-version: 0.1.3
+description: "Zero-allocation Impeller GLSL 460 shaders, 3D metaballs, 3D tilt, swipe deck, scratch card, before/after slider, and zero-saveLayer effects."
+version: 0.1.4
 homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_fx
 issue_tracker: https://github.com/ANIZA15/D-Zero/issues
@@ -20,7 +20,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  d_zero_core: ^0.1.3
+  d_zero_core: ^0.1.4
 
 dev_dependencies:
   flutter_test:

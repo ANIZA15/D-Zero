@@ -374,5 +374,33 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
     });
+
+    testWidgets('ZVideoTimeline (ZThumbnailScrubber) scrubs playhead and survives double-dispose',
+        (tester) async {
+      final timeline = ZeroTimelineController(slotCount: 16, durationMs: 60000);
+      timeline.setPlayhead(0.5);
+      timeline.setTrimRange(0.2, 0.8);
+      expect(timeline.playheadMs, equals(30000));
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZThumbnailScrubber(controller: timeline),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(ZVideoTimeline));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(timeline.hasListeners, isFalse);
+
+      timeline.dispose();
+      timeline.dispose();
+      expect(timeline.isDisposed, isTrue);
+      expect(timeline.playheadMs, equals(0));
+    });
   });
 }

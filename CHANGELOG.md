@@ -2,8 +2,20 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.4 - 2026-10-31
+
+* Synchronized release of D-Zero workspace packages.
+
 ## 0.1.3 - 2026-10-30
 
+* **18 Real-World App Zero-Allocation Widgets**:
+  * **`d_zero_ui`**: Added `ZWheelPicker` (`ZDrumRollPicker`), `ZSegmentedControl` (`ZSlidingTabBar`), `ZPageIndicator` (`ZWormIndicator`), `ZRatingBar` (`ZStarRating`), `ZPullToRefresh` (`ZRefreshHeader`), `ZNumberPad` (`ZPinPad`), `ZStoryProgressBar` (`ZSegmentedProgress`), and `ZStreamingMarkdown` (`ZTokenStream`).
+  * **`d_zero_chart`**: Added `ZActivityRings` (`ZConcentricRings`), `ZRadarChart` (`ZSpiderChart`), `ZDonutChart` (`ZPieChart`), and `ZContributionGraph` (`ZHabitGrid`).
+  * **`d_zero_fx`**: Added `ZSwipeDeck` (`ZTinderCards`), `ZScratchCard` (`ZScratchOff`), and `ZBeforeAfterSlider` (`ZImageComparison`).
+  * **`d_zero_particles`**: Added `ZReactionStream` (`ZFloatingHearts`).
+  * **`d_zero_sensor`**: Added `ZQRGenerator` (`ZMatrixCode`).
+  * **`d_zero_player`**: Added `ZVideoTimeline` (`ZThumbnailScrubber`).
+* **Simplified Comparison Apps**: Unified all `packages/*/example` and `apps/benchmark_app` screens to display **D-Zero (`D-Zero`)**, **Traditional (`従来`)**, **FPS**, and **CPU usage (`CPU使用率`)**.
 * chore(rules,tool): enforce README and pubspec sync audit for all exported Z-Widgets (eed8a3c)
 
 ## 0.1.2 - 2026-10-30

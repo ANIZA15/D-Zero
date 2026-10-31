@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
@@ -9,7 +8,7 @@ void main() {
   runApp(const DZeroParticlesBenchmarkApp());
 }
 
-enum ParticleBenchMode { dZero, traditional, sideBySide }
+enum ParticleBenchMode { dZero, traditional }
 
 class DZeroParticlesBenchmarkApp extends StatelessWidget {
   const DZeroParticlesBenchmarkApp({super.key});
@@ -17,7 +16,7 @@ class DZeroParticlesBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_particles SIMD Benchmark',
+      title: 'd_zero_particles Sample',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF090D16),
@@ -42,24 +41,20 @@ class ParticlesBenchmarkScreen extends StatefulWidget {
 
 class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     implements ZeroSlottedFrameListener {
+  static const int _particleCount = 5000;
+
   ParticleBenchMode _mode = ParticleBenchMode.dZero;
   int _schedulerSlot = -1;
-  final bool _isRunning = true;
-  int _particleCount = 5000;
   int _tickCount = 0;
   Duration? _lastElapsed;
 
   final Stopwatch _cpuStopwatch = Stopwatch();
   final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(6.0);
-  final ZeroDoubleNotifier _rssMb = ZeroDoubleNotifier(48.0);
-  final ZeroDoubleNotifier _peakMb = ZeroDoubleNotifier(48.0);
-  final ZeroIntNotifier _dZeroRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradRebuilds = ZeroIntNotifier(0);
-  final ZeroIntNotifier _tradAllocs = ZeroIntNotifier(0);
 
-  late ZeroParticleController _particleCtrl;
+  late final ZeroParticleController _particleCtrl;
   late final ZeroConfettiController _confettiCtrl;
-  late List<_TradParticle> _tradParticles;
+  late final ZeroReactionController _reactionCtrl;
+  late final List<_TradParticle> _tradParticles;
 
   @override
   int get zeroSchedulerSlot => _schedulerSlot;
@@ -71,17 +66,12 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
   void initState() {
     super.initState();
     _confettiCtrl = ZeroConfettiController(capacity: 160);
-    _initParticles(_particleCount);
-    _sampleMemory();
-    ZeroFrameScheduler.instance.subscribe(this);
-  }
-
-  void _initParticles(int count) {
-    _particleCtrl = ZeroParticleController(capacity: count);
+    _reactionCtrl = ZeroReactionController(capacity: 128);
+    _particleCtrl = ZeroParticleController(capacity: _particleCount);
     _particleCtrl.ensureInitialized(width: 340.0, height: 180.0);
     final math.Random rng = math.Random(42);
     _tradParticles = List<_TradParticle>.generate(
-      count,
+      _particleCount,
       (_) => _TradParticle(
         x: rng.nextDouble() * 340.0,
         y: rng.nextDouble() * 180.0,
@@ -89,11 +79,12 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
         vy: (rng.nextDouble() - 0.5) * 200.0,
       ),
     );
+    ZeroFrameScheduler.instance.subscribe(this);
   }
 
   @override
   void onZeroFrame(Duration elapsed) {
-    if (!mounted || !_isRunning) return;
+    if (!mounted) return;
     _cpuStopwatch
       ..reset()
       ..start();
@@ -103,13 +94,15 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     if (_tickCount % 90 == 0) {
       _confettiCtrl.burst();
     }
+    if (_tickCount % 20 == 0) {
+      _reactionCtrl.emit(count: 4);
+    }
 
-    if (_mode != ParticleBenchMode.dZero) {
-      _stepTraditionalParticles(dt);
-      setState(() {
-        _tradRebuilds.add(1);
-        _tradAllocs.add(_particleCount * 2);
-      });
+    if (_mode == ParticleBenchMode.traditional) {
+      for (int i = 0; i < _tradParticles.length; i++) {
+        _tradParticles[i].step(dt, 340.0, 180.0);
+      }
+      setState(() {});
     }
 
     _cpuStopwatch.stop();
@@ -124,36 +117,12 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     return us > 0 ? (us / 1000000.0).clamp(0.001, 0.05) : 0.0083;
   }
 
-  void _stepTraditionalParticles(double dt) {
-    for (int i = 0; i < _tradParticles.length; i++) {
-      _tradParticles[i].step(dt, 340.0, 180.0);
-    }
-  }
-
   void _updateTelemetry(int workMicros) {
     final double overhead =
         _mode == ParticleBenchMode.dZero ? 220.0 : (_particleCount * 0.65);
-    final double pct = ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.5, 99.9);
+    final double pct =
+        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.5, 99.9);
     _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
-    if (_tickCount % 15 == 0) _sampleMemory();
-  }
-
-  void _sampleMemory() {
-    try {
-      final double mb = ProcessInfo.currentRss / (1024.0 * 1024.0);
-      _rssMb.value = mb;
-      if (mb > _peakMb.value) _peakMb.value = mb;
-    } catch (_) {
-      _rssMb.value = 52.0;
-    }
-  }
-
-  void _changeParticleCount(int nextCount) {
-    setState(() {
-      _particleCount = nextCount;
-      _particleCtrl.dispose();
-      _initParticles(nextCount);
-    });
   }
 
   @override
@@ -161,12 +130,8 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     ZeroFrameScheduler.instance.unsubscribe(this);
     _particleCtrl.dispose();
     _confettiCtrl.dispose();
+    _reactionCtrl.dispose();
     _cpuPct.dispose();
-    _rssMb.dispose();
-    _peakMb.dispose();
-    _dZeroRebuilds.dispose();
-    _tradRebuilds.dispose();
-    _tradAllocs.dispose();
     super.dispose();
   }
 
@@ -174,15 +139,8 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_particles SIMD Benchmark'),
+        title: const Text('⚡️ d_zero_particles'),
         backgroundColor: const Color(0xFF131B2A),
-        actions: [
-          TextButton.icon(
-            onPressed: _confettiCtrl.burst,
-            icon: const Icon(Icons.celebration, size: 16),
-            label: const Text('Burst Confetti'),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(14.0),
@@ -191,9 +149,24 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
           children: [
             _buildHud(),
             const SizedBox(height: 12),
-            _buildControls(),
+            SegmentedButton<ParticleBenchMode>(
+              segments: const [
+                ButtonSegment(
+                  value: ParticleBenchMode.dZero,
+                  label: Text('D-Zero'),
+                ),
+                ButtonSegment(
+                  value: ParticleBenchMode.traditional,
+                  label: Text('従来'),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) => setState(() => _mode = s.first),
+            ),
             const SizedBox(height: 12),
-            _buildArenas(),
+            _mode == ParticleBenchMode.dZero
+                ? _buildDZeroArena()
+                : _buildTradArena(),
           ],
         ),
       ),
@@ -206,109 +179,41 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF101624),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45)),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+        ),
       ),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Row(
         children: [
           const ZFPSMonitor(size: Size(148.0, 44.0)),
-          _buildPriceBox('CPU Load %', _cpuPct, ZeroNumberPainter.glyphPercent, Colors.amberAccent),
-          _buildPriceBox('RSS MB', _rssMb, ZeroNumberPainter.glyphPlus, const Color(0xFF00E5FF)),
-          _buildPriceBox('Peak MB', _peakMb, ZeroNumberPainter.glyphPlus, Colors.orangeAccent),
-          _buildIntBox('D-Zero Rebuilds', _dZeroRebuilds, const Color(0xFF00FF88)),
-          _buildIntBox('Trad Rebuilds', _tradRebuilds, Colors.redAccent),
-          _buildIntBox('Trad Allocs', _tradAllocs, Colors.pinkAccent),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceBox(String label, ZeroDoubleNotifier n, int glyph, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        SizedBox(
-          width: 72,
-          height: 20,
-          child: ZPriceTicker(
-            valueListenable: n,
-            currencyGlyph: glyph,
-            fractionDigits: 1,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color, fontFamily: 'monospace'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIntBox(String label, ZeroIntNotifier n, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        SizedBox(
-          width: 82,
-          height: 20,
-          child: ZCounter(
-            valueListenable: n,
-            minDigits: 1,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color, fontFamily: 'monospace'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControls() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131B2A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SegmentedButton<ParticleBenchMode>(
-            segments: const [
-              ButtonSegment(value: ParticleBenchMode.dZero, label: Text('D-Zero SIMD')),
-              ButtonSegment(value: ParticleBenchMode.traditional, label: Text('Traditional')),
-              ButtonSegment(value: ParticleBenchMode.sideBySide, label: Text('Both')),
+          const SizedBox(width: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'CPU使用率',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              SizedBox(
+                width: 72,
+                height: 22,
+                child: ZPriceTicker(
+                  valueListenable: _cpuPct,
+                  currencyGlyph: ZeroNumberPainter.glyphPercent,
+                  fractionDigits: 1,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amberAccent,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
             ],
-            selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
-          ),
-          SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 2000, label: Text('2K')),
-              ButtonSegment(value: 5000, label: Text('5K')),
-              ButtonSegment(value: 10000, label: Text('10K')),
-            ],
-            selected: {_particleCount},
-            onSelectionChanged: (s) => _changeParticleCount(s.first),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildArenas() {
-    if (_mode == ParticleBenchMode.dZero) return _buildDZeroArena();
-    if (_mode == ParticleBenchMode.traditional) return _buildTradArena();
-    return Column(
-      children: [
-        _buildDZeroArena(),
-        const SizedBox(height: 12),
-        _buildTradArena(),
-      ],
     );
   }
 
@@ -318,14 +223,19 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF0E1624),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45)),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '🚀 D-Zero (ZParticles SIMD Float32x4 + drawRawPoints + ZConfetti: $_particleCount pts)',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+          const Text(
+            'D-Zero (ZParticles + ZConfetti + ZReactionStream)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF00E5FF),
+            ),
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -335,13 +245,13 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
               children: [
                 ZParticles(
                   controller: _particleCtrl,
-                  isRunning: _isRunning,
                   color: const Color(0xFF00E5FF),
                   pointSize: 2.5,
                 ),
-                ZConfetti(
-                  controller: _confettiCtrl,
-                  isRunning: _isRunning,
+                ZConfetti(controller: _confettiCtrl),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: ZReactionStream(controller: _reactionCtrl),
                 ),
               ],
             ),
@@ -362,17 +272,18 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '🐢 Traditional Flutter (OOP List<Particle> + drawCircle loop: $_particleCount pts)',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent),
+          const Text(
+            '従来 (List<Particle> + drawCircle loop)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
           ),
           const SizedBox(height: 10),
           SizedBox(
             height: 180,
             width: double.infinity,
-            child: CustomPaint(
-              painter: _TradParticlesPainter(_tradParticles),
-            ),
+            child: CustomPaint(painter: _TradParticlesPainter(_tradParticles)),
           ),
         ],
       ),

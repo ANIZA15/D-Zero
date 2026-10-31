@@ -231,4 +231,61 @@ void main() {
       expect(shaderCtrl.hasListeners, isFalse);
     });
   });
+
+  group('ZSwipeDeck, ZScratchCard & ZBeforeAfterSlider', () {
+    test('ZeroSwipeDeckController & ZeroScratchCardController survive double-dispose', () {
+      final swipe = ZeroSwipeDeckController(cardCount: 5);
+      swipe.setDrag(45.0, -10.0);
+      expect(swipe.dragDx, closeTo(45.0, 1e-4));
+      swipe.swipeNext();
+      expect(swipe.topIndex, equals(1));
+      swipe.dispose();
+      swipe.dispose();
+      expect(swipe.topIndex, equals(0));
+
+      final scratch = ZeroScratchCardController(cols: 8, rows: 6);
+      scratch.scratchAtNormalized(0.5, 0.5);
+      expect(scratch.scratchPercent, greaterThan(0.0));
+      scratch.reset();
+      expect(scratch.scratchPercent, equals(0.0));
+      scratch.dispose();
+      scratch.dispose();
+      scratch.scratchAtNormalized(0.2, 0.2);
+      expect(scratch.scratchPercent, equals(0.0));
+    });
+
+    testWidgets('Interactive FX widgets handle pointer drag and unmount cleanly', (tester) async {
+      final swipe = ZeroSwipeDeckController();
+      final scratch = ZeroScratchCardController();
+      final split = ValueNotifier<double>(0.5);
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              ZTinderCards(controller: swipe),
+              ZScratchOff(controller: scratch),
+              ZImageComparison(splitListenable: split, controller: split),
+            ],
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ZSwipeDeck), const Offset(60.0, 0.0));
+      await tester.drag(find.byType(ZScratchCard), const Offset(30.0, 20.0));
+      await tester.drag(find.byType(ZBeforeAfterSlider), const Offset(25.0, 0.0));
+      await tester.pump();
+
+      expect(scratch.scratchPercent, greaterThan(0.0));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(swipe.hasListeners, isFalse);
+      expect(scratch.hasListeners, isFalse);
+
+      swipe.dispose();
+      scratch.dispose();
+      split.dispose();
+    });
+  });
 }

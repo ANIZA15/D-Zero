@@ -1,3 +1,7 @@
+## 0.1.4
+
+* Synchronized release of `d_zero_counter` v0.1.4.
+
 ## 0.1.3
 
 * Synchronized release of `d_zero_counter` v0.1.3.

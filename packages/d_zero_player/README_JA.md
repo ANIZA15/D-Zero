@@ -66,6 +66,8 @@
   `build()` メソッドを持たず、FFI ポインタから現在ミリ秒を直接読み取って `Canvas.drawLine` するシークバー。ドラッグ・タップ操作にも完全対応。
 * **`ZDirectTimeLabel`** (または `ZTimeLabel`, 旧: `DirectTimeLabel`):
   秒数の変化（`00:11` など）の瞬間だけ局所的に差分描画する高効率タイムコード Widget。
+* **`ZVideoTimeline`** (または `ZThumbnailScrubber`, 旧: `ZeroVideoTimeline`):
+  トリムハンドル・プレイヘッド・波形バー・`ZeroNumberPainter` タイムコードを単一 `ZeroRenderBox` で描画する動画編集タイムラインスクラバー（`ZeroTimelineController`）。
 * **`shaders/zero_blur.frag`**:
   Impeller 向けに設計されたシングルパス Kawase ブラーシェーダー。`BackdropFilter` の重いレンダーターゲット退避を完全回避。
 
