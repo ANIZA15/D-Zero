@@ -112,6 +112,10 @@ test/libzero_player_test.dylib
 **/test/libzero_player_test.*
 src/libzero_player_native.dylib
 **/src/libzero_player_native.*
+test/libzero_terminal_test.dylib
+**/test/libzero_terminal_test.*
+src/libzero_terminal_native.dylib
+**/src/libzero_terminal_native.*
 
 # =============================================================================
 # Android / Gradle / NDK
@@ -215,3 +219,4 @@ dist/
 !packages/d_zero_3dengine/example/.gitignore
 !packages/d_zero_3dengine/example/macos/**
 !packages/d_zero_3dengine/example/windows/**
+!packages/d_zero_terminal/example/.gitignore

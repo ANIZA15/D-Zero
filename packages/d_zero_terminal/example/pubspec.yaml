@@ -1,0 +1,25 @@
+name: d_zero_terminal_example
+description: "High-throughput FFI PTY & VT100/TrueColor terminal emulator benchmark comparing D-Zero vs legacy Flutter text rendering."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  d_zero_core:
+  d_zero_counter:
+  d_zero_terminal:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

@@ -41,6 +41,7 @@ Every package under `packages/*` includes a standalone **High-Load Comparison Be
 | **`d_zero_canvas`** | `0.1.3` | `Z3DMesh` (`Z3DGlobe`), `ZRibbon` (`ZLowLatencyInk`), `ZDanmaku` (`ZChatStream`), `ZInfiniteGrid` (`ZCanvasGrid`), `ZFreehandCanvas` | [README](packages/d_zero_canvas/README.md) | [Example](packages/d_zero_canvas/example) |
 | **`d_zero_sensor`** | `0.1.3` | `Z3DPointCloud` (`ZLidarView`), `ZBarcodeScanner` (`ZCameraPreview`), `ZQRGenerator` (`ZMatrixCode`), `ZCompass`, `ZLeveler` | [README](packages/d_zero_sensor/README.md) | [Example](packages/d_zero_sensor/example) |
 | **`d_zero_3dengine`** | `0.1.4` | `ZViewport3D` (`ZScene3D`), `ZEngineTelemetryHud` (`Z3DStatsOverlay`), `ZSceneInspector3D` (`ZNaniteLodPanel`), `ZTransformGizmo3D` (`Z3DGizmoOverlay`), `ZOutliner3D` (`ZEntityOutliner3D`), `ZMaterialEditor3D` (`ZPbrMaterialPanel`), `ZPostProcess3D` (`ZPostProcessPanel3D`), `ZSequencer3D` (`ZTimelineSequencer3D`), `Zero3DEngineController`, `zero_3d_raytrace.frag` | [README](packages/d_zero_3dengine/README.md) | [Example](packages/d_zero_3dengine/example) |
+| **`d_zero_terminal`** | `0.1.4` | `ZPtyTerminal` (`ZTerminalEmulator`), `ZTerminalHud` (`ZTerminalTelemetryBar`), `ZTerminalMinimap` (`ZScrollbackRadar`), `ZeroPtyController` | [README](packages/d_zero_terminal/README.md) | [Example](packages/d_zero_terminal/example) |
 
 ---
 

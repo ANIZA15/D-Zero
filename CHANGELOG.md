@@ -4,6 +4,7 @@ All notable changes to the **D-Zero** monorepo and its packages are documented i
 
 ## 0.1.4 - 2026-10-31
 
+* **`d_zero_terminal` (`v0.1.4`)**: Added ultra-lightweight FFI PTY terminal emulator (`ZPtyTerminal` / `ZTerminalEmulator`), telemetry HUD (`ZTerminalHud` / `ZTerminalTelemetryBar`), scrollback radar minimap (`ZTerminalMinimap` / `ZScrollbackRadar`), and 128-byte (2 cache lines) C++17 shared memory (`ZeroTerminalState`) with VT100/ANSI/TrueColor parser and POSIX `forkpty` execution.
 * **`d_zero_3dengine` (`v0.1.4`)**: Added low-level 3D Game Engine viewport (`ZViewport3D` / `ZScene3D`), live telemetry HUD (`ZEngineTelemetryHud` / `Z3DStatsOverlay`), 128-byte (2 cache lines) C++ FFI shared state (`Zero3DEngineState`) with magic canary & ASan/UBSan/TSan verification, Nanite-style meshlet cluster culling, Ray Tracing shader, and 120Hz / 144Hz / 240Hz / Uncapped FPS support.
 * Synchronized release of D-Zero workspace packages.
 
