@@ -552,8 +552,31 @@ void _printPackageTable(List<_PackageInfo> packages) {
       exit(1);
     }
     _verifyPackageReadmeContainsWidgets(p);
+    _verifyPubspecTopics(p);
   }
   stdout.writeln('---------------------------------------------------------------');
+}
+
+void _verifyPubspecTopics(_PackageInfo pkg) {
+  final pubspec = File('${pkg.directory.path}/pubspec.yaml');
+  if (!pubspec.existsSync()) return;
+  final text = pubspec.readAsStringSync();
+  final topicSection =
+      RegExp(r'^topics:\s*\n((?:\s+-\s+[^\n]+\n?)+)', multiLine: true)
+          .firstMatch(text);
+  if (topicSection == null) return;
+  final validTopic = RegExp(r'^[a-z](?:[a-z0-9]|-(?!-))*[a-z0-9]$');
+  final itemRegExp = RegExp(r'^\s+-\s+(.+)$', multiLine: true);
+  for (final m in itemRegExp.allMatches(topicSection.group(1)!)) {
+    final topic = m.group(1)!.trim();
+    if (!validTopic.hasMatch(topic)) {
+      stderr.writeln(
+        '     ❌ ${pkg.name}/pubspec.yaml の topics 値 "$topic" は pub.dev 規約違反です '
+        '(a-z で始まり a-z0-9 で終わる小文字英数字・ハイフンのみ)。',
+      );
+      exit(1);
+    }
+  }
 }
 
 void _verifyPackageReadmeContainsWidgets(_PackageInfo pkg) {

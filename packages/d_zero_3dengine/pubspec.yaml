@@ -5,7 +5,7 @@ homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_3dengine
 issue_tracker: https://github.com/ANIZA15/D-Zero/issues
 topics:
-  - 3d
+  - graphics-3d
   - game-engine
   - raytracing
   - impeller
