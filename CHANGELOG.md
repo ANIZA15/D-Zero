@@ -2,6 +2,10 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.5 - 2026-11-02
+
+* Synchronized release of D-Zero workspace packages.
+
 ## 0.1.4 - 2026-10-31
 
 * **`d_zero_sensor` (`v0.1.4`)**: Added low-level C++17 Seqlock shared-memory camera & zero-copy YUV420 luma QR/barcode scanner (`ZCameraScanner` / `ZZeroCamera`, `ZeroCameraController`, and 704-byte `alignas(64)` `ZeroCameraSharedState`), plus live device camera QR scanning (`mobile_scanner` + C++17 FFI) and 1,000 QR battle benchmark (`30 FPS`, `60 FPS`, `120 FPS`, `Uncapped`).

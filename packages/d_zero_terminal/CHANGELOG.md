@@ -1,3 +1,7 @@
+## 0.1.5
+
+* Synchronized release of `d_zero_terminal` v0.1.5.
+
 ## 0.1.4
 
 * Initial release of `d_zero_terminal` v0.1.4.

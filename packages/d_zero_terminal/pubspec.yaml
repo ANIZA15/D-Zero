@@ -1,6 +1,6 @@
 name: d_zero_terminal
 description: "Ultra-lightweight zero-allocation FFI PTY terminal emulator with C++17 VT100/TrueColor parser and single-pass Impeller drawRawAtlas rendering."
-version: 0.1.4
+version: 0.1.5
 homepage: https://github.com/ANIZA15/D-Zero
 repository: https://github.com/ANIZA15/D-Zero/tree/main/packages/d_zero_terminal
 issue_tracker: https://github.com/ANIZA15/D-Zero/issues
@@ -21,7 +21,7 @@ dependencies:
   flutter:
     sdk: flutter
   ffi: ^2.1.2
-  d_zero_core: ^0.1.4
+  d_zero_core: ^0.1.5
 
 dev_dependencies:
   flutter_test:

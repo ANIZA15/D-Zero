@@ -1,3 +1,7 @@
+## 0.1.5
+
+* Synchronized release of `d_zero_ui` v0.1.5.
+
 ## 0.1.4
 
 * Synchronized release of `d_zero_ui` v0.1.4.
