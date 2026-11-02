@@ -18,6 +18,98 @@ Traditional object-oriented particle engines (`List<Particle>`) suffer from CPU 
 
 ---
 
+## ⚔️ Implementation Comparison: D-Zero vs. Traditional Flutter
+
+| Aspect | Traditional (`List<Particle> + CustomPaint`) | D-Zero (`ZParticles` + `ZeroParticleBuffer`) |
+| :--- | :--- | :--- |
+| **Memory Layout** | Array-of-Structures (`List<Particle>` heap objects, pointer chasing & cache misses) | Contiguous Structure-of-Arrays (`Float32List` / `Float32x4List` views) |
+| **Physics Update (`N` particles)** | `N` scalar loop iterations with `if / else` boundary branches | `N / 2` branchless 4-lane SIMD (`Float32x4`) vector operations (`select` & `clamp`) |
+| **Frame Trigger** | `State.setState(() {})` every frame -> rebuilds widget subtree | `ZeroRenderBox.markNeedsPaint()` on isolated `RepaintBoundary` (**0 Widget Rebuilds**) |
+| **GPU Draw Calls (`N` particles)** | `N` separate `canvas.drawCircle(Offset(x, y), r, Paint())` calls | **1 single batch call**: `canvas.drawRawPoints(PointMode.points, positions, _paint)` |
+| **Per-Frame Heap Allocations** | `N` `Offset` + `N` `Paint` instances per frame -> heavy GC pauses | **0 bytes / frame** (all typed-data buffers and `Paint` objects are pre-allocated) |
+
+### ❌ Traditional Flutter Implementation (What causes jank at 15,000–100,000 particles)
+
+```dart
+// 1. Heap-allocated object per particle (scattered in memory -> CPU cache misses)
+class TradParticle {
+  double x, y, vx, vy;
+  TradParticle(this.x, this.y, this.vx, this.vy);
+
+  void step(double dt, double w, double h) {
+    vy += 98.0 * dt;
+    x += vx * dt;
+    y += vy * dt;
+    if (x < 0 || x > w) { x = x.clamp(0.0, w); vx = -vx * 0.85; }
+    if (y < 0 || y > h) { y = y.clamp(0.0, h); vy = -vy * 0.85; }
+  }
+}
+
+// 2. Every frame: scalar loop + setState() widget tree rebuild
+void onTick(double dt) {
+  for (int i = 0; i < particles.length; i++) {
+    particles[i].step(dt, width, height);
+  }
+  setState(() {}); // Triggers build() every VSync frame
+}
+
+// 3. CustomPainter: N individual draw calls + per-particle Offset/Paint allocations
+class TradParticlesPainter extends CustomPainter {
+  final List<TradParticle> particles;
+  TradParticlesPainter(this.particles);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (int i = 0; i < particles.length; i++) {
+      final p = particles[i];
+      canvas.drawCircle(
+        Offset(p.x, p.y), // Heap allocation
+        1.8,
+        Paint()..color = const Color(0xFF64748B), // Heap allocation
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant TradParticlesPainter oldDelegate) => true;
+}
+```
+
+### ⚡️ D-Zero Implementation (Zero Rebuild & Zero Per-Frame Allocation)
+
+```dart
+// 1. Pre-allocate contiguous Float32List / Float32x4List buffers once
+final particleCtrl = ZeroParticleController(capacity: 100000);
+
+// 2. Drop ZParticles into the widget tree — no setState() or Ticker boilerplate needed
+ZParticles(
+  controller: particleCtrl,
+  color: const Color(0xFF2563EB),
+  pointSize: 1.8,
+  pointStyle: ZParticlePointStyle.square,
+);
+```
+
+Under the hood, `ZeroParticleBuffer._stepSimd` and `RenderZParticles.paintZero` execute with **zero allocations**:
+
+```dart
+// Inside ZeroParticleBuffer._stepSimd: 2 particles (4 floats) per SIMD instruction, branchless
+final int quadCount = _posSimd.length;
+for (int i = 0; i < quadCount; i++) {
+  Float32x4 vel = _velSimd[i] + gd;
+  final Float32x4 pos = _posSimd[i] + vel * dt4;
+  final Int32x4 outOfBounds = pos.lessThan(lo) | pos.greaterThan(hi);
+  vel = outOfBounds.select(vel * negBounce, vel);
+  _posSimd[i] = pos.clamp(lo, hi);
+  _velSimd[i] = vel * fr4;
+}
+
+// Inside RenderZParticles.paintZero: 1 GPU batch call for all 100,000 particles
+canvas.drawRawPoints(PointMode.points, _controller.buffer.positions, _paint);
+```
+
+---
+
 ## 📦 Distributed `Z` Widgets & Controllers
 
 | Symbol | Kind | Description |
