@@ -5,9 +5,50 @@ import 'package:d_zero_chart/d_zero_chart.dart';
 import 'package:d_zero_ui/d_zero_ui.dart';
 
 import 'package:benchmark_app/main.dart';
+import 'package:benchmark_app/particles_benchmark_view.dart';
 import 'package:benchmark_app/suite_switch_demo_view.dart';
+import 'package:d_zero_particles/d_zero_particles.dart';
 
 void main() {
+  testWidgets(
+      'ParticlesBenchmarkView renders telemetry HUD and switches load presets up to 100,000',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: ParticlesBenchmarkView())),
+    );
+    await tester.pump(const Duration(milliseconds: 16));
+
+    expect(find.byType(ZFPSMonitor), findsOneWidget);
+    expect(find.text('CPU使用率'), findsOneWidget);
+    expect(find.text('処理時間'), findsOneWidget);
+    expect(find.text('粒子数'), findsOneWidget);
+    expect(find.byType(ZParticles), findsOneWidget);
+    expect(find.text('D-Zero パーティクル (15,000)'), findsOneWidget);
+
+    await tester.tap(find.text('100,000'));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('D-Zero パーティクル (100,000)'), findsOneWidget);
+
+    await tester.tap(find.text('3,000'));
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SegmentedButton<ParticleRenderMode>),
+        matching: find.text('従来'),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 32));
+    expect(find.text('従来 (List + CustomPaint / 3,000)'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets(
       'Suite comparison demo switches between D-Zero and traditional widgets with FPS & CPU usage only',
       (WidgetTester tester) async {

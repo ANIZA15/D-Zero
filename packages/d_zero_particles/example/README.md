@@ -1,12 +1,17 @@
-# ⚡️ d_zero_particles SIMD Benchmark App
+# ⚡️ d_zero_particles High-Load SIMD Benchmark App
 
-Compares `ZParticles` (4-lane `Float32x4` SIMD + `Canvas.drawRawPoints`) and `ZConfetti` against traditional `List<Particle>` + `Canvas.drawCircle` loops at `2,000`, `5,000`, and `10,000` particles.
+Compares `D-Zero` (`ZParticles` 4-lane `Float32x4` SIMD + `ZConfetti` + `ZReactionStream` via `Canvas.drawRawPoints`) against traditional Flutter (`List<Particle>` + `CustomPaint` + `setState`) across **`3,000`, `15,000`, `50,000`, and `100,000`** particles in a clean Material 3 light theme UI.
 
-## 📊 Live Metrics Displayed
-- **FPS & Frame Histogram** (`ZFPSMonitor`)
-- **CPU Load (%)** (`ZPriceTicker`)
-- **RSS Memory / Peak MB** (`ZPriceTicker`)
-- **D-Zero vs Traditional Rebuilds & Per-Frame Allocations** (`ZCounter`)
+## 📊 Genuine Runtime Telemetry Displayed
+- **FPS & 60-Frame Histogram** (`ZFPSMonitor`)
+- **CPU Usage (`%`) & Frame Time (`ms`)** (`ZPriceTicker` backed by `SchedulerBinding.instance.addTimingsCallback` / `FrameTiming` and `Stopwatch`)
+- **Particle Count** (`ZCounter`)
+- **Real Widget Rebuild Counter** (`Rebuild: N` measured in `build()` for both `D-Zero` and `従来` modes)
+
+## 🎮 Interactive Controls
+- **Mode Switch**: `D-Zero` vs `従来` (`SegmentedButton`)
+- **Load Preset Switch**: `3,000` / `15,000` / `50,000` / `100,000` particles (`SegmentedButton`)
+- **Action Buttons**: `紙吹雪バースト` (`ZeroConfettiController.burst`), `リアクション追加` (`ZeroReactionController.emit`), and `リセット` (`ZeroParticleController.reset`)
 
 ```bash
 flutter run
