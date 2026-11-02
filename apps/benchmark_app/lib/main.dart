@@ -11,14 +11,22 @@ class DZeroBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'D-Zero Benchmark Suite',
+      title: 'D-Zero サンプル一覧',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF090A0F),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00FF88),
-          secondary: Color(0xFF00E5FF),
-          surface: Color(0xFF121420),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const BenchmarkHomeScreen(),
@@ -33,10 +41,13 @@ class BenchmarkHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121420),
         title: const Text(
-          '⚡️ D-Zero',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          'D-Zero サンプル一覧',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
         ),
       ),
       body: const SuiteSwitchDemoView(),

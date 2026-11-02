@@ -82,7 +82,16 @@ test('Controller survives double dispose and post-dispose access', () {
 
 ---
 
-## 4. Pre-Commit Verification & Documentation Sync Checklist
+## 4. Sample App UI Design Rule (Simple ToDo-App Style)
+
+All `packages/*/example` and `apps/*` sample apps must follow a clean, everyday **ToDo-app style** aesthetic without visual clutter:
+1. **Clean Material 3 Light Theme**: Use light gray backgrounds (`#F8FAFC`), flat white `Card` containers (`elevation: 0`, `1px` `#E2E8F0` border), dark slate typography (`#0F172A` / `#475569`), and calm blue (`#2563EB`) / green (`#16A34A`) accents.
+2. **No Neon / Cyber Clutter**: Avoid dark neon themes, verbose technical spec banners, or crowded multi-row telemetry HUDs.
+3. **Minimal Layout**: Keep screens focused on a clean `AppBar`, a simple `D-Zero` vs `従来` `SegmentedButton`, a clean white `Card` showcasing the widget, and only essential metrics (e.g., FPS / CPU usage / Rebuild count).
+
+---
+
+## 5. Pre-Commit Verification & Documentation Sync Checklist
 
 Whenever adding or renaming any public `Z` widget, you **must** update in the same commit:
 1. `packages/<pkg>/README.md` (Widget table & usage snippet — rendered directly on `pub.dev`).

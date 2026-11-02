@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:d_zero_core/d_zero_core.dart';
@@ -184,6 +185,100 @@ void main() {
       expect(controller.hasListeners, isTrue);
 
       controller.updateToken(999999);
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(controller.hasListeners, isFalse);
+    });
+  });
+
+  group('ZeroCameraController & ZCameraScanner (ZZeroCamera)', () {
+    test('ZeroCameraController scans YUV420 luma zero-copy, updates Seqlock state, and survives double-dispose', () {
+      final ZeroCameraController controller = ZeroCameraController();
+      expect(controller.stateAddress, greaterThan(0));
+
+      final Uint8List yPlane = Uint8List(64 * 64);
+      for (int y = 0; y < 64; y++) {
+        for (int x = 0; x < 64; x++) {
+          final bool inCenter = x >= 16 && x < 48 && y >= 16 && y < 48;
+          yPlane[y * 64 + x] = inCenter ? (((x + y) & 1) == 0 ? 250 : 10) : 128;
+        }
+      }
+
+      final int detected = controller.scanLumaPlaneZeroCopy(
+        yPlane,
+        width: 64,
+        height: 64,
+        rowStride: 64,
+      );
+      expect(detected, greaterThanOrEqualTo(0));
+      expect(controller.frameCount, greaterThanOrEqualTo(1));
+
+      controller.recordNativeDetection(
+        left: 0.15,
+        top: 0.2,
+        right: 0.85,
+        bottom: 0.8,
+        confidence: 99.1,
+        payload: 'https://d-zero.dev/qr/0424',
+        decodeMicros: 85,
+      );
+      expect(controller.scanCount, greaterThanOrEqualTo(1));
+      expect(controller.readLatestPayload(), equals('https://d-zero.dev/qr/0424'));
+      expect(controller.activeBoxCount, equals(1));
+      expect(controller.lastDecodeUs, equals(85));
+
+      controller.resetCounters();
+      expect(controller.scanCount, equals(0));
+      expect(controller.frameCount, equals(0));
+
+      controller.dispose();
+      controller.dispose();
+      expect(controller.isDisposed, isTrue);
+      expect(controller.stateAddress, equals(0));
+      expect(controller.scanCount, equals(0));
+      expect(controller.activeBoxCount, equals(0));
+      expect(controller.lastDecodeUs, equals(0));
+      expect(controller.readLatestPayload(), isEmpty);
+    });
+
+    testWidgets('ZCameraScanner (ZZeroCamera) renders Seqlock HUD, child preview, and detaches on unmount', (tester) async {
+      final ZeroCameraController controller = ZeroCameraController();
+      addTearDown(controller.dispose);
+
+      controller.recordNativeDetection(
+        left: 0.2,
+        top: 0.2,
+        right: 0.75,
+        bottom: 0.75,
+        confidence: 98.4,
+        payload: 'https://d-zero.dev/qr/0001',
+        decodeMicros: 90,
+      );
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: ZZeroCamera(
+              controller: controller,
+              size: const Size(320.0, 220.0),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      expect(controller.hasListeners, isTrue);
+
+      controller.recordNativeDetection(
+        left: 0.25,
+        top: 0.25,
+        right: 0.8,
+        bottom: 0.8,
+        confidence: 99.2,
+        payload: 'https://d-zero.dev/qr/0002',
+        decodeMicros: 75,
+      );
       await tester.pump();
 
       await tester.pumpWidget(const SizedBox.shrink());

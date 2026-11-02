@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_chart/d_zero_chart.dart';
 
 void main() {
@@ -16,14 +15,22 @@ class DZeroChartBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_chart Sample',
+      title: 'チャート',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF090D16),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00FF88),
-          secondary: Color(0xFF00E5FF),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const ChartBenchmarkScreen(),
@@ -42,21 +49,13 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
     implements ZeroSlottedFrameListener {
   ChartBenchMode _mode = ChartBenchMode.dZero;
   int _schedulerSlot = -1;
-  int _tickCount = 0;
   double _phase = 0.0;
-
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(4.5);
+  int _tradRebuilds = 0;
 
   late final ZeroChartController _sparklineCtrl;
   late final ZeroCandlestickBuffer _candleBuffer;
-  late final ZeroHeatmapBuffer _heatmapBuffer;
-  late final ZeroOrderBookController _orderBookCtrl;
   late final ZeroActivityRingsController _ringsCtrl;
-  late final ZeroRadarChartController _radarCtrl;
-  late final ZeroDonutChartController _donutCtrl;
   late final ZeroContributionBuffer _habitBuffer;
-  final List<double> _scratchHeat = List<double>.filled(96, 0.0, growable: false);
   final List<double> _tradPrices = <double>[];
   final math.Random _rng = math.Random(77);
 
@@ -69,26 +68,22 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
   @override
   void initState() {
     super.initState();
-    _sparklineCtrl = ZeroChartController(capacity: 128);
-    _candleBuffer = ZeroCandlestickBuffer(capacity: 32);
-    _heatmapBuffer = ZeroHeatmapBuffer(rows: 6, cols: 16);
-    _orderBookCtrl = ZeroOrderBookController(maxDepth: 6);
+    _sparklineCtrl = ZeroChartController(capacity: 96);
+    _candleBuffer = ZeroCandlestickBuffer(capacity: 24);
     _ringsCtrl = ZeroActivityRingsController();
-    _radarCtrl = ZeroRadarChartController(axisCount: 6);
-    _donutCtrl = ZeroDonutChartController(sliceCount: 4);
-    _habitBuffer = ZeroContributionBuffer(weeks: 16);
+    _habitBuffer = ZeroContributionBuffer(weeks: 14);
     _seedCharts();
     ZeroFrameScheduler.instance.subscribe(this);
   }
 
   void _seedCharts() {
     double p = 64000.0;
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < 96; i++) {
       p += (_rng.nextDouble() - 0.49) * 25.0;
       _sparklineCtrl.push(p);
       _tradPrices.add(p);
     }
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 20; i++) {
       final double o = 63900.0 + i * 10.0;
       final double c = o + (_rng.nextDouble() - 0.45) * 45.0;
       _candleBuffer.addCandle(
@@ -98,25 +93,19 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
         c,
       );
     }
-    for (int w = 0; w < 16; w++) {
+    for (int w = 0; w < 14; w++) {
       for (int d = 0; d < 7; d++) {
         _habitBuffer.setLevel(w, d, (w + d) % 5);
       }
     }
-    _stepOrderBook(64000.0);
   }
 
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
-    _tickCount++;
-    _phase += 0.07;
+    _phase += 0.06;
     final double price =
-        64000.0 + math.sin(_phase) * 220.0 + (_rng.nextDouble() - 0.5) * 35.0;
+        64000.0 + math.sin(_phase) * 180.0 + (_rng.nextDouble() - 0.5) * 30.0;
     _sparklineCtrl.push(price);
 
     _ringsCtrl.updateRings(
@@ -124,7 +113,6 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
       exercise: 0.5 + 0.45 * math.cos(_phase * 0.8),
       stand: 0.6 + 0.35 * math.sin(_phase * 0.5),
     );
-    _radarCtrl.setAxis(_tickCount % 6, 0.4 + 0.55 * math.sin(_phase).abs());
 
     final int lastIdx = _candleBuffer.count - 1;
     if (lastIdx >= 0) {
@@ -136,43 +124,13 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
         price,
       );
     }
-    _stepOrderBook(price);
-    for (int i = 0; i < _scratchHeat.length; i++) {
-      _scratchHeat[i] =
-          (0.5 + 0.48 * math.sin(_phase + i * 0.25)).clamp(0.0, 1.0);
-    }
-    _heatmapBuffer.updateAll(_scratchHeat);
 
     if (_mode == ChartBenchMode.traditional) {
-      if (_tradPrices.length >= 128) _tradPrices.removeAt(0);
+      if (_tradPrices.length >= 96) _tradPrices.removeAt(0);
       _tradPrices.add(price);
+      _tradRebuilds++;
       setState(() {});
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(_cpuStopwatch.elapsedMicroseconds);
-  }
-
-  void _stepOrderBook(double mid) {
-    for (int i = 0; i < _orderBookCtrl.maxDepth; i++) {
-      _orderBookCtrl.updateBid(
-        i,
-        mid - (i + 1) * 2.5,
-        1.0 + ((_tickCount + i * 5) % 14) * 0.4,
-      );
-      _orderBookCtrl.updateAsk(
-        i,
-        mid + (i + 1) * 2.5,
-        1.0 + ((_tickCount + i * 9) % 14) * 0.4,
-      );
-    }
-  }
-
-  void _updateTelemetry(int workMicros) {
-    final double overhead = _mode == ChartBenchMode.dZero ? 160.0 : 1900.0;
-    final double pct =
-        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.2, 99.9);
-    _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
   }
 
   @override
@@ -180,219 +138,182 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
     ZeroFrameScheduler.instance.unsubscribe(this);
     _sparklineCtrl.dispose();
     _candleBuffer.dispose();
-    _heatmapBuffer.dispose();
-    _orderBookCtrl.dispose();
     _ringsCtrl.dispose();
-    _radarCtrl.dispose();
-    _donutCtrl.dispose();
     _habitBuffer.dispose();
-    _cpuPct.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == ChartBenchMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_chart'),
-        backgroundColor: const Color(0xFF131B2A),
+        title: const Text(
+          'チャート',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<ChartBenchMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ChartBenchMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: ChartBenchMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  isDZero ? _buildDZeroCharts() : _buildTradCharts(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDZeroCharts() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHud(),
-            const SizedBox(height: 12),
-            SegmentedButton<ChartBenchMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ChartBenchMode.dZero,
-                  label: Text('D-Zero'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'D-Zero チャート',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
-                ButtonSegment(
-                  value: ChartBenchMode.traditional,
-                  label: Text('従来'),
+                Text(
+                  'Rebuild: 0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF16A34A),
+                  ),
                 ),
               ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
             ),
             const SizedBox(height: 12),
-            _mode == ChartBenchMode.dZero
-                ? _buildDZeroCharts()
-                : _buildTradCharts(),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 90,
+                child: ZSparkline(
+                  controller: _sparklineCtrl,
+                  lineColor: const Color(0xFF2563EB),
+                  backgroundColor: const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 120,
+                width: double.infinity,
+                child: ZCandlestickChart(
+                  buffer: _candleBuffer,
+                  backgroundColor: const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 14,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ZActivityRings(controller: _ringsCtrl),
+                ZContributionGraph(buffer: _habitBuffer),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00FF88).withValues(alpha: 0.45),
-        ),
+  Widget _buildTradCharts() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          const ZFPSMonitor(size: Size(148.0, 44.0)),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'CPU使用率',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: ZPriceTicker(
-                  valueListenable: _cpuPct,
-                  currencyGlyph: ZeroNumberPainter.glyphPercent,
-                  fractionDigits: 1,
-                  style: const TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '従来 (setState + CustomPaint)',
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amberAccent,
-                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
+                Text(
+                  'Rebuild: $_tradRebuilds',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 100,
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDZeroCharts() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1724),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00FF88).withValues(alpha: 0.45),
+              child: CustomPaint(painter: _TradSparklinePainter(_tradPrices)),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero Charts',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00FF88),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 90,
-            child: ZSparkline(
-              controller: _sparklineCtrl,
-              lineColor: const Color(0xFF00FF88),
-              backgroundColor: const Color(0xFF080B12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              ZActivityRings(controller: _ringsCtrl),
-              ZRadarChart(controller: _radarCtrl),
-              ZDonutChart(controller: _donutCtrl),
-              ZContributionGraph(buffer: _habitBuffer),
-              SizedBox(
-                width: 240,
-                height: 120,
-                child: ZCandlestickChart(
-                  buffer: _candleBuffer,
-                  backgroundColor: const Color(0xFF080B12),
-                ),
-              ),
-              SizedBox(
-                width: 240,
-                height: 120,
-                child: ZOrderBook(
-                  controller: _orderBookCtrl,
-                  backgroundColor: const Color(0xFF080B12),
-                ),
-              ),
-              SizedBox(
-                width: 240,
-                height: 120,
-                child: ZHeatmap(
-                  buffer: _heatmapBuffer,
-                  preferredSize: const Size(240, 120),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTradCharts() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (setState + CustomPaint Path + Row/Column)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 90,
-            width: double.infinity,
-            child: CustomPaint(painter: _TradSparklinePainter(_tradPrices)),
-          ),
-          const SizedBox(height: 10),
-          Column(
-            children: [
-              for (int i = 0; i < 6; i++)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'BID \$${_orderBookCtrl.bidPriceAt(i).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Colors.greenAccent,
-                        fontSize: 11,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    Text(
-                      'ASK \$${_orderBookCtrl.askPriceAt(i).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 11,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -426,7 +347,7 @@ class _TradSparklinePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = Colors.redAccent
+        ..color = const Color(0xFF2563EB)
         ..strokeWidth = 2.0
         ..style = PaintingStyle.stroke,
     );

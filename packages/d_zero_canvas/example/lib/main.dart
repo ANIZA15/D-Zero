@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_canvas/d_zero_canvas.dart';
 
 void main() {
@@ -16,14 +15,22 @@ class DZeroCanvasBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_canvas Sample',
+      title: 'キャンバス・お絵描き',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E17),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E5FF),
-          secondary: Color(0xFF00FF88),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const CanvasBenchmarkScreen(),
@@ -43,19 +50,17 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
   CanvasBenchMode _mode = CanvasBenchMode.dZero;
   int _schedulerSlot = -1;
   int _tickCount = 0;
-
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(4.2);
+  int _tradRebuilds = 0;
 
   late final ZeroDanmakuController _danmakuCtrl;
   late final ZeroViewportController _viewportCtrl;
   late final ZeroFreehandController _freehandCtrl;
 
   static const List<String> _messages = <String>[
-    '⚡️ Zero-Allocation Danmaku!',
-    '🚀 Single RenderBox Bullet Stream',
-    '💎 120Hz Freehand drawRawPoints',
-    '🔥 Infinite Grid Pan & Zoom',
+    'コメントストリーム',
+    'ゼロリビルド描画',
+    '120Hz フリーハンド',
+    '無限グリッド',
   ];
 
   @override
@@ -67,7 +72,7 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
   @override
   void initState() {
     super.initState();
-    _danmakuCtrl = ZeroDanmakuController(capacity: 48);
+    _danmakuCtrl = ZeroDanmakuController(capacity: 32);
     _viewportCtrl = ZeroViewportController();
     _freehandCtrl = ZeroFreehandController(maxSegments: 1024);
     for (int i = 0; i < 60; i++) {
@@ -81,32 +86,19 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
     _tickCount++;
-    if (_tickCount % 20 == 0) {
+    if (_tickCount % 25 == 0) {
       _danmakuCtrl.emit(
         _messages[_tickCount % _messages.length],
-        speed: 110.0 + (_tickCount % 50),
+        speed: 100.0 + (_tickCount % 40),
       );
     }
-    _viewportCtrl.pan(0.6, 0.3);
+    _viewportCtrl.pan(0.5, 0.25);
 
     if (_mode == CanvasBenchMode.traditional) {
+      _tradRebuilds++;
       setState(() {});
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(_cpuStopwatch.elapsedMicroseconds);
-  }
-
-  void _updateTelemetry(int workMicros) {
-    final double overhead = _mode == CanvasBenchMode.dZero ? 150.0 : 1750.0;
-    final double pct =
-        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.2, 99.9);
-    _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
   }
 
   @override
@@ -115,173 +107,189 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
     _danmakuCtrl.dispose();
     _viewportCtrl.dispose();
     _freehandCtrl.dispose();
-    _cpuPct.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == CanvasBenchMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_canvas'),
-        backgroundColor: const Color(0xFF131B2A),
+        title: const Text(
+          'キャンバス・お絵描き',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<CanvasBenchMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CanvasBenchMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: CanvasBenchMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  isDZero ? _buildDZeroCard() : _buildTradCard(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDZeroCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHud(),
-            const SizedBox(height: 12),
-            SegmentedButton<CanvasBenchMode>(
-              segments: const [
-                ButtonSegment(
-                  value: CanvasBenchMode.dZero,
-                  label: Text('D-Zero'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'D-Zero キャンバス',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
-                ButtonSegment(
-                  value: CanvasBenchMode.traditional,
-                  label: Text('従来'),
+                Text(
+                  'Rebuild: 0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF16A34A),
+                  ),
                 ),
               ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
             ),
             const SizedBox(height: 12),
-            _mode == CanvasBenchMode.dZero
-                ? _buildDZeroCanvas()
-                : _buildTradCanvas(),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: ZDanmaku(
+                controller: _danmakuCtrl,
+                size: const Size(340, 80),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ZInfiniteGrid(
+                    controller: _viewportCtrl,
+                    size: const Size(200, 110),
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ZFreehandCanvas(
+                    controller: _freehandCtrl,
+                    size: const Size(200, 110),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
+  Widget _buildTradCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          const ZFPSMonitor(size: Size(148.0, 44.0)),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'CPU使用率',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: ZPriceTicker(
-                  valueListenable: _cpuPct,
-                  currencyGlyph: ZeroNumberPainter.glyphPercent,
-                  fractionDigits: 1,
-                  style: const TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '従来 (Stack + Positioned)',
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amberAccent,
-                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDZeroCanvas() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1724),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero (ZDanmaku + ZInfiniteGrid + ZFreehandCanvas)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-            ),
-          ),
-          const SizedBox(height: 10),
-          ZDanmaku(controller: _danmakuCtrl, size: const Size(340, 90)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              ZInfiniteGrid(
-                controller: _viewportCtrl,
-                size: const Size(220, 110),
-              ),
-              ZFreehandCanvas(
-                controller: _freehandCtrl,
-                size: const Size(220, 110),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTradCanvas() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (Stack + Positioned + Text)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 90,
-            child: Stack(
-              children: [
-                for (int i = 0; i < 8; i++)
-                  Positioned(
-                    left: ((320 - (_tickCount * 2 + i * 45) % 320)).toDouble(),
-                    top: (i * 11).toDouble(),
-                    child: Text(
-                      _messages[i % _messages.length],
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.orangeAccent,
-                      ),
-                    ),
+                Text(
+                  'Rebuild: $_tradRebuilds',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
                   ),
+                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Stack(
+                children: [
+                  for (int i = 0; i < 6; i++)
+                    Positioned(
+                      left: ((300 - (_tickCount * 2 + i * 45) % 300))
+                          .toDouble(),
+                      top: (10 + i * 14).toDouble(),
+                      child: Text(
+                        _messages[i % _messages.length],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

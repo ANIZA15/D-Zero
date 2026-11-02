@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:d_zero_3dengine/d_zero_3dengine.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 
 void main() {
   runApp(const DZero3DEngineExampleApp());
@@ -12,10 +11,23 @@ class DZero3DEngineExampleApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_3dengine Editor & Benchmark',
+      title: '3D ビューア',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF070B12),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
+        ),
       ),
       home: const EngineEditorScreen(),
     );
@@ -69,67 +81,61 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_3dengine (Nanite + Ray Tracing)'),
-        backgroundColor: const Color(0xFF101726),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12.0),
-            child: Center(child: ZFPSMonitor(size: Size(140.0, 38.0))),
-          ),
-        ],
+        title: const Text(
+          '3D ビューア',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildToolbar(),
-            const SizedBox(height: 12),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return ZViewport3D(
-                    controller: _controller,
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    overlay: Stack(
-                      children: [
-                        Positioned(
-                          right: 14.0,
-                          top: 14.0,
-                          child: ZOutliner3D(controller: _controller),
-                        ),
-                        Positioned(
-                          right: 14.0,
-                          top: 218.0,
-                          child: ZPostProcess3D(controller: _controller),
-                        ),
-                        Positioned(
-                          left: 290.0,
-                          top: 14.0,
-                          child: ZSequencer3D(controller: _controller),
-                        ),
-                        Positioned(
-                          left: 14.0,
-                          bottom: 14.0,
-                          child: ZTransformGizmo3D(controller: _controller),
-                        ),
-                        Positioned(
-                          right: 294.0,
-                          bottom: 14.0,
-                          child: ZMaterialEditor3D(controller: _controller),
-                        ),
-                        Positioned(
-                          right: 14.0,
-                          bottom: 14.0,
-                          child: ZSceneInspector3D(controller: _controller),
-                        ),
-                      ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildToolbar(),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return ZViewport3D(
+                            controller: _controller,
+                            size: Size(
+                              constraints.maxWidth,
+                              constraints.maxHeight,
+                            ),
+                            overlay: Align(
+                              alignment: Alignment.bottomRight,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: ZSceneInspector3D(
+                                  controller: _controller,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -140,62 +146,26 @@ class _EngineEditorScreenState extends State<EngineEditorScreen> {
       spacing: 8,
       runSpacing: 8,
       children: [
-        ElevatedButton(
+        FilledButton.tonal(
           onPressed: () => _controller.setPipelineConfig(
             renderMode: Zero3DRenderMode.hybridNaniteRt,
           ),
-          child: const Text('Hybrid Nanite + RT'),
+          child: const Text('標準表示'),
         ),
-        ElevatedButton(
+        OutlinedButton(
           onPressed: () => _controller.setPipelineConfig(
             renderMode: Zero3DRenderMode.raytracingGi,
             maxRayBounces: 3,
           ),
-          child: const Text('Ray Tracing GI (3-Bounce)'),
+          child: const Text('レイトレーシング'),
         ),
-        ElevatedButton(
-          onPressed: () => _controller.setPipelineConfig(
-            renderMode: Zero3DRenderMode.naniteClusters,
-          ),
-          child: const Text('Nanite Cluster View'),
-        ),
-        ElevatedButton(
-          onPressed: () => _controller.setPipelineConfig(
-            fpsMode: Zero3DFpsMode.cap144,
-          ),
-          child: const Text('144Hz Target'),
-        ),
-        ElevatedButton(
-          onPressed: () => _controller.setPipelineConfig(
-            fpsMode: Zero3DFpsMode.cap240,
-          ),
-          child: const Text('240Hz Target'),
-        ),
-        ElevatedButton(
-          onPressed: () => _controller.setPipelineConfig(
-            fpsMode: Zero3DFpsMode.uncapped,
-          ),
-          child: const Text('Uncapped FPS'),
-        ),
-        ElevatedButton(
+        OutlinedButton(
           onPressed: () {
             final next = !_controller.isPhysicsEnabled;
             _controller.setPhysicsEnabled(next);
             if (next) _controller.applyEntityImpulse(vy: 5.8);
           },
-          child: const Text('Physics Bounce (Space)'),
-        ),
-        ElevatedButton(
-          onPressed: () => _controller.buildProceduralMeshlets(
-            triangleCount: 8192,
-          ),
-          child: const Text('Build 8K Nanite Meshlets'),
-        ),
-        ElevatedButton(
-          onPressed: () => _controller.loadBuiltinObjPreset(
-            presetId: 1,
-          ),
-          child: const Text('Load OBJ Mesh (C++)'),
+          child: const Text('物理ジャンプ'),
         ),
       ],
     );

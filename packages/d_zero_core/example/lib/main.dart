@@ -14,14 +14,22 @@ class DZeroCoreBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_core Sample',
+      title: 'd_zero_core',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E17),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E5FF),
-          secondary: Color(0xFF00FF88),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const CoreBenchmarkScreen(),
@@ -42,10 +50,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   int _schedulerSlot = -1;
   double _phase = 0.0;
   Duration? _lastElapsed;
-
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _fps = ZeroDoubleNotifier(120.0);
-  final ZeroDoubleNotifier _cpuUsagePct = ZeroDoubleNotifier(3.8);
+  int _tradRebuilds = 0;
 
   late final FloatRingBuffer _ringBuffer;
   late final ZeroPool<_PooledDot> _dotPool;
@@ -62,17 +67,17 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   @override
   void initState() {
     super.initState();
-    _ringBuffer = FloatRingBuffer(256);
-    for (int i = 0; i < 256; i++) {
-      final double v = math.sin(i * 0.08) * 35.0;
+    _ringBuffer = FloatRingBuffer(128);
+    for (int i = 0; i < 128; i++) {
+      final double v = math.sin(i * 0.08) * 30.0;
       _ringBuffer.push(v);
       _tradHistory.add(v);
     }
     _dotPool = ZeroPool<_PooledDot>(
       factory: _PooledDot.new,
       reset: (d) => d.reset(),
-      initialCapacity: 128,
-      maxCapacity: 512,
+      initialCapacity: 64,
+      maxCapacity: 256,
     );
     ZeroFrameScheduler.instance.subscribe(this);
   }
@@ -80,51 +85,42 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
     final double dt = _computeDt(elapsed);
-    _phase += dt * 4.5;
+    _phase += dt * 4.0;
     _stepSimulation();
     if (_mode == CoreBenchmarkMode.traditional) {
       _stepTraditionalRebuild();
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(dt, _cpuStopwatch.elapsedMicroseconds);
   }
 
   double _computeDt(Duration elapsed) {
     final Duration? prev = _lastElapsed;
     _lastElapsed = elapsed;
-    if (prev == null) return 0.0083;
+    if (prev == null) return 0.016;
     final int us = (elapsed - prev).inMicroseconds;
-    return us > 0 ? (us / 1000000.0).clamp(0.001, 0.05) : 0.0083;
+    return us > 0 ? (us / 1000000.0).clamp(0.001, 0.05) : 0.016;
   }
 
   void _stepSimulation() {
-    for (int i = 0; i < 2; i++) {
-      final double sample =
-          math.sin(_phase + i * 0.2) * 38.0 + math.cos(_phase * 2.1) * 16.0;
-      _ringBuffer.push(sample);
-    }
+    final double sample =
+        math.sin(_phase) * 32.0 + math.cos(_phase * 2.1) * 14.0;
+    _ringBuffer.push(sample);
     _stepPooledDots();
   }
 
   void _stepPooledDots() {
-    if (_activeDots.length < 96) {
+    if (_activeDots.length < 48) {
       final _PooledDot d = _dotPool.acquire();
-      d.x = _rng.nextDouble() * 320.0;
+      d.x = _rng.nextDouble() * 300.0;
       d.y = 70.0;
-      d.vx = (_rng.nextDouble() - 0.5) * 3.5;
-      d.vy = (_rng.nextDouble() - 0.5) * 3.5;
+      d.vx = (_rng.nextDouble() - 0.5) * 3.0;
+      d.vy = (_rng.nextDouble() - 0.5) * 3.0;
       d.life = 1.0;
       _activeDots.add(d);
     }
     for (int i = _activeDots.length - 1; i >= 0; i--) {
       final _PooledDot d = _activeDots[i];
-      d.x = (d.x + d.vx).clamp(4.0, 316.0);
+      d.x = (d.x + d.vx).clamp(4.0, 296.0);
       d.y = (d.y + d.vy).clamp(4.0, 136.0);
       d.life -= 0.015;
       if (d.life <= 0.0) {
@@ -135,135 +131,131 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   }
 
   void _stepTraditionalRebuild() {
-    for (int i = 0; i < 6; i++) {
-      if (_tradHistory.length >= 256) {
-        _tradHistory.removeAt(0);
-      }
-      _tradHistory.add(math.sin(_phase + i * 0.1) * 38.0);
+    if (_tradHistory.length >= 128) {
+      _tradHistory.removeAt(0);
     }
+    _tradHistory.add(math.sin(_phase) * 32.0);
+    _tradRebuilds++;
     setState(() {});
-  }
-
-  void _updateTelemetry(double dt, int workMicros) {
-    final double instantFps = (1.0 / dt).clamp(1.0, 120.0);
-    _fps.value = _fps.value * 0.9 + instantFps * 0.1;
-    final double modeOverheadUs =
-        _mode == CoreBenchmarkMode.dZero ? 180.0 : 1950.0;
-    final double cpuPct =
-        ((workMicros + modeOverheadUs) / 8333.0 * 100.0).clamp(1.2, 99.9);
-    _cpuUsagePct.value = _cpuUsagePct.value * 0.85 + cpuPct * 0.15;
   }
 
   @override
   void dispose() {
     ZeroFrameScheduler.instance.unsubscribe(this);
-    _fps.dispose();
-    _cpuUsagePct.dispose();
     _dotPool.clear();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == CoreBenchmarkMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_core'),
-        backgroundColor: const Color(0xFF131B2A),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _CoreTelemetryHud(fps: _fps, cpuPct: _cpuUsagePct),
-            const SizedBox(height: 12),
-            SegmentedButton<CoreBenchmarkMode>(
-              segments: const [
-                ButtonSegment(
-                  value: CoreBenchmarkMode.dZero,
-                  label: Text('D-Zero'),
-                ),
-                ButtonSegment(
-                  value: CoreBenchmarkMode.traditional,
-                  label: Text('従来'),
-                ),
-              ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
-            ),
-            const SizedBox(height: 12),
-            _mode == CoreBenchmarkMode.dZero
-                ? _buildDZeroSection()
-                : _buildTraditionalSection(),
-          ],
+        title: const Text(
+          'd_zero_core',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
         ),
       ),
-    );
-  }
-
-  Widget _buildDZeroSection() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero (FloatRingBuffer + ZeroPool + ZeroNumberPainter)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: _ZCoreCanvasBenchWidget(
-              ringBuffer: _ringBuffer,
-              dots: _activeDots,
-              poolAvailableFn: () => _dotPool.availableCount,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTraditionalSection() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (setState + List.removeAt(0) + CustomPaint)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 140,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _TraditionalCorePainter(
-                history: _tradHistory,
-                dots: _activeDots,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<CoreBenchmarkMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CoreBenchmarkMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: CoreBenchmarkMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildContentCard(isDZero),
+                ],
               ),
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentCard(bool isDZero) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isDZero ? 'FloatRingBuffer & ZeroPool' : '従来 (List + setState)',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  isDZero ? 'Rebuild: 0' : 'Rebuild: $_tradRebuilds',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDZero
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: isDZero
+                  ? _ZCoreCanvasBenchWidget(
+                      ringBuffer: _ringBuffer,
+                      dots: _activeDots,
+                      poolAvailableFn: () => _dotPool.availableCount,
+                    )
+                  : CustomPaint(
+                      painter: _TraditionalCorePainter(
+                        history: _tradHistory,
+                        dots: _activeDots,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -282,128 +274,6 @@ class _PooledDot {
     vx = 0;
     vy = 0;
     life = 1.0;
-  }
-}
-
-class _CoreTelemetryHud extends ZLeafWidget<_RenderCoreTelemetryHud> {
-  final ZeroDoubleNotifier fps;
-  final ZeroDoubleNotifier cpuPct;
-
-  const _CoreTelemetryHud({required this.fps, required this.cpuPct});
-
-  @override
-  _RenderCoreTelemetryHud createRenderObject(BuildContext context) {
-    return _RenderCoreTelemetryHud(fps: fps, cpuPct: cpuPct);
-  }
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderCoreTelemetryHud renderObject,
-  ) {
-    renderObject.updateNotifiers(fps: fps, cpuPct: cpuPct);
-  }
-}
-
-class _RenderCoreTelemetryHud extends ZeroRenderBox {
-  ZeroDoubleNotifier _fps;
-  ZeroDoubleNotifier _cpuPct;
-
-  final Paint _bgPaint = Paint()..color = const Color(0xFF101624);
-  final Paint _borderPaint = Paint()
-    ..color = const Color(0xFF00E5FF)
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1.2;
-
-  late final ZeroNumberPainter _numGreen;
-  late final ZeroNumberPainter _numAmber;
-  late final TextPainter _labelsPainter;
-
-  _RenderCoreTelemetryHud({
-    required ZeroDoubleNotifier fps,
-    required ZeroDoubleNotifier cpuPct,
-  })  : _fps = fps,
-        _cpuPct = cpuPct,
-        super(animatePerFrame: true) {
-    _numGreen = ZeroNumberPainter(
-      style: const TextStyle(
-        color: Color(0xFF00FF88),
-        fontSize: 15,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'monospace',
-      ),
-    );
-    _numAmber = ZeroNumberPainter(
-      style: const TextStyle(
-        color: Colors.amberAccent,
-        fontSize: 15,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'monospace',
-      ),
-    );
-    _labelsPainter = TextPainter(
-      text: const TextSpan(
-        text: 'FPS             CPU使用率',
-        style: TextStyle(
-          color: Color(0xFF94A3B8),
-          fontSize: 11,
-          fontFamily: 'monospace',
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-  }
-
-  void updateNotifiers({
-    required ZeroDoubleNotifier fps,
-    required ZeroDoubleNotifier cpuPct,
-  }) {
-    _fps = fps;
-    _cpuPct = cpuPct;
-    markDirty();
-  }
-
-  @override
-  Size computeDryLayout(BoxConstraints constraints) {
-    return Size(
-      constraints.maxWidth.isFinite ? constraints.maxWidth : 340.0,
-      58.0,
-    );
-  }
-
-  @override
-  void performLayout() {
-    size = computeDryLayout(constraints);
-  }
-
-  @override
-  void paintZero(PaintingContext context, Offset offset) {
-    final Canvas canvas = context.canvas;
-    final RRect rrect = RRect.fromRectAndRadius(
-      offset & size,
-      const Radius.circular(10.0),
-    );
-    canvas.drawRRect(rrect, _bgPaint);
-    canvas.drawRRect(rrect, _borderPaint);
-
-    _labelsPainter.paint(canvas, offset + const Offset(14.0, 8.0));
-    final double y = offset.dy + 28.0;
-    final double x0 = offset.dx + 14.0;
-
-    _numGreen.paintDouble(canvas, Offset(x0, y), _fps.value, fractionDigits: 1);
-    _numAmber.paintPercent(
-      canvas,
-      Offset(x0 + 112.0, y),
-      _cpuPct.value,
-      fractionDigits: 1,
-    );
-  }
-
-  @override
-  void dispose() {
-    _numGreen.dispose();
-    _numAmber.dispose();
-    super.dispose();
   }
 }
 
@@ -445,11 +315,11 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
   int Function() poolAvailableFn;
 
   final Paint _wavePaint = Paint()
-    ..color = const Color(0xFF00E5FF)
+    ..color = const Color(0xFF2563EB)
     ..strokeWidth = 2.0
     ..style = PaintingStyle.stroke;
   final Paint _dotPaint = Paint()
-    ..color = const Color(0xFF00FF88)
+    ..color = const Color(0xFF16A34A)
     ..style = PaintingStyle.fill;
   late final ZeroNumberPainter _numPainter;
 
@@ -460,9 +330,9 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
   }) : super(animatePerFrame: true) {
     _numPainter = ZeroNumberPainter(
       style: const TextStyle(
-        color: Color(0xFF00FF88),
-        fontSize: 13,
-        fontFamily: 'monospace',
+        color: Color(0xFF475569),
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -471,7 +341,7 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
   Size computeDryLayout(BoxConstraints constraints) {
     return Size(
       constraints.maxWidth.isFinite ? constraints.maxWidth : 340.0,
-      140.0,
+      150.0,
     );
   }
 
@@ -497,11 +367,11 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
     }
     for (int i = 0; i < dots.length; i++) {
       final _PooledDot d = dots[i];
-      canvas.drawCircle(offset + Offset(d.x, d.y), 2.5, _dotPaint);
+      canvas.drawCircle(offset + Offset(d.x, d.y), 3.0, _dotPaint);
     }
     _numPainter.paintInt(
       canvas,
-      offset + const Offset(8.0, 8.0),
+      offset + const Offset(10.0, 10.0),
       poolAvailableFn(),
     );
   }
@@ -522,7 +392,7 @@ class _TraditionalCorePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = Colors.redAccent
+      ..color = const Color(0xFF64748B)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
     final Path path = Path();
@@ -539,8 +409,8 @@ class _TraditionalCorePainter extends CustomPainter {
       final _PooledDot d = dots[i];
       canvas.drawCircle(
         Offset(d.x, d.y),
-        2.5,
-        Paint()..color = Colors.orangeAccent,
+        3.0,
+        Paint()..color = const Color(0xFF94A3B8),
       );
     }
   }

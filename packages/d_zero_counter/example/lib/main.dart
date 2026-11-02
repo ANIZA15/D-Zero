@@ -15,14 +15,22 @@ class DZeroCounterBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_counter Sample',
+      title: 'カウンター・タイマー',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E17),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E676),
-          secondary: Color(0xFF00B0FF),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const CounterBenchmarkScreen(),
@@ -39,16 +47,15 @@ class CounterBenchmarkScreen extends StatefulWidget {
 
 class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
     implements ZeroSlottedFrameListener {
-  static const int _cellCount = 36;
+  static const int _cellCount = 8;
 
   CounterBenchMode _mode = CounterBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
+  int _tradRebuilds = 0;
 
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(3.5);
-  final ZeroIntNotifier _fastCounter = ZeroIntNotifier(10000);
-  final ZeroDoubleNotifier _odometerVal = ZeroDoubleNotifier(84210.5);
+  final ZeroIntNotifier _fastCounter = ZeroIntNotifier(1000);
+  final ZeroDoubleNotifier _odometerVal = ZeroDoubleNotifier(8420.5);
   late final List<ZeroDoubleNotifier> _tickerCells;
 
   @override
@@ -71,32 +78,19 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
-    _phase += 0.06;
+    _phase += 0.05;
     _fastCounter.add(1);
-    _odometerVal.value = _odometerVal.value + 0.35;
+    _odometerVal.value = _odometerVal.value + 0.25;
 
     for (int i = 0; i < _cellCount; i++) {
       _tickerCells[i].value =
-          100.0 + i * 25.0 + math.sin(_phase + i * 0.4) * 14.0;
+          100.0 + i * 25.0 + math.sin(_phase + i * 0.4) * 12.0;
     }
 
     if (_mode == CounterBenchMode.traditional) {
+      _tradRebuilds++;
       setState(() {});
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(_cpuStopwatch.elapsedMicroseconds);
-  }
-
-  void _updateTelemetry(int workMicros) {
-    final double overhead = _mode == CounterBenchMode.dZero ? 140.0 : 1800.0;
-    final double pct =
-        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.0, 99.9);
-    _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
   }
 
   @override
@@ -105,7 +99,6 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
     for (final ZeroDoubleNotifier c in _tickerCells) {
       c.dispose();
     }
-    _cpuPct.dispose();
     _fastCounter.dispose();
     _odometerVal.dispose();
     super.dispose();
@@ -113,243 +106,300 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == CounterBenchMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_counter'),
-        backgroundColor: const Color(0xFF131B2A),
+        title: const Text(
+          'カウンター・タイマー',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<CounterBenchMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CounterBenchMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: CounterBenchMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  isDZero ? _buildDZeroCard() : _buildTraditionalCard(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDZeroCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTelemetryHud(),
-            const SizedBox(height: 12),
-            SegmentedButton<CounterBenchMode>(
-              segments: const [
-                ButtonSegment(
-                  value: CounterBenchMode.dZero,
-                  label: Text('D-Zero'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'D-Zero カウンター一覧',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
-                ButtonSegment(
-                  value: CounterBenchMode.traditional,
-                  label: Text('従来'),
+                Text(
+                  'Rebuild: 0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF16A34A),
+                  ),
                 ),
               ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
             ),
-            const SizedBox(height: 12),
-            _mode == CounterBenchMode.dZero
-                ? _buildDZeroWall()
-                : _buildTraditionalWall(),
+            const Divider(height: 24, color: Color(0xFFF1F5F9)),
+            _buildRowItem(
+              'カウンター (ZCounter)',
+              ZCounter(
+                valueListenable: _fastCounter,
+                minDigits: 5,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const Divider(height: 20, color: Color(0xFFF1F5F9)),
+            const _StaticRowItem(
+              label: 'ストップウォッチ (ZStopwatch)',
+              child: ZStopwatch(
+                isRunning: true,
+                includeHours: false,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            ),
+            const Divider(height: 20, color: Color(0xFFF1F5F9)),
+            const _StaticRowItem(
+              label: 'カウントダウン (ZCountdown)',
+              child: ZCountdown(
+                duration: Duration(minutes: 5),
+                isRunning: true,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+            const Divider(height: 20, color: Color(0xFFF1F5F9)),
+            _buildRowItem(
+              'オドメーター (ZOdometer)',
+              ZOdometer(
+                valueListenable: _odometerVal,
+                minDigits: 5,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const Divider(height: 24, color: Color(0xFFF1F5F9)),
+            const Text(
+              '価格ティッカー (ZPriceTicker)',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (int i = 0; i < _cellCount; i++)
+                  Container(
+                    width: 96,
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: ZPriceTicker(
+                      valueListenable: _tickerCells[i],
+                      fractionDigits: 2,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTelemetryHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E676).withValues(alpha: 0.45),
+  Widget _buildRowItem(String label, Widget trailing) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
         ),
+        trailing,
+      ],
+    );
+  }
+
+  Widget _buildTraditionalCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          const ZFPSMonitor(size: Size(148.0, 44.0)),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'CPU使用率',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: ZPriceTicker(
-                  valueListenable: _cpuPct,
-                  currencyGlyph: ZeroNumberPainter.glyphPercent,
-                  fractionDigits: 1,
-                  style: const TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '従来 (setState + Text)',
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amberAccent,
-                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDZeroWall() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101926),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E676).withValues(alpha: 0.45),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero (ZCounter, ZStopwatch, ZCountdown, ZOdometer, ZPriceTicker × 36)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E676),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ZCounter(
-                valueListenable: _fastCounter,
-                minDigits: 6,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF00E676),
-                  fontFamily: 'monospace',
-                ),
-              ),
-              const ZStopwatch(
-                isRunning: true,
-                includeHours: true,
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Color(0xFF00B0FF),
-                  fontFamily: 'monospace',
-                ),
-              ),
-              const ZCountdown(
-                duration: Duration(minutes: 5),
-                isRunning: true,
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Colors.amberAccent,
-                  fontFamily: 'monospace',
-                ),
-              ),
-              ZOdometer(
-                valueListenable: _odometerVal,
-                minDigits: 5,
-                style: const TextStyle(
-                  fontSize: 20,
-                  color: Colors.cyanAccent,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (int i = 0; i < _cellCount; i++)
-                SizedBox(
-                  width: 92,
-                  height: 24,
-                  child: ZPriceTicker(
-                    valueListenable: _tickerCells[i],
-                    fractionDigits: 2,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      color: Colors.white,
-                    ),
+                Text(
+                  'Rebuild: $_tradRebuilds',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
                   ),
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTraditionalWall() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (setState + Text × 36)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
+            const Divider(height: 24, color: Color(0xFFF1F5F9)),
+            _buildRowItem(
+              'カウンター',
               Text(
-                _fastCounter.value.toString().padLeft(6, '0'),
+                _fastCounter.value.toString().padLeft(5, '0'),
                 style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.redAccent,
-                  fontFamily: 'monospace',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
                 ),
               ),
+            ),
+            const Divider(height: 20, color: Color(0xFFF1F5F9)),
+            _buildRowItem(
+              'オドメーター',
               Text(
                 _odometerVal.value.toStringAsFixed(1),
                 style: const TextStyle(
-                  fontSize: 20,
-                  color: Colors.orangeAccent,
-                  fontFamily: 'monospace',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (int i = 0; i < _cellCount; i++)
-                Container(
-                  width: 92,
-                  height: 24,
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  color: const Color(0xFF281C2D),
-                  child: Text(
-                    '\$${_tickerCells[i].value.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
+            ),
+            const Divider(height: 24, color: Color(0xFFF1F5F9)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (int i = 0; i < _cellCount; i++)
+                  Container(
+                    width: 96,
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '\$${_tickerCells[i].value.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _StaticRowItem extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _StaticRowItem({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+        ),
+        child,
+      ],
     );
   }
 }

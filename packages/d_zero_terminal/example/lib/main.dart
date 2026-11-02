@@ -1,15 +1,12 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_terminal/d_zero_terminal.dart';
 
 void main() {
   runApp(const DZeroTerminalExampleApp());
 }
 
-/// Interactive benchmark and terminal demo app for `d_zero_terminal`.
+/// Simple, clean terminal demo app for `d_zero_terminal`.
 class DZeroTerminalExampleApp extends StatefulWidget {
-  /// Creates a const [DZeroTerminalExampleApp].
   const DZeroTerminalExampleApp({super.key});
 
   @override
@@ -19,55 +16,28 @@ class DZeroTerminalExampleApp extends StatefulWidget {
 
 class _DZeroTerminalExampleAppState extends State<DZeroTerminalExampleApp> {
   late final ZeroPtyController _controller;
-  Timer? _streamTimer;
-  bool _streamingBurst = false;
   int _burstTick = 1;
 
   @override
   void initState() {
     super.initState();
     _controller = ZeroPtyController(
-      cols: 96,
-      rows: 28,
-      scrollbackCapacity: 2048,
+      cols: 80,
+      rows: 24,
+      scrollbackCapacity: 1024,
     );
     _seedWelcomeBanner();
   }
 
   void _seedWelcomeBanner() {
     _controller.feedAnsiText(
-      '\x1b[1;36m============================================================\x1b[0m\r\n'
-      '\x1b[1;32m ⚡ D-ZERO TERMINAL (C++17 FFI + Impeller drawRawAtlas)\x1b[0m\r\n'
-      '\x1b[38;2;140;180;255m Zero Rebuild | Zero Allocation | Zero Channel (0ns FFI)\x1b[0m\r\n'
-      '\x1b[1;36m============================================================\x1b[0m\r\n',
-    );
-    _controller.runStressBurst(lineCount: 24, seed: 42);
-  }
-
-  void _toggleLiveStream() {
-    setState(() {
-      _streamingBurst = !_streamingBurst;
-    });
-    _streamTimer?.cancel();
-    if (_streamingBurst) {
-      _streamTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-        _controller.runStressBurst(lineCount: 16, seed: _burstTick++);
-      });
-    }
-  }
-
-  void _cycleCursorStyle() {
-    final nextIdx = (_controller.cursorStyle.index + 1) %
-        ZeroTerminalCursorStyle.values.length;
-    _controller.setCursorStyle(
-      style: ZeroTerminalCursorStyle.values[nextIdx],
-      visible: true,
+      'D-Zero Terminal Ready\r\n'
+      'Type commands or press buttons above.\r\n',
     );
   }
 
   @override
   void dispose() {
-    _streamTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -75,49 +45,77 @@ class _DZeroTerminalExampleAppState extends State<DZeroTerminalExampleApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'ターミナル',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: Scaffold(
-        backgroundColor: const Color(0xFF06090F),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0D1117),
-          title: const Text(
-            'D-Zero FFI PTY Terminal Benchmark',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-          ),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: ZFPSMonitor(),
-            ),
-          ],
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildToolbar(),
-              const SizedBox(height: 10),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: ZPtyTerminal(
-                        controller: _controller,
-                        autoResize: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
+        ),
+      ),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'ターミナル',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+          ),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildToolbar(),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Card(
+                    elevation: 0,
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: ZPtyTerminal(
+                                controller: _controller,
+                                autoResize: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ZTerminalMinimap(
+                            controller: _controller,
+                            width: 40,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    ZTerminalMinimap(
-                      controller: _controller,
-                      width: 46,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -126,34 +124,23 @@ class _DZeroTerminalExampleAppState extends State<DZeroTerminalExampleApp> {
 
   Widget _buildToolbar() {
     return Wrap(
-      spacing: 10,
+      spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         ZTerminalHud(controller: _controller),
-        FilledButton.icon(
+        FilledButton(
           onPressed: () => _controller.spawnShell(),
-          icon: const Icon(Icons.terminal, size: 16),
-          label: const Text('Spawn /bin/zsh PTY'),
+          child: const Text('シェル起動'),
         ),
-        FilledButton.tonalIcon(
+        OutlinedButton(
           onPressed: () =>
-              _controller.runStressBurst(lineCount: 512, seed: _burstTick++),
-          icon: const Icon(Icons.bolt, size: 16),
-          label: const Text('512-Line TrueColor Burst'),
+              _controller.runStressBurst(lineCount: 64, seed: _burstTick++),
+          child: const Text('サンプル出力'),
         ),
-        OutlinedButton.icon(
-          onPressed: _toggleLiveStream,
-          icon: Icon(_streamingBurst ? Icons.pause : Icons.play_arrow, size: 16),
-          label: Text(_streamingBurst ? 'Stop 60Hz Stream' : '60Hz Stress Stream'),
-        ),
-        OutlinedButton(
-          onPressed: _cycleCursorStyle,
-          child: const Text('Cursor Style'),
-        ),
-        OutlinedButton(
+        TextButton(
           onPressed: () => _controller.clearScreen(),
-          child: const Text('Clear'),
+          child: const Text('クリア'),
         ),
       ],
     );

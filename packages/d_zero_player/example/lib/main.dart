@@ -14,14 +14,22 @@ class ZeroPlayerComparisonApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_player Sample',
+      title: '動画プレイヤー',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0D0D12),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFF0055),
-          secondary: Color(0xFF00E5FF),
-          surface: Color(0xFF16161F),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const ComparisonScreen(),
@@ -137,131 +145,158 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('⚡️ d_zero_player')),
+      appBar: AppBar(
+        title: const Text(
+          '動画プレイヤー',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(14.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHud(),
-              const SizedBox(height: 12),
-              SegmentedButton<PlayerMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: PlayerMode.zeroPlayer,
-                    label: Text('D-Zero'),
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<PlayerMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: PlayerMode.zeroPlayer,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: PlayerMode.standardPlayer,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_currentMode},
+                    onSelectionChanged: (set) =>
+                        setState(() => _currentMode = set.first),
                   ),
-                  ButtonSegment(
-                    value: PlayerMode.standardPlayer,
-                    label: Text('従来'),
+                  const SizedBox(height: 12),
+                  _buildSimpleStatusBar(),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: _currentMode == PlayerMode.zeroPlayer
+                        ? _buildZeroPlayerCard()
+                        : _buildStandardPlayerCard(),
                   ),
                 ],
-                selected: {_currentMode},
-                onSelectionChanged: (set) =>
-                    setState(() => _currentMode = set.first),
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: _currentMode == PlayerMode.zeroPlayer
-                    ? _buildZeroPlayerCard()
-                    : _buildStandardPlayerCard(),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16161F),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x33FFFFFF)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'FPS: ${_fps.toStringAsFixed(1)}',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.greenAccent,
-              fontFamily: 'monospace',
-            ),
+  Widget _buildSimpleStatusBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'FPS: ${_fps.toStringAsFixed(1)}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
-          const SizedBox(width: 24),
-          Text(
-            'CPU使用率: ${_cpuUsagePct.toStringAsFixed(1)}%',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.amberAccent,
-              fontFamily: 'monospace',
-            ),
+        ),
+        Text(
+          'CPU使用率: ${_cpuUsagePct.toStringAsFixed(1)}%',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildZeroPlayerCard() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFF0055)),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ColoredBox(
+                  color: const Color(0xFF0F172A),
+                  child: _isZeroLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : (_zeroError != null
+                          ? Center(
+                              child: Text(
+                                _zeroError!,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            )
+                          : (_zeroController != null
+                              ? ZPlayer(
+                                  controller: _zeroController!,
+                                  showControls: true,
+                                )
+                              : const SizedBox.shrink())),
+                ),
+              ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: _isZeroLoading
-                ? const Center(child: CircularProgressIndicator())
-                : (_zeroError != null
-                    ? Center(child: Text(_zeroError!))
-                    : (_zeroController != null
-                        ? ZPlayer(
-                            controller: _zeroController!,
-                            showControls: true,
-                          )
-                        : const SizedBox.shrink())),
-          ),
+            const SizedBox(height: 12),
+            ZVideoTimeline(controller: _timelineCtrl),
+          ],
         ),
-        const SizedBox(height: 10),
-        ZVideoTimeline(controller: _timelineCtrl),
-      ],
+      ),
     );
   }
 
   Widget _buildStandardPlayerCard() {
     final standard.VideoPlayerController? controller = _standardController;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: _isStandardLoading ||
-              controller == null ||
-              !controller.value.isInitialized
-          ? const Center(
-              child: Text(
-                '従来 video_player',
-                style: TextStyle(color: Colors.white70),
-              ),
-            )
-          : Center(
-              child: AspectRatio(
-                aspectRatio: controller.value.aspectRatio,
-                child: standard.VideoPlayer(controller),
-              ),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ColoredBox(
+            color: const Color(0xFF0F172A),
+            child: _isStandardLoading ||
+                    controller == null ||
+                    !controller.value.isInitialized
+                ? const Center(
+                    child: Text(
+                      '従来 video_player',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  )
+                : Center(
+                    child: AspectRatio(
+                      aspectRatio: controller.value.aspectRatio,
+                      child: standard.VideoPlayer(controller),
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }

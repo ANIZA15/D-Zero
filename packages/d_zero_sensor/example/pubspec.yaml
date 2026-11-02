@@ -12,6 +12,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  mobile_scanner: ^7.5.0
   d_zero_core:
   d_zero_counter:
   d_zero_sensor:

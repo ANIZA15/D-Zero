@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_waveform/d_zero_waveform.dart';
 
 void main() {
@@ -16,14 +15,22 @@ class DZeroWaveformBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_waveform Sample',
+      title: 'オーディオ波形',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E17),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E5FF),
-          secondary: Color(0xFF00FF88),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const WaveformBenchmarkScreen(),
@@ -41,14 +48,12 @@ class WaveformBenchmarkScreen extends StatefulWidget {
 
 class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
     implements ZeroSlottedFrameListener {
-  static const int _binCount = 32;
+  static const int _binCount = 24;
 
   WaveformBenchMode _mode = WaveformBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
-
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(4.1);
+  int _tradRebuilds = 0;
 
   late final ZeroWaveformController _waveformCtrl;
   late final ZeroSpectrumController _spectrumCtrl;
@@ -79,11 +84,7 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
-    _phase += 0.09;
+    _phase += 0.08;
     final double sample =
         (math.sin(_phase * 3.5) * 0.6 + math.cos(_phase * 8.0) * 0.35)
             .clamp(-1.0, 1.0);
@@ -100,18 +101,9 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
     _meterCtrl.updateLevels(leftRms: _leftRms, rightRms: _rightRms);
 
     if (_mode == WaveformBenchMode.traditional) {
+      _tradRebuilds++;
       setState(() {});
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(_cpuStopwatch.elapsedMicroseconds);
-  }
-
-  void _updateTelemetry(int workMicros) {
-    final double overhead = _mode == WaveformBenchMode.dZero ? 150.0 : 1850.0;
-    final double pct =
-        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.2, 99.9);
-    _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
   }
 
   @override
@@ -120,175 +112,185 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
     _waveformCtrl.dispose();
     _spectrumCtrl.dispose();
     _meterCtrl.dispose();
-    _cpuPct.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == WaveformBenchMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_waveform'),
-        backgroundColor: const Color(0xFF131B2A),
+        title: const Text(
+          'オーディオ波形',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<WaveformBenchMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: WaveformBenchMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: WaveformBenchMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  isDZero ? _buildDZeroCard() : _buildTradCard(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDZeroCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHud(),
-            const SizedBox(height: 12),
-            SegmentedButton<WaveformBenchMode>(
-              segments: const [
-                ButtonSegment(
-                  value: WaveformBenchMode.dZero,
-                  label: Text('D-Zero'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'D-Zero 波形 & スペクトラム',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
-                ButtonSegment(
-                  value: WaveformBenchMode.traditional,
-                  label: Text('従来'),
+                Text(
+                  'Rebuild: 0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF16A34A),
+                  ),
                 ),
               ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 85,
+                child: ZWaveform(
+                  controller: _waveformCtrl,
+                  backgroundColor: const Color(0xFF0F172A),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
-            _mode == WaveformBenchMode.dZero
-                ? _buildDZeroPanel()
-                : _buildTradPanel(),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 85,
+                child: ZSpectrumAnalyzer(
+                  controller: _spectrumCtrl,
+                  backgroundColor: const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(height: 36, child: ZAudioMeter(controller: _meterCtrl)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
+  Widget _buildTradCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          const ZFPSMonitor(size: Size(148.0, 44.0)),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'CPU使用率',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: ZPriceTicker(
-                  valueListenable: _cpuPct,
-                  currencyGlyph: ZeroNumberPainter.glyphPercent,
-                  fractionDigits: 1,
-                  style: const TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '従来 (setState + Container)',
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amberAccent,
-                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDZeroPanel() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1724),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero (ZWaveform + ZSpectrumAnalyzer + ZAudioMeter)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 85,
-            child: ZWaveform(
-              controller: _waveformCtrl,
-              backgroundColor: const Color(0xFF080B12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 85,
-            child: ZSpectrumAnalyzer(
-              controller: _spectrumCtrl,
-              backgroundColor: const Color(0xFF080B12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(height: 40, child: ZAudioMeter(controller: _meterCtrl)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTradPanel() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (setState + Row of Containers + LinearProgressIndicator)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 75,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (int i = 0; i < _binCount; i++)
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      height: 70.0 * _scratchBins[i],
-                      color: Colors.redAccent,
-                    ),
+                Text(
+                  'Rebuild: $_tradRebuilds',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
                   ),
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 10),
-          LinearProgressIndicator(value: _leftRms, color: Colors.orangeAccent),
-          const SizedBox(height: 6),
-          LinearProgressIndicator(value: _rightRms, color: Colors.redAccent),
-        ],
+            const SizedBox(height: 14),
+            Container(
+              height: 85,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (int i = 0; i < _binCount; i++)
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        height: 64.0 * _scratchBins[i],
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            LinearProgressIndicator(value: _leftRms),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: _rightRms),
+          ],
+        ),
       ),
     );
   }

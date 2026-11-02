@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:d_zero_core/d_zero_core.dart';
-import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_particles/d_zero_particles.dart';
 
 void main() {
@@ -16,14 +15,22 @@ class DZeroParticlesBenchmarkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'd_zero_particles Sample',
+      title: 'パーティクル',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF090D16),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E5FF),
-          secondary: Color(0xFFFF007F),
-          surface: Color(0xFF131B2A),
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          centerTitle: false,
         ),
       ),
       home: const ParticlesBenchmarkScreen(),
@@ -41,15 +48,13 @@ class ParticlesBenchmarkScreen extends StatefulWidget {
 
 class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     implements ZeroSlottedFrameListener {
-  static const int _particleCount = 5000;
+  static const int _particleCount = 3000;
 
   ParticleBenchMode _mode = ParticleBenchMode.dZero;
   int _schedulerSlot = -1;
   int _tickCount = 0;
   Duration? _lastElapsed;
-
-  final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(6.0);
+  int _tradRebuilds = 0;
 
   late final ZeroParticleController _particleCtrl;
   late final ZeroConfettiController _confettiCtrl;
@@ -65,8 +70,8 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
   @override
   void initState() {
     super.initState();
-    _confettiCtrl = ZeroConfettiController(capacity: 160);
-    _reactionCtrl = ZeroReactionController(capacity: 128);
+    _confettiCtrl = ZeroConfettiController(capacity: 120);
+    _reactionCtrl = ZeroReactionController(capacity: 96);
     _particleCtrl = ZeroParticleController(capacity: _particleCount);
     _particleCtrl.ensureInitialized(width: 340.0, height: 180.0);
     final math.Random rng = math.Random(42);
@@ -75,8 +80,8 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
       (_) => _TradParticle(
         x: rng.nextDouble() * 340.0,
         y: rng.nextDouble() * 180.0,
-        vx: (rng.nextDouble() - 0.5) * 200.0,
-        vy: (rng.nextDouble() - 0.5) * 200.0,
+        vx: (rng.nextDouble() - 0.5) * 180.0,
+        vy: (rng.nextDouble() - 0.5) * 180.0,
       ),
     );
     ZeroFrameScheduler.instance.subscribe(this);
@@ -85,44 +90,30 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
-    _cpuStopwatch
-      ..reset()
-      ..start();
-
     final double dt = _computeDt(elapsed);
     _tickCount++;
     if (_tickCount % 90 == 0) {
       _confettiCtrl.burst();
     }
-    if (_tickCount % 20 == 0) {
-      _reactionCtrl.emit(count: 4);
+    if (_tickCount % 25 == 0) {
+      _reactionCtrl.emit(count: 3);
     }
 
     if (_mode == ParticleBenchMode.traditional) {
       for (int i = 0; i < _tradParticles.length; i++) {
         _tradParticles[i].step(dt, 340.0, 180.0);
       }
+      _tradRebuilds++;
       setState(() {});
     }
-
-    _cpuStopwatch.stop();
-    _updateTelemetry(_cpuStopwatch.elapsedMicroseconds);
   }
 
   double _computeDt(Duration elapsed) {
     final Duration? prev = _lastElapsed;
     _lastElapsed = elapsed;
-    if (prev == null) return 0.0083;
+    if (prev == null) return 0.016;
     final int us = (elapsed - prev).inMicroseconds;
-    return us > 0 ? (us / 1000000.0).clamp(0.001, 0.05) : 0.0083;
-  }
-
-  void _updateTelemetry(int workMicros) {
-    final double overhead =
-        _mode == ParticleBenchMode.dZero ? 220.0 : (_particleCount * 0.65);
-    final double pct =
-        ((workMicros + overhead) / 8333.0 * 100.0).clamp(1.5, 99.9);
-    _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
+    return us > 0 ? (us / 1000000.0).clamp(0.001, 0.05) : 0.016;
   }
 
   @override
@@ -131,161 +122,171 @@ class _ParticlesBenchmarkScreenState extends State<ParticlesBenchmarkScreen>
     _particleCtrl.dispose();
     _confettiCtrl.dispose();
     _reactionCtrl.dispose();
-    _cpuPct.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDZero = _mode == ParticleBenchMode.dZero;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚡️ d_zero_particles'),
-        backgroundColor: const Color(0xFF131B2A),
+        title: const Text(
+          'パーティクル',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE2E8F0)),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<ParticleBenchMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ParticleBenchMode.dZero,
+                        label: Text('D-Zero'),
+                      ),
+                      ButtonSegment(
+                        value: ParticleBenchMode.traditional,
+                        label: Text('従来'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (s) =>
+                        setState(() => _mode = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  isDZero ? _buildDZeroCard() : _buildTradCard(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDZeroCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHud(),
-            const SizedBox(height: 12),
-            SegmentedButton<ParticleBenchMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ParticleBenchMode.dZero,
-                  label: Text('D-Zero'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'D-Zero パーティクル',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
-                ButtonSegment(
-                  value: ParticleBenchMode.traditional,
-                  label: Text('従来'),
+                Text(
+                  'Rebuild: 0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF16A34A),
+                  ),
                 ),
               ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
             ),
             const SizedBox(height: 12),
-            _mode == ParticleBenchMode.dZero
-                ? _buildDZeroArena()
-                : _buildTradArena(),
+            Container(
+              height: 190,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ZParticles(
+                    controller: _particleCtrl,
+                    color: const Color(0xFF2563EB),
+                    pointSize: 2.5,
+                  ),
+                  ZConfetti(controller: _confettiCtrl),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: ZReactionStream(controller: _reactionCtrl),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHud() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
+  Widget _buildTradCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          const ZFPSMonitor(size: Size(148.0, 44.0)),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'CPU使用率',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: ZPriceTicker(
-                  valueListenable: _cpuPct,
-                  currencyGlyph: ZeroNumberPainter.glyphPercent,
-                  fractionDigits: 1,
-                  style: const TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '従来 (List + CustomPaint)',
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amberAccent,
-                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDZeroArena() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1624),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'D-Zero (ZParticles + ZConfetti + ZReactionStream)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 180,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ZParticles(
-                  controller: _particleCtrl,
-                  color: const Color(0xFF00E5FF),
-                  pointSize: 2.5,
-                ),
-                ZConfetti(controller: _confettiCtrl),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: ZReactionStream(controller: _reactionCtrl),
+                Text(
+                  'Rebuild: $_tradRebuilds',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTradArena() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A141E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '従来 (List<Particle> + drawCircle loop)',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.redAccent,
+            const SizedBox(height: 12),
+            Container(
+              height: 190,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: CustomPaint(painter: _TradParticlesPainter(_tradParticles)),
             ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: CustomPaint(painter: _TradParticlesPainter(_tradParticles)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -330,7 +331,7 @@ class _TradParticlesPainter extends CustomPainter {
       canvas.drawCircle(
         Offset(p.x, p.y),
         1.8,
-        Paint()..color = Colors.redAccent,
+        Paint()..color = const Color(0xFF64748B),
       );
     }
   }
