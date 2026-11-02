@@ -20,15 +20,15 @@ Traditional object-oriented particle engines (`List<Particle>`) suffer from CPU 
 
 ## ⚔️ Implementation Comparison: D-Zero vs. Traditional Flutter
 
-| Aspect | Traditional (`List<Particle> + CustomPaint`) | D-Zero (`ZParticles` + `ZeroParticleBuffer`) |
+| Aspect | Traditional (Optimized `List<Particle> + CustomPaint`) | D-Zero (`ZParticles` + `ZeroParticleBuffer`) |
 | :--- | :--- | :--- |
 | **Memory Layout** | Array-of-Structures (`List<Particle>` heap objects, pointer chasing & cache misses) | Contiguous Structure-of-Arrays (`Float32List` / `Float32x4List` views) |
-| **Physics Update (`N` particles)** | `N` scalar loop iterations with `if / else` boundary branches | `N / 2` branchless 4-lane SIMD (`Float32x4`) vector operations (`select` & `clamp`) |
+| **Physics Update (`N` particles)** | `N` scalar loop iterations with `if / else if` boundary branches | `N / 2` branchless 4-lane SIMD (`Float32x4`) vector operations (`select` & `clamp`) |
 | **Frame Trigger** | `State.setState(() {})` every frame -> rebuilds widget subtree | `ZeroRenderBox.markNeedsPaint()` on isolated `RepaintBoundary` (**0 Widget Rebuilds**) |
-| **GPU Draw Calls (`N` particles)** | `N` separate `canvas.drawCircle(Offset(x, y), r, Paint())` calls | **1 single batch call**: `canvas.drawRawPoints(PointMode.points, positions, _paint)` |
-| **Per-Frame Heap Allocations** | `N` `Offset` + `N` `Paint` instances per frame -> heavy GC pauses | **0 bytes / frame** (all typed-data buffers and `Paint` objects are pre-allocated) |
+| **GPU Draw Calls (`N` particles)** | `N` separate `canvas.drawCircle(Offset(x, y), r, _paint)` calls (even with shared `_paint`) | **1 single batch call**: `canvas.drawRawPoints(PointMode.points, positions, _paint)` |
+| **Per-Frame Heap Allocations** | `N` `Offset` allocations + `CustomPainter` / `Widget` rebuild per frame | **0 bytes / frame** (all typed-data buffers and `Paint` objects are pre-allocated) |
 
-### ❌ Traditional Flutter Implementation (What causes jank at 15,000–100,000 particles)
+### Traditional Flutter Implementation (Optimized with shared `Paint`, yet limited at 15,000–100,000 particles)
 
 ```dart
 // 1. Heap-allocated object per particle (scattered in memory -> CPU cache misses)
@@ -40,8 +40,12 @@ class TradParticle {
     vy += 98.0 * dt;
     x += vx * dt;
     y += vy * dt;
-    if (x < 0 || x > w) { x = x.clamp(0.0, w); vx = -vx * 0.85; }
-    if (y < 0 || y > h) { y = y.clamp(0.0, h); vy = -vy * 0.85; }
+    if (x < 0.0) { x = 0.0; vx = -vx * 0.85; }
+    else if (x > w) { x = w; vx = -vx * 0.85; }
+    if (y < 0.0) { y = 0.0; vy = -vy * 0.85; }
+    else if (y > h) { y = h; vy = -vy * 0.85; }
+    vx *= 0.999;
+    vy *= 0.999;
   }
 }
 
@@ -53,20 +57,21 @@ void onTick(double dt) {
   setState(() {}); // Triggers build() every VSync frame
 }
 
-// 3. CustomPainter: N individual draw calls + per-particle Offset/Paint allocations
+// 3. CustomPainter: Reuses a single static Paint, but still issues N drawCircle calls per frame
 class TradParticlesPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..color = const Color(0xFF64748B)
+    ..style = PaintingStyle.fill;
+
   final List<TradParticle> particles;
   TradParticlesPainter(this.particles);
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (int i = 0; i < particles.length; i++) {
+    final int len = particles.length;
+    for (int i = 0; i < len; i++) {
       final p = particles[i];
-      canvas.drawCircle(
-        Offset(p.x, p.y), // Heap allocation
-        1.8,
-        Paint()..color = const Color(0xFF64748B), // Heap allocation
-      );
+      canvas.drawCircle(Offset(p.x, p.y), 1.8, _paint);
     }
   }
 

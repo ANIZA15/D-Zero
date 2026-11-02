@@ -90,11 +90,12 @@ All `packages/*/example` and `apps/*` sample apps must follow a clean, everyday 
 2. **No Neon / Cyber Clutter**: Avoid dark neon themes, verbose technical spec banners, or crowded multi-row telemetry HUDs.
 3. **Minimal Layout**: Keep screens focused on a clean `AppBar`, a simple `D-Zero` vs `従来` `SegmentedButton`, a clean white `Card` showcasing the widget, and only essential metrics (e.g., FPS / CPU usage / Rebuild count).
 
-### 4.2 Strict Prohibition of Fake or Hardcoded Telemetry
-Displaying fake, hardcoded, or artificially inflated/deflated metrics in benchmarks and sample apps is strictly forbidden:
-1. **No Hardcoded `"Rebuild: 0"` Strings**: Never hardcode `'Rebuild: 0'` or `'0 (Zero Rebuild)'`. Always count actual widget `build()` / `setState()` invocations at runtime for **both** D-Zero and Traditional modes (e.g. `'Rebuild: $_dZeroRebuilds'`) so any accidental rebuild in D-Zero mode is immediately visible.
-2. **No Artificial CPU Overhead or Rate Handicaps**: Never add mode-dependent fake `overhead` constants to CPU usage calculations, never assign hardcoded CPU percentages (such as `3.4%` vs `18.5%`), and never throttle Traditional mode's target simulation rate.
-3. **Genuine Runtime Measurements Only**: All displayed telemetry (FPS, CPU frame load via `SchedulerBinding.instance.addTimingsCallback` / `Stopwatch`, rebuild counters, allocation counters, RSS memory) must be derived strictly from real runtime measurements so true bottlenecks and optimization opportunities are surfaced.
+### 4.2 Fair Comparison & Strict Prohibition of Fake or Hardcoded Telemetry
+Benchmarks and sample apps must compare an **optimized, idiomatic Traditional Flutter implementation** against **D-Zero** under completely fair conditions, and displaying fake, hardcoded, or artificially inflated/deflated metrics is strictly forbidden:
+1. **Fair & Optimized Traditional Baseline**: The Traditional (`従来`) mode must be implemented in a properly optimized state (e.g., reusing a pre-allocated `Paint` field outside loops in `CustomPainter`, avoiding artificial inner-loop allocations or dummy work) so that comparisons reflect the genuine architectural difference between well-written standard Flutter (`List<Object> + setState + CustomPainter`) and D-Zero (`SoA Buffer + SIMD + ZeroRenderBox + batch draw`).
+2. **No Hardcoded `"Rebuild: 0"` Strings**: Never hardcode `'Rebuild: 0'` or `'0 (Zero Rebuild)'`. Always count actual widget `build()` / `setState()` invocations at runtime for **both** D-Zero and Traditional modes (e.g. `'Rebuild: $_dZeroRebuilds'`) so any accidental rebuild in D-Zero mode is immediately visible.
+3. **No Artificial CPU Overhead or Rate Handicaps**: Never add mode-dependent fake `overhead` constants to CPU usage calculations, never assign hardcoded CPU percentages (such as `3.4%` vs `18.5%`), and never throttle Traditional mode's target simulation rate.
+4. **Genuine Runtime Measurements Only**: All displayed telemetry (FPS, CPU frame load via `SchedulerBinding.instance.addTimingsCallback` / `Stopwatch`, rebuild counters, allocation counters, RSS memory) must be derived strictly from real runtime measurements so true bottlenecks and optimization opportunities are surfaced.
 
 ---
 

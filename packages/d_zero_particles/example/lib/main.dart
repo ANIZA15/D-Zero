@@ -585,30 +585,39 @@ class _TradParticle {
     vy += 98.0 * dt;
     x += vx * dt;
     y += vy * dt;
-    if (x < 0 || x > w) {
-      x = x.clamp(0.0, w);
+    if (x < 0.0) {
+      x = 0.0;
+      vx = -vx * 0.85;
+    } else if (x > w) {
+      x = w;
       vx = -vx * 0.85;
     }
-    if (y < 0 || y > h) {
-      y = y.clamp(0.0, h);
+    if (y < 0.0) {
+      y = 0.0;
+      vy = -vy * 0.85;
+    } else if (y > h) {
+      y = h;
       vy = -vy * 0.85;
     }
+    vx *= 0.999;
+    vy *= 0.999;
   }
 }
 
 class _TradParticlesPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..color = const Color(0xFF64748B)
+    ..style = PaintingStyle.fill;
+
   final List<_TradParticle> particles;
   _TradParticlesPainter(this.particles);
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (int i = 0; i < particles.length; i++) {
+    final int len = particles.length;
+    for (int i = 0; i < len; i++) {
       final _TradParticle p = particles[i];
-      canvas.drawCircle(
-        Offset(p.x, p.y),
-        1.8,
-        Paint()..color = const Color(0xFF64748B),
-      );
+      canvas.drawCircle(Offset(p.x, p.y), 1.8, _paint);
     }
   }
 

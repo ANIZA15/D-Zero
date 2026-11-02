@@ -133,19 +133,28 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   }
 
   void _updateTraditionalPhysics(double dt) {
-    for (int i = 0; i < _traditionalParticles.length; i++) {
+    final int len = _traditionalParticles.length;
+    for (int i = 0; i < len; i++) {
       final TraditionalParticle p = _traditionalParticles[i];
       p.vy += 98.0 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.x < 0.0 || p.x > _stageWidth) {
-        p.x = p.x.clamp(0.0, _stageWidth);
+      if (p.x < 0.0) {
+        p.x = 0.0;
+        p.vx = -p.vx * 0.85;
+      } else if (p.x > _stageWidth) {
+        p.x = _stageWidth;
         p.vx = -p.vx * 0.85;
       }
-      if (p.y < 0.0 || p.y > _stageHeight) {
-        p.y = p.y.clamp(0.0, _stageHeight);
+      if (p.y < 0.0) {
+        p.y = 0.0;
+        p.vy = -p.vy * 0.85;
+      } else if (p.y > _stageHeight) {
+        p.y = _stageHeight;
         p.vy = -p.vy * 0.85;
       }
+      p.vx *= 0.999;
+      p.vy *= 0.999;
     }
   }
 
@@ -430,24 +439,25 @@ class TraditionalParticle {
   });
 }
 
-/// Traditional CustomPainter drawing each particle one by one with Paint creation.
+/// Traditional CustomPainter drawing each particle with a shared pre-allocated Paint.
 class TraditionalParticlePainter extends CustomPainter {
   final List<TraditionalParticle> particles;
   final Color color;
+  final Paint _paint;
 
   TraditionalParticlePainter({
     required this.particles,
     required this.color,
-  });
+  }) : _paint = Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (int i = 0; i < particles.length; i++) {
-      final p = particles[i];
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(p.x, p.y), 1.5, paint);
+    final int len = particles.length;
+    for (int i = 0; i < len; i++) {
+      final TraditionalParticle p = particles[i];
+      canvas.drawCircle(Offset(p.x, p.y), 1.5, _paint);
     }
   }
 

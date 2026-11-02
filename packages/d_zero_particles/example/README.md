@@ -8,7 +8,7 @@ Compares `D-Zero` (`ZParticles` 4-lane `Float32x4` SIMD + `ZConfetti` + `ZReacti
 | :--- | :--- | :--- |
 | **Data Structure** | `ZeroParticleBuffer` (`Float32List` / `Float32x4List` contiguous SoA) | `List<_TradParticle>` (individual Dart heap objects) |
 | **Physics Step** | Branchless 4-lane SIMD (`Float32x4`, 2 particles/iteration) inside `RenderZParticles.onFrameTick` | Scalar loop over `_tradParticles[i].step(...)` + `setState(() {})` |
-| **Rendering** | 1 batch call `canvas.drawRawPoints(PointMode.points, positions, _paint)` | `N` calls to `canvas.drawCircle(Offset(p.x, p.y), 1.8, Paint()..)` |
+| **Rendering** | 1 batch call `canvas.drawRawPoints(PointMode.points, positions, _paint)` | `N` calls to `canvas.drawCircle(Offset(p.x, p.y), 1.8, _paint)` using a shared pre-allocated `Paint` |
 | **Widget Rebuilds** | `Rebuild: 1` (initial mount only; 0 rebuilds during simulation) | Increments every frame (`60`–`120` rebuilds/sec) |
 
 ## 📊 Genuine Runtime Telemetry Displayed
