@@ -1,3 +1,7 @@
+## 0.1.7
+
+* Synchronized release of `d_zero_chart` v0.1.7.
+
 ## 0.1.6
 
 * Synchronized release of `d_zero_chart` v0.1.6.

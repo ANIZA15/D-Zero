@@ -2,6 +2,10 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.7 - 2026-11-02
+
+* feat(sensor): add AVFoundation YUV420 pointer -> C++ Seqlock camera pipeline and genuine YUV benchmark (dac921a)
+
 ## 0.1.6 - 2026-11-02
 
 * fix(3dengine,tool): replace numeric-prefixed topic '3d' with 'graphics-3d' and validate topics in distribute_widgets (e2871f9)
