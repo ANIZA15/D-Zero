@@ -194,6 +194,15 @@ class RenderZReactionStream extends ZeroRenderBox {
   ];
 
   late final List<Paint> _paints;
+  late List<Float32List> _batchViews;
+
+  static List<Float32List> _buildBatchViews(Float32List buf, int maxCount) {
+    return List<Float32List>.generate(
+      maxCount + 1,
+      (n) => Float32List.sublistView(buf, 0, n * 2),
+      growable: false,
+    );
+  }
 
   /// Creates a [RenderZReactionStream].
   RenderZReactionStream({
@@ -205,6 +214,7 @@ class RenderZReactionStream extends ZeroRenderBox {
         _preferredSize = preferredSize,
         _batchCoords = Float32List(controller.capacity * 2),
         super(animatePerFrame: isRunning) {
+    _batchViews = _buildBatchViews(_batchCoords, controller.capacity);
     _paints = List<Paint>.generate(_colors.length, (i) {
       return Paint()
         ..color = _colors[i]
@@ -224,6 +234,7 @@ class RenderZReactionStream extends ZeroRenderBox {
     _controller = value;
     if (_batchCoords.length < value.capacity * 2) {
       _batchCoords = Float32List(value.capacity * 2);
+      _batchViews = _buildBatchViews(_batchCoords, value.capacity);
     }
     markDirty();
   }
@@ -310,7 +321,7 @@ class RenderZReactionStream extends ZeroRenderBox {
       if (count > 0) {
         canvas.drawRawPoints(
           ui.PointMode.points,
-          Float32List.sublistView(_batchCoords, 0, count * 2),
+          _batchViews[count],
           _paints[p],
         );
       }

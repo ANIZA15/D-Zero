@@ -50,7 +50,9 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
   UiBenchMode _mode = UiBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   final ZeroIntNotifier _badgeCount = ZeroIntNotifier(3);
   final ValueNotifier<bool> _switchVal = ValueNotifier<bool>(true);
@@ -86,8 +88,19 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
     _storyCtrl.advance(0.006);
 
     if (_mode == UiBenchMode.traditional) {
-      _tradRebuilds++;
       setState(() {});
+    }
+  }
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
     }
   }
 
@@ -110,6 +123,7 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == UiBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -142,8 +156,10 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroUiCard() : _buildTraditionalUiCard(),
@@ -169,10 +185,10 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero コントロール',
                   style: TextStyle(
                     fontSize: 15,
@@ -181,8 +197,8 @@ class _UiBenchmarkScreenState extends State<UiBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

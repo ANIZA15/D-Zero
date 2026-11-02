@@ -52,7 +52,9 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
   int _schedulerSlot = -1;
   int _tickCount = 0;
   double _phase = 0.0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   final ZeroDoubleNotifier _liquidProgress = ZeroDoubleNotifier(0.65);
   final ValueNotifier<double> _splitRatio = ValueNotifier<double>(0.5);
@@ -84,8 +86,19 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
     }
 
     if (_mode == FxBenchMode.traditional) {
-      _tradRebuilds++;
       setState(() {});
+    }
+  }
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
     }
   }
 
@@ -102,6 +115,7 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == FxBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -134,8 +148,10 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroFxCard() : _buildTradFxCard(),
@@ -161,10 +177,10 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero エフェクト',
                   style: TextStyle(
                     fontSize: 15,
@@ -173,8 +189,8 @@ class _FxBenchmarkScreenState extends State<FxBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

@@ -168,9 +168,18 @@ class RenderZQRGenerator extends ZeroRenderBox {
   ZeroQRCodeController _controller;
   Size _preferredSize;
   late Float32List _pointBuffer;
+  late List<Float32List> _pointViews;
 
   final Paint _bgPaint = Paint()..style = PaintingStyle.fill;
   final Paint _modulePaint = Paint()..strokeCap = StrokeCap.square;
+
+  static List<Float32List> _buildPointViews(Float32List buf, int maxModules) {
+    return List<Float32List>.generate(
+      maxModules + 1,
+      (n) => Float32List.sublistView(buf, 0, n * 2),
+      growable: false,
+    );
+  }
 
   /// Creates a [RenderZQRGenerator].
   RenderZQRGenerator({
@@ -181,6 +190,10 @@ class RenderZQRGenerator extends ZeroRenderBox {
   })  : _controller = controller,
         _preferredSize = preferredSize,
         _pointBuffer = Float32List(controller.gridSize * controller.gridSize * 2) {
+    _pointViews = _buildPointViews(
+      _pointBuffer,
+      controller.gridSize * controller.gridSize,
+    );
     _bgPaint.color = backgroundColor;
     _modulePaint.color = foregroundColor;
   }
@@ -194,9 +207,11 @@ class RenderZQRGenerator extends ZeroRenderBox {
       value.addListener(markDirty);
     }
     _controller = value;
-    final int cap = value.gridSize * value.gridSize * 2;
+    final int maxModules = value.gridSize * value.gridSize;
+    final int cap = maxModules * 2;
     if (_pointBuffer.length < cap) {
       _pointBuffer = Float32List(cap);
+      _pointViews = _buildPointViews(_pointBuffer, maxModules);
     }
     markDirty();
   }
@@ -275,7 +290,7 @@ class RenderZQRGenerator extends ZeroRenderBox {
     if (count > 0) {
       canvas.drawRawPoints(
         ui.PointMode.points,
-        Float32List.sublistView(_pointBuffer, 0, count * 2),
+        _pointViews[count],
         _modulePaint,
       );
     }

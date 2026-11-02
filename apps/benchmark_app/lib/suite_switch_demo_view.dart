@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:d_zero_core/d_zero_core.dart';
 import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_ui/d_zero_ui.dart';
@@ -30,7 +31,10 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   int _tickCount = 0;
 
   final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuLoad = ZeroDoubleNotifier(3.8);
+  final Stopwatch _buildStopwatch = Stopwatch();
+  final ZeroDoubleNotifier _cpuLoad = ZeroDoubleNotifier(0.0);
+  int _lastEngineFrameUs = 0;
+  int _lastBuildUs = 0;
 
   late final List<ZeroDoubleNotifier> _wallPriceNotifiers;
   late final List<ZeroDoubleNotifier> _wallLoadNotifiers;
@@ -73,6 +77,14 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
     );
     _initControllers();
     ZeroFrameScheduler.instance.subscribe(this);
+    SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
+  }
+
+  void _onFrameTimings(List<FrameTiming> timings) {
+    if (!mounted || timings.isEmpty) return;
+    final FrameTiming last = timings.last;
+    _lastEngineFrameUs =
+        last.buildDuration.inMicroseconds + last.rasterDuration.inMicroseconds;
   }
 
   void _initControllers() {
@@ -120,14 +132,15 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
 
     if (_mode == SuiteRenderMode.traditionalOnly) {
       setState(() {});
+    } else {
+      _lastBuildUs = 0;
     }
 
     _cpuStopwatch.stop();
-    final double overhead =
-        _mode == SuiteRenderMode.dZeroOnly ? 180.0 : 2800.0;
-    final double pct =
-        ((_cpuStopwatch.elapsedMicroseconds + overhead) / 8333.0 * 100.0)
-            .clamp(1.2, 99.9);
+    final int stepUs = _cpuStopwatch.elapsedMicroseconds;
+    final int measuredUs =
+        _lastEngineFrameUs > 0 ? _lastEngineFrameUs : (stepUs + _lastBuildUs);
+    final double pct = (measuredUs / 8333.0 * 100.0).clamp(0.1, 100.0);
     _cpuLoad.value = _cpuLoad.value * 0.85 + pct * 0.15;
   }
 
@@ -204,6 +217,7 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
   @override
   void dispose() {
     ZeroFrameScheduler.instance.unsubscribe(this);
+    SchedulerBinding.instance.removeTimingsCallback(_onFrameTimings);
     for (int i = 0; i < _wallCells; i++) {
       _wallPriceNotifiers[i].dispose();
       _wallLoadNotifiers[i].dispose();
@@ -222,7 +236,10 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    _buildStopwatch
+      ..reset()
+      ..start();
+    final Widget tree = SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Center(
         child: ConstrainedBox(
@@ -255,6 +272,9 @@ class _SuiteSwitchDemoViewState extends State<SuiteSwitchDemoView>
         ),
       ),
     );
+    _buildStopwatch.stop();
+    _lastBuildUs = _buildStopwatch.elapsedMicroseconds;
+    return tree;
   }
 
   Widget _buildTopTelemetryHud() {

@@ -82,12 +82,19 @@ test('Controller survives double dispose and post-dispose access', () {
 
 ---
 
-## 4. Sample App UI Design Rule (Simple ToDo-App Style)
+## 4. Sample App UI Design & True Telemetry Rule
 
+### 4.1 Simple ToDo-App Style UI
 All `packages/*/example` and `apps/*` sample apps must follow a clean, everyday **ToDo-app style** aesthetic without visual clutter:
 1. **Clean Material 3 Light Theme**: Use light gray backgrounds (`#F8FAFC`), flat white `Card` containers (`elevation: 0`, `1px` `#E2E8F0` border), dark slate typography (`#0F172A` / `#475569`), and calm blue (`#2563EB`) / green (`#16A34A`) accents.
 2. **No Neon / Cyber Clutter**: Avoid dark neon themes, verbose technical spec banners, or crowded multi-row telemetry HUDs.
 3. **Minimal Layout**: Keep screens focused on a clean `AppBar`, a simple `D-Zero` vs `従来` `SegmentedButton`, a clean white `Card` showcasing the widget, and only essential metrics (e.g., FPS / CPU usage / Rebuild count).
+
+### 4.2 Strict Prohibition of Fake or Hardcoded Telemetry
+Displaying fake, hardcoded, or artificially inflated/deflated metrics in benchmarks and sample apps is strictly forbidden:
+1. **No Hardcoded `"Rebuild: 0"` Strings**: Never hardcode `'Rebuild: 0'` or `'0 (Zero Rebuild)'`. Always count actual widget `build()` / `setState()` invocations at runtime for **both** D-Zero and Traditional modes (e.g. `'Rebuild: $_dZeroRebuilds'`) so any accidental rebuild in D-Zero mode is immediately visible.
+2. **No Artificial CPU Overhead or Rate Handicaps**: Never add mode-dependent fake `overhead` constants to CPU usage calculations, never assign hardcoded CPU percentages (such as `3.4%` vs `18.5%`), and never throttle Traditional mode's target simulation rate.
+3. **Genuine Runtime Measurements Only**: All displayed telemetry (FPS, CPU frame load via `SchedulerBinding.instance.addTimingsCallback` / `Stopwatch`, rebuild counters, allocation counters, RSS memory) must be derived strictly from real runtime measurements so true bottlenecks and optimization opportunities are surfaced.
 
 ---
 

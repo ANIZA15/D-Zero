@@ -50,7 +50,9 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   int _schedulerSlot = -1;
   double _phase = 0.0;
   Duration? _lastElapsed;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   late final FloatRingBuffer _ringBuffer;
   late final ZeroPool<_PooledDot> _dotPool;
@@ -135,8 +137,21 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
       _tradHistory.removeAt(0);
     }
     _tradHistory.add(math.sin(_phase) * 32.0);
-    _tradRebuilds++;
     setState(() {});
+  }
+
+  int _getPoolAvailable() => _dotPool.availableCount;
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
+    }
   }
 
   @override
@@ -149,6 +164,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == CoreBenchmarkMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -181,8 +197,10 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   _buildContentCard(isDZero),
@@ -220,7 +238,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  isDZero ? 'Rebuild: 0' : 'Rebuild: $_tradRebuilds',
+                  'Rebuild: ${isDZero ? _dZeroRebuilds : _tradRebuilds}',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -245,7 +263,7 @@ class _CoreBenchmarkScreenState extends State<CoreBenchmarkScreen>
                   ? _ZCoreCanvasBenchWidget(
                       ringBuffer: _ringBuffer,
                       dots: _activeDots,
-                      poolAvailableFn: () => _dotPool.availableCount,
+                      poolAvailableFn: _getPoolAvailable,
                     )
                   : CustomPaint(
                       painter: _TraditionalCorePainter(

@@ -53,7 +53,9 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
   WaveformBenchMode _mode = WaveformBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   late final ZeroWaveformController _waveformCtrl;
   late final ZeroSpectrumController _spectrumCtrl;
@@ -101,8 +103,19 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
     _meterCtrl.updateLevels(leftRms: _leftRms, rightRms: _rightRms);
 
     if (_mode == WaveformBenchMode.traditional) {
-      _tradRebuilds++;
       setState(() {});
+    }
+  }
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
     }
   }
 
@@ -118,6 +131,7 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == WaveformBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -150,8 +164,10 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroCard() : _buildTradCard(),
@@ -177,10 +193,10 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero 波形 & スペクトラム',
                   style: TextStyle(
                     fontSize: 15,
@@ -189,8 +205,8 @@ class _WaveformBenchmarkScreenState extends State<WaveformBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

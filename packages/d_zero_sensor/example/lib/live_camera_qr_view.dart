@@ -64,7 +64,9 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
 
   final List<Rect> _tradBoxes = <Rect>[];
   final List<ScannedQrItem> _recentItems = <ScannedQrItem>[];
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   @override
   int get zeroSchedulerSlot => _schedulerSlot;
@@ -115,7 +117,6 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     if (_sessionTimer.isRunning && _scanCount.value < targetQrCount) {
       _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
       if (_engineMode == QrCameraEngineMode.traditional) {
-        _tradRebuilds++;
         setState(() {});
       }
     }
@@ -164,7 +165,6 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     final int next = math.min(targetQrCount, _scanCount.value + 1);
     _scanCount.value = next;
     _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
-    _pushHistoryItem(next, raw, isDZero: true);
 
     if (next >= targetQrCount) {
       _sessionTimer.stop();
@@ -183,7 +183,6 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     final int next = math.min(targetQrCount, _scanCount.value + 1);
     _scanCount.value = next;
     _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
-    _tradRebuilds++;
     _pushHistoryItem(next, raw, isDZero: false);
 
     if (next >= targetQrCount) {
@@ -194,15 +193,13 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
 
   void _pushHistoryItem(int index, String raw, {required bool isDZero}) {
     if (_recentItems.isEmpty || _recentItems.first.text != raw) {
-      setState(() {
-        _recentItems.insert(
-          0,
-          ScannedQrItem(index: index, text: raw, isDZero: isDZero),
-        );
-        if (_recentItems.length > 6) {
-          _recentItems.removeLast();
-        }
-      });
+      _recentItems.insert(
+        0,
+        ScannedQrItem(index: index, text: raw, isDZero: isDZero),
+      );
+      if (_recentItems.length > 6) {
+        _recentItems.removeLast();
+      }
     }
   }
 
@@ -238,8 +235,7 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
   void simulateQrFrame() {
     final int idx = _scanCount.value + 1;
     _syntheticLumaFrame[idx % _syntheticLumaFrame.length] = (idx * 73) & 0xFF;
-    if (_engineMode == QrCameraEngineMode.dZero &&
-        _zeroCamCtrl.isNativeCppActive) {
+    if (_engineMode == QrCameraEngineMode.dZero) {
       if (!_sessionTimer.isRunning && _scanCount.value < targetQrCount) {
         _sessionTimer.start();
       }
@@ -251,11 +247,9 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
       final int next = math.min(targetQrCount, _scanCount.value + 1);
       _scanCount.value = next;
       _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
-      _pushHistoryItem(
-        next,
-        _zeroCamCtrl.readLatestPayload(),
-        isDZero: true,
-      );
+      if (next >= targetQrCount) {
+        _sessionTimer.stop();
+      }
       return;
     }
 
@@ -279,6 +273,7 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
 
   void _toggleStartStop() {
     setState(() {
+      _resettingMode = true;
       _isScanning = !_isScanning;
       if (_isScanning) {
         _cameraController?.start();
@@ -298,15 +293,30 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     _scanCount.value = 0;
     _elapsedSec.value = 0.0;
     setState(() {
+      _resettingMode = true;
       _recentItems.clear();
+      _dZeroRebuilds = 0;
       _tradRebuilds = 0;
       _isScanning = true;
     });
   }
 
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _engineMode == QrCameraEngineMode.dZero;
+    _recordRebuild(isDZero);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -339,7 +349,10 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
               ),
             ],
             selected: {_engineMode},
-            onSelectionChanged: (s) => setState(() => _engineMode = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _engineMode = s.first;
+              _resettingMode = true;
+            }),
           ),
         ),
         const SizedBox(width: 8),
@@ -393,9 +406,7 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    isDZero
-                        ? '0 (Zero Rebuild)'
-                        : 'Rebuild: $_tradRebuilds',
+                    'Rebuild: ${isDZero ? _dZeroRebuilds : _tradRebuilds}',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,

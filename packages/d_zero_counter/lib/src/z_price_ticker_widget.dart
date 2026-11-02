@@ -101,6 +101,16 @@ class RenderZPriceTicker extends ZeroRenderBox {
   double _lastValue;
   int _direction = 0; // +1 for up, -1 for down, 0 for neutral
   double _flashIntensity = 0.0;
+  late List<Color> _upFlashLut;
+  late List<Color> _downFlashLut;
+
+  static List<Color> _buildAlphaLut(Color base) {
+    return List<Color>.generate(
+      256,
+      (a) => base.withAlpha(a),
+      growable: false,
+    );
+  }
 
   RenderZPriceTicker({
     required ValueListenable<double> valueListenable,
@@ -122,6 +132,8 @@ class RenderZPriceTicker extends ZeroRenderBox {
         _lastValue = valueListenable.value,
         super(animatePerFrame: false) {
     _painter = ZeroNumberPainter(style: _style);
+    _upFlashLut = _buildAlphaLut(_upFlashColor);
+    _downFlashLut = _buildAlphaLut(_downFlashColor);
   }
 
   ValueListenable<double> get valueListenable => _valueListenable;
@@ -176,6 +188,7 @@ class RenderZPriceTicker extends ZeroRenderBox {
   set upFlashColor(Color value) {
     if (_upFlashColor == value) return;
     _upFlashColor = value;
+    _upFlashLut = _buildAlphaLut(value);
     markNeedsPaint();
   }
 
@@ -183,6 +196,7 @@ class RenderZPriceTicker extends ZeroRenderBox {
   set downFlashColor(Color value) {
     if (_downFlashColor == value) return;
     _downFlashColor = value;
+    _downFlashLut = _buildAlphaLut(value);
     markNeedsPaint();
   }
 
@@ -250,9 +264,10 @@ class RenderZPriceTicker extends ZeroRenderBox {
   }
 
   void _paintFlashBackground(Canvas canvas, Offset offset) {
-    final Color baseColor = _direction > 0 ? _upFlashColor : _downFlashColor;
+    final bool isUp = _direction > 0;
+    final Color baseColor = isUp ? _upFlashColor : _downFlashColor;
     final int alpha = (baseColor.a * 255.0 * _flashIntensity).round().clamp(0, 255);
-    _flashPaint.color = baseColor.withAlpha(alpha);
+    _flashPaint.color = isUp ? _upFlashLut[alpha] : _downFlashLut[alpha];
     final RRect rrect = RRect.fromRectAndRadius(
       offset & size,
       const Radius.circular(4.0),

@@ -28,6 +28,7 @@ class ZeroDanmakuController {
   final Float32List _width;
   final Uint8List _active;
   final List<TextPainter> _painters;
+  final List<String?> _slotTexts;
   final ZeroIntNotifier _revision = ZeroIntNotifier(0);
 
   int _writeCursor = 0;
@@ -55,7 +56,8 @@ class ZeroDanmakuController {
           capacity,
           (_) => TextPainter(textDirection: TextDirection.ltr),
           growable: false,
-        );
+        ),
+        _slotTexts = List<String?>.filled(capacity, null, growable: false);
 
   /// Whether this controller has been disposed.
   bool get isDisposed => _isDisposed;
@@ -82,15 +84,29 @@ class ZeroDanmakuController {
     if (height > 0.0) _viewportHeight = height;
   }
 
+  int _selectSlotForText(String text) {
+    for (int i = 0; i < capacity; i++) {
+      if (_active[i] == 0 && _slotTexts[i] == text) {
+        return i;
+      }
+    }
+    final int slot = _writeCursor;
+    _writeCursor = (slot + 1) % capacity;
+    return slot;
+  }
+
   /// Emits a new bullet comment [text] moving from right to left at [speed] px/s.
   void emit(String text, {double speed = 120.0}) {
     if (_isDisposed || text.isEmpty) return;
-    final int slot = _writeCursor;
-    _writeCursor = (slot + 1) % capacity;
+    final int slot = _selectSlotForText(text);
 
-    final TextPainter tp = _painters[slot]
-      ..text = TextSpan(text: text, style: textStyle)
-      ..layout();
+    final TextPainter tp = _painters[slot];
+    if (_slotTexts[slot] != text) {
+      _slotTexts[slot] = text;
+      tp
+        ..text = TextSpan(text: text, style: textStyle)
+        ..layout();
+    }
 
     if (_active[slot] == 0) {
       _active[slot] = 1;

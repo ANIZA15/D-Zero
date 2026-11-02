@@ -162,6 +162,11 @@ class RenderZInfiniteGrid extends ZeroRenderBox {
   Color _majorGridColor;
 
   final Float32List _lineBuffer = Float32List(_maxLines * 4);
+  late final List<Float32List> _lineViews = List<Float32List>.generate(
+    _maxLines + 1,
+    (n) => Float32List.sublistView(_lineBuffer, 0, n * 4),
+    growable: false,
+  );
   final Paint _bgPaint = Paint()..style = PaintingStyle.fill;
   final Paint _minorPaint = Paint()
     ..style = PaintingStyle.stroke
@@ -318,8 +323,11 @@ class RenderZInfiniteGrid extends ZeroRenderBox {
     int floatCount = _stageVerticalLines(rect, step, 0);
     floatCount = _stageHorizontalLines(rect, step, floatCount);
     if (floatCount > 0) {
-      final Float32List view = Float32List.sublistView(_lineBuffer, 0, floatCount);
-      canvas.drawRawPoints(ui.PointMode.lines, view, _minorPaint);
+      canvas.drawRawPoints(
+        ui.PointMode.lines,
+        _lineViews[floatCount >> 2],
+        _minorPaint,
+      );
     }
   }
 

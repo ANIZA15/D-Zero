@@ -28,6 +28,7 @@ class _ZeroOverdriveScreenState extends State<ZeroOverdriveScreen> {
   late final bool _ownsController;
   final FocusNode _focusNode = FocusNode();
   final Set<LogicalKeyboardKey> _pressedKeys = <LogicalKeyboardKey>{};
+  bool _isModeSwitchBuild = true;
 
   @override
   void initState() {
@@ -39,7 +40,9 @@ class _ZeroOverdriveScreenState extends State<ZeroOverdriveScreen> {
 
   void _onControllerModeChanged() {
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _isModeSwitchBuild = true;
+      });
     }
   }
 
@@ -108,6 +111,11 @@ class _ZeroOverdriveScreenState extends State<ZeroOverdriveScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _controller.engineMode == GameEngineMode.dZero;
+    if (_isModeSwitchBuild) {
+      _isModeSwitchBuild = false;
+    } else if (isDZero) {
+      _controller.recordDZeroRebuild();
+    }
 
     return Scaffold(
       backgroundColor: ZeroGamePalette.bgVoid,

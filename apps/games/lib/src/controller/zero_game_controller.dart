@@ -87,6 +87,7 @@ class ZeroGameController extends ChangeNotifier {
   double _shieldFlash = 0.0;
   double _audioPulse = 0.0;
   int _tickCount = 0;
+  int _pendingFlutterPaintAllocs = 0;
 
   ZeroGameController({math.Random? random})
       : _rng = random ?? math.Random(77),
@@ -234,9 +235,33 @@ class ZeroGameController extends ChangeNotifier {
   /// Resets comparative telemetry counters.
   void resetTelemetryCounters() {
     if (_isDisposed) return;
+    _pendingFlutterPaintAllocs = 0;
     dZeroRebuildsNotifier.value = 0;
     flutterRebuildsNotifier.value = 0;
     flutterHeapAllocsNotifier.value = 0;
+  }
+
+  /// Records a measured widget rebuild while in D-Zero mode.
+  void recordDZeroRebuild() {
+    if (_isDisposed) return;
+    dZeroRebuildsNotifier.add(1);
+  }
+
+  /// Stages the exact number of heap objects allocated during `CustomPainter.paint`
+  /// so it can be committed on the next frame tick outside the paint phase.
+  void stageFlutterPaintAllocs(int count) {
+    if (_isDisposed || count <= 0) return;
+    _pendingFlutterPaintAllocs += count;
+  }
+
+  /// Commits a measured Flutter frame rebuild and any staged paint allocations.
+  void commitFlutterFrameMetrics() {
+    if (_isDisposed) return;
+    flutterRebuildsNotifier.add(1);
+    if (_pendingFlutterPaintAllocs > 0) {
+      flutterHeapAllocsNotifier.add(_pendingFlutterPaintAllocs);
+      _pendingFlutterPaintAllocs = 0;
+    }
   }
 
   /// Unleashes the Overdrive Nova super-attack: 72 radial bolts, multi-ripples,
@@ -619,7 +644,7 @@ class ZeroGameController extends ChangeNotifier {
     }
     if (kills % 10 == 0) {
       final String msg = _killAnnouncements[(kills ~/ 10) % _killAnnouncements.length];
-      danmakuCtrl.emit('$msg (x$combo)', speed: 135.0);
+      danmakuCtrl.emit(msg, speed: 135.0);
     }
   }
 
@@ -637,13 +662,6 @@ class ZeroGameController extends ChangeNotifier {
 
     _updateSpectrumBins();
     _syncEntityCount();
-
-    if (_engineMode == GameEngineMode.flutter) {
-      flutterRebuildsNotifier.add(1);
-      final int frameAllocs =
-          _particleCtrl.capacity + activeEntitiesNotifier.value * 3 + 48;
-      flutterHeapAllocsNotifier.add(frameAllocs);
-    }
 
     if (_tickCount % 4 == 0) {
       frameChartCtrl.push(frameTimeMsNotifier.value);

@@ -50,7 +50,9 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
   ChartBenchMode _mode = ChartBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   late final ZeroChartController _sparklineCtrl;
   late final ZeroCandlestickBuffer _candleBuffer;
@@ -128,8 +130,19 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
     if (_mode == ChartBenchMode.traditional) {
       if (_tradPrices.length >= 96) _tradPrices.removeAt(0);
       _tradPrices.add(price);
-      _tradRebuilds++;
       setState(() {});
+    }
+  }
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
     }
   }
 
@@ -146,6 +159,7 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == ChartBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -178,8 +192,10 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroCharts() : _buildTradCharts(),
@@ -205,10 +221,10 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero チャート',
                   style: TextStyle(
                     fontSize: 15,
@@ -217,8 +233,8 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

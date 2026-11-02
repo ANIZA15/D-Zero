@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart' as standard;
+import 'package:d_zero_core/d_zero_core.dart';
+import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_player/d_zero_player.dart';
 
 void main() {
@@ -46,8 +48,11 @@ class ComparisonScreen extends StatefulWidget {
 
 enum PlayerMode { zeroPlayer, standardPlayer }
 
-class _ComparisonScreenState extends State<ComparisonScreen> {
+class _ComparisonScreenState extends State<ComparisonScreen>
+    implements ZeroSlottedFrameListener {
   PlayerMode _currentMode = PlayerMode.zeroPlayer;
+  int _schedulerSlot = -1;
+  Duration? _lastElapsed;
 
   static const String _videoUrl =
       'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4';
@@ -60,35 +65,44 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
   standard.VideoPlayerController? _standardController;
   bool _isStandardLoading = true;
 
-  double _fps = 60.0;
-  double _cpuUsagePct = 3.2;
-  DateTime _lastFrameTime = DateTime.now();
-  Timer? _fpsUpdateTimer;
+  final ZeroDoubleNotifier _fpsNotifier = ZeroDoubleNotifier(60.0);
+  final ZeroDoubleNotifier _cpuUsageNotifier = ZeroDoubleNotifier(0.0);
+
+  @override
+  int get zeroSchedulerSlot => _schedulerSlot;
+
+  @override
+  set zeroSchedulerSlot(int slot) => _schedulerSlot = slot;
 
   @override
   void initState() {
     super.initState();
     _timelineCtrl = ZeroTimelineController();
     _loadAllPlayers(_videoUrl);
-    _startFpsMonitor();
+    ZeroFrameScheduler.instance.subscribe(this);
+    SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
   }
 
-  void _startFpsMonitor() {
-    SchedulerBinding.instance.addPersistentFrameCallback((_) {
-      final DateTime now = DateTime.now();
-      final double diffMs =
-          now.difference(_lastFrameTime).inMicroseconds / 1000.0;
-      _lastFrameTime = now;
-      if (diffMs > 0) {
-        final double currentFps = (1000.0 / diffMs).clamp(1.0, 120.0);
-        _fps = (_fps * 0.9) + (currentFps * 0.1);
-      }
-    });
+  @override
+  void onZeroFrame(Duration elapsed) {
+    if (!mounted) return;
+    final Duration? prev = _lastElapsed;
+    _lastElapsed = elapsed;
+    if (prev == null) return;
+    final int diffUs = (elapsed - prev).inMicroseconds;
+    if (diffUs > 0) {
+      final double currentFps = (1000000.0 / diffUs).clamp(1.0, 120.0);
+      _fpsNotifier.value = (_fpsNotifier.value * 0.9) + (currentFps * 0.1);
+    }
+  }
 
-    _fpsUpdateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      _cpuUsagePct = _currentMode == PlayerMode.zeroPlayer ? 3.4 : 18.5;
-      if (mounted) setState(() {});
-    });
+  void _onFrameTimings(List<FrameTiming> timings) {
+    if (!mounted || timings.isEmpty) return;
+    final FrameTiming last = timings.last;
+    final int activeUs =
+        last.buildDuration.inMicroseconds + last.rasterDuration.inMicroseconds;
+    final double pct = (activeUs / 16667.0 * 100.0).clamp(0.1, 100.0);
+    _cpuUsageNotifier.value = _cpuUsageNotifier.value * 0.85 + pct * 0.15;
   }
 
   Future<void> _loadAllPlayers(String url) async {
@@ -135,7 +149,10 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
 
   @override
   void dispose() {
-    _fpsUpdateTimer?.cancel();
+    ZeroFrameScheduler.instance.unsubscribe(this);
+    SchedulerBinding.instance.removeTimingsCallback(_onFrameTimings);
+    _fpsNotifier.dispose();
+    _cpuUsageNotifier.dispose();
     _timelineCtrl.dispose();
     _zeroController?.dispose();
     _standardController?.dispose();
@@ -200,21 +217,61 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'FPS: ${_fps.toStringAsFixed(1)}',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF475569),
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'FPS: ',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
+            ),
+            SizedBox(
+              width: 56,
+              height: 20,
+              child: ZPriceTicker(
+                valueListenable: _fpsNotifier,
+                currencyGlyph: 0,
+                fractionDigits: 1,
+                thousandsSeparator: false,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
         ),
-        Text(
-          'CPU使用率: ${_cpuUsagePct.toStringAsFixed(1)}%',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF475569),
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'CPU使用率: ',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
+            ),
+            SizedBox(
+              width: 64,
+              height: 20,
+              child: ZPriceTicker(
+                valueListenable: _cpuUsageNotifier,
+                currencyGlyph: ZeroNumberPainter.glyphPercent,
+                fractionDigits: 1,
+                thousandsSeparator: false,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

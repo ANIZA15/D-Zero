@@ -52,7 +52,9 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
   CounterBenchMode _mode = CounterBenchMode.dZero;
   int _schedulerSlot = -1;
   double _phase = 0.0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   final ZeroIntNotifier _fastCounter = ZeroIntNotifier(1000);
   final ZeroDoubleNotifier _odometerVal = ZeroDoubleNotifier(8420.5);
@@ -88,7 +90,6 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
     }
 
     if (_mode == CounterBenchMode.traditional) {
-      _tradRebuilds++;
       setState(() {});
     }
   }
@@ -104,9 +105,22 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
     super.dispose();
   }
 
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == CounterBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -139,8 +153,10 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroCard() : _buildTraditionalCard(),
@@ -166,10 +182,10 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero カウンター一覧',
                   style: TextStyle(
                     fontSize: 15,
@@ -178,8 +194,8 @@ class _CounterBenchmarkScreenState extends State<CounterBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

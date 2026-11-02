@@ -56,6 +56,7 @@ class _FlutterGameStageState extends State<FlutterGameStage>
     );
     ctrl.rippleCtrl.step(dt);
     ctrl.danmakuCtrl.step(dt);
+    ctrl.commitFlutterFrameMetrics();
 
     // Traditional anti-pattern: full widget rebuild every frame
     setState(() {
@@ -120,17 +121,20 @@ class _TraditionalArenaPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (controller.isDisposed) return;
-    _paintTraditionalGrid(canvas, size);
-    _paintTraditionalAmbientParticles(canvas);
-    _paintTraditionalRipples(canvas);
-    _paintTraditionalSparks(canvas);
-    _paintTraditionalConfetti(canvas);
-    _paintTraditionalProjectiles(canvas);
-    _paintTraditionalEnemies(canvas);
-    _paintTraditionalPlayer(canvas);
+    int allocs = 0;
+    allocs += _paintTraditionalGrid(canvas, size);
+    allocs += _paintTraditionalAmbientParticles(canvas);
+    allocs += _paintTraditionalRipples(canvas);
+    allocs += _paintTraditionalSparks(canvas);
+    allocs += _paintTraditionalConfetti(canvas);
+    allocs += _paintTraditionalProjectiles(canvas);
+    allocs += _paintTraditionalEnemies(canvas);
+    allocs += _paintTraditionalPlayer(canvas);
+    controller.stageFlutterPaintAllocs(allocs);
   }
 
-  void _paintTraditionalGrid(Canvas canvas, Size size) {
+  int _paintTraditionalGrid(Canvas canvas, Size size) {
+    int allocs = 2; // bgPaint + Rect
     final bgPaint = Paint()..color = ZeroGamePalette.bgVoid;
     canvas.drawRect(Offset.zero & size, bgPaint);
 
@@ -142,18 +146,22 @@ class _TraditionalArenaPainter extends CustomPainter {
         ..color = const Color(0xFF151E32)
         ..strokeWidth = 1.0;
       canvas.drawLine(Offset(x, 0.0), Offset(x, size.height), linePaint);
+      allocs += 3; // Paint + 2 Offsets
     }
     for (double y = oy; y < size.height; y += step) {
       final linePaint = Paint()
         ..color = const Color(0xFF151E32)
         ..strokeWidth = 1.0;
       canvas.drawLine(Offset(0.0, y), Offset(size.width, y), linePaint);
+      allocs += 3; // Paint + 2 Offsets
     }
+    return allocs;
   }
 
-  void _paintTraditionalAmbientParticles(Canvas canvas) {
+  int _paintTraditionalAmbientParticles(Canvas canvas) {
     final positions = controller.particleCtrl.buffer.positions;
     final int count = positions.length >> 1;
+    int allocs = 0;
     for (int i = 0; i < count; i++) {
       final int idx = i << 1;
       // Traditional anti-pattern: per-particle Paint + Offset allocation & drawCircle
@@ -161,11 +169,14 @@ class _TraditionalArenaPainter extends CustomPainter {
         ..color = const Color(0x88FF5252)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(Offset(positions[idx], positions[idx + 1]), 1.6, paint);
+      allocs += 2;
     }
+    return allocs;
   }
 
-  void _paintTraditionalRipples(Canvas canvas) {
+  int _paintTraditionalRipples(Canvas canvas) {
     final rCtrl = controller.rippleCtrl;
+    int allocs = 0;
     for (int i = 0; i < rCtrl.capacity; i++) {
       if (rCtrl.isActiveAt(i)) {
         final double p = rCtrl.progressAt(i);
@@ -178,12 +189,15 @@ class _TraditionalArenaPainter extends CustomPainter {
           12.0 + 150.0 * p,
           paint,
         );
+        allocs += 3; // Paint + Color + Offset
       }
     }
+    return allocs;
   }
 
-  void _paintTraditionalSparks(Canvas canvas) {
+  int _paintTraditionalSparks(Canvas canvas) {
     final SoaSparkPool sparks = controller.sparks;
+    int allocs = 0;
     for (int i = 0; i < sparks.capacity; i++) {
       if (sparks.active[i] != 0) {
         final int bucket = sparks.colorBucket[i];
@@ -197,28 +211,34 @@ class _TraditionalArenaPainter extends CustomPainter {
           Offset(sx, sy),
           paint,
         );
+        allocs += 3; // Paint + 2 Offsets
       }
     }
+    return allocs;
   }
 
-  void _paintTraditionalConfetti(Canvas canvas) {
+  int _paintTraditionalConfetti(Canvas canvas) {
     final cCtrl = controller.confettiCtrl;
     final xs = cCtrl.x;
     final ys = cCtrl.y;
     final lifes = cCtrl.life;
     final colors = cCtrl.colors;
+    int allocs = 0;
     for (int i = 0; i < xs.length; i++) {
       if (lifes[i] > 0.0) {
         final paint = Paint()
           ..color = Color(colors[i])
           ..strokeWidth = 3.5;
         canvas.drawCircle(Offset(xs[i], ys[i]), 3.0, paint);
+        allocs += 3; // Paint + Color + Offset
       }
     }
+    return allocs;
   }
 
-  void _paintTraditionalProjectiles(Canvas canvas) {
+  int _paintTraditionalProjectiles(Canvas canvas) {
     final SoaProjectilePool proj = controller.projectiles;
+    int allocs = 0;
     for (int i = 0; i < proj.capacity; i++) {
       if (proj.active[i] != 0) {
         final int t = proj.team[i];
@@ -228,12 +248,15 @@ class _TraditionalArenaPainter extends CustomPainter {
               : (t == 2 ? ZeroGamePalette.neonAmber : ZeroGamePalette.neonCyan)
           ..strokeWidth = 3.0;
         canvas.drawCircle(Offset(proj.x[i], proj.y[i]), t == 1 ? 4.0 : 2.5, paint);
+        allocs += 2; // Paint + Offset
       }
     }
+    return allocs;
   }
 
-  void _paintTraditionalEnemies(Canvas canvas) {
+  int _paintTraditionalEnemies(Canvas canvas) {
     final SoaEnemyPool pool = controller.enemies;
+    int allocs = 0;
     for (int i = 0; i < pool.capacity; i++) {
       if (pool.active[i] != 0) {
         final int k = pool.kind[i];
@@ -248,11 +271,13 @@ class _TraditionalArenaPainter extends CustomPainter {
           pool.radius[i],
           paint,
         );
+        allocs += 2; // Paint + Offset
       }
     }
+    return allocs;
   }
 
-  void _paintTraditionalPlayer(Canvas canvas) {
+  int _paintTraditionalPlayer(Canvas canvas) {
     final double px = controller.playerX;
     final double py = controller.playerY;
     final double ang = controller.aimAngle;
@@ -284,6 +309,7 @@ class _TraditionalArenaPainter extends CustomPainter {
     )..layout();
     tp.paint(canvas, Offset(px - 14.0, py + 18.0));
     tp.dispose();
+    return 9; // 2 Paints + 4 Offsets + String + TextSpan + TextPainter
   }
 
   @override

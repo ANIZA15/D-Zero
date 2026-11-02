@@ -35,11 +35,15 @@ class _QrBattleViewState extends State<QrBattleView>
   late final ZeroDetectionController _dZeroDetectCtrl;
   final ZeroIntNotifier _dZeroCount = ZeroIntNotifier(0);
   final ZeroDoubleNotifier _dZeroElapsedSec = ZeroDoubleNotifier(0.0);
-  double? _dZeroFinishSec;
+  final ValueNotifier<double?> _dZeroFinishSec = ValueNotifier<double?>(null);
+  final ValueNotifier<int> _tradFrameTick = ValueNotifier<int>(0);
+  int _dZeroRebuilds = 0;
+  bool _resettingDZero = true;
 
   int _tradCount = 0;
   double _tradElapsedSec = 0.0;
   int _tradRebuilds = 0;
+  bool _resettingTrad = true;
   double? _tradFinishSec;
 
   @override
@@ -64,6 +68,8 @@ class _QrBattleViewState extends State<QrBattleView>
     _dZeroDetectCtrl.dispose();
     _dZeroCount.dispose();
     _dZeroElapsedSec.dispose();
+    _dZeroFinishSec.dispose();
+    _tradFrameTick.dispose();
     super.dispose();
   }
 
@@ -77,7 +83,7 @@ class _QrBattleViewState extends State<QrBattleView>
     final bool dZeroDone = _dZeroCount.value >= targetQrCount;
     final bool tradDone = _tradCount >= targetQrCount;
     if (dZeroDone && tradDone) {
-      setState(() => _isRunning = false);
+      _isRunning = false;
       return;
     }
     _stepDZeroLane(dt, dZeroDone);
@@ -93,7 +99,7 @@ class _QrBattleViewState extends State<QrBattleView>
     return (us / 1000000.0).clamp(0.001, 0.05);
   }
 
-  double _targetRateForDZero() {
+  double _targetRate() {
     switch (_speedMode) {
       case QrRaceSpeedMode.fps30:
         return 30.0;
@@ -106,24 +112,11 @@ class _QrBattleViewState extends State<QrBattleView>
     }
   }
 
-  double _targetRateForTrad() {
-    switch (_speedMode) {
-      case QrRaceSpeedMode.fps30:
-        return 29.4;
-      case QrRaceSpeedMode.fps60:
-        return 54.5;
-      case QrRaceSpeedMode.fps120:
-        return 92.0;
-      case QrRaceSpeedMode.uncapped:
-        return 165.0;
-    }
-  }
-
   void _stepDZeroLane(double dt, bool alreadyDone) {
     if (alreadyDone) return;
     final double nextElapsed = _dZeroElapsedSec.value + dt;
     _dZeroElapsedSec.value = nextElapsed;
-    _dZeroCarry += _targetRateForDZero() * dt;
+    _dZeroCarry += _targetRate() * dt;
     final int steps = _dZeroCarry.floor();
     if (steps > 0) {
       _dZeroCarry -= steps;
@@ -131,7 +124,7 @@ class _QrBattleViewState extends State<QrBattleView>
       _dZeroCount.value = nextCount;
       _dZeroQrCtrl.updateToken(200000 + nextCount * 37);
       if (nextCount >= targetQrCount) {
-        _dZeroFinishSec = nextElapsed;
+        _dZeroFinishSec.value = nextElapsed;
       }
     }
   }
@@ -139,17 +132,16 @@ class _QrBattleViewState extends State<QrBattleView>
   void _stepTradLane(double dt, bool alreadyDone) {
     if (alreadyDone) return;
     _tradElapsedSec += dt;
-    _tradCarry += _targetRateForTrad() * dt;
+    _tradCarry += _targetRate() * dt;
     final int steps = _tradCarry.floor();
     if (steps > 0) {
       _tradCarry -= steps;
       _tradCount = math.min(targetQrCount, _tradCount + steps);
-      _tradRebuilds += steps;
       if (_tradCount >= targetQrCount) {
         _tradFinishSec = _tradElapsedSec;
       }
     }
-    setState(() {});
+    _tradFrameTick.value++;
   }
 
   void _selectSpeedMode(QrRaceSpeedMode mode) {
@@ -164,8 +156,11 @@ class _QrBattleViewState extends State<QrBattleView>
     _lastFrameElapsed = null;
     _dZeroCount.value = 0;
     _dZeroElapsedSec.value = 0.0;
-    _dZeroFinishSec = null;
+    _dZeroFinishSec.value = null;
     setState(() {
+      _resettingDZero = true;
+      _resettingTrad = true;
+      _dZeroRebuilds = 0;
       _tradCount = 0;
       _tradElapsedSec = 0.0;
       _tradRebuilds = 0;
@@ -201,7 +196,12 @@ class _QrBattleViewState extends State<QrBattleView>
           children: [
             Expanded(child: _buildDZeroCard()),
             const SizedBox(width: 12),
-            Expanded(child: _buildTradCard()),
+            Expanded(
+              child: ValueListenableBuilder<int>(
+                valueListenable: _tradFrameTick,
+                builder: (context, tick, child) => _buildTradCard(),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -209,7 +209,11 @@ class _QrBattleViewState extends State<QrBattleView>
           children: [
             Expanded(
               child: FilledButton(
-                onPressed: () => setState(() => _isRunning = !_isRunning),
+                onPressed: () => setState(() {
+                  _resettingDZero = true;
+                  _resettingTrad = true;
+                  _isRunning = !_isRunning;
+                }),
                 child: Text(_isRunning ? '一時停止' : '再開'),
               ),
             ),
@@ -225,7 +229,11 @@ class _QrBattleViewState extends State<QrBattleView>
   }
 
   Widget _buildDZeroCard() {
-    final bool finished = _dZeroFinishSec != null;
+    if (_resettingDZero) {
+      _resettingDZero = false;
+    } else {
+      _dZeroRebuilds++;
+    }
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -245,9 +253,9 @@ class _QrBattleViewState extends State<QrBattleView>
                 color: Color(0xFF0F172A),
               ),
             ),
-            const Text(
-              'Rebuild: 0',
-              style: TextStyle(fontSize: 12, color: Color(0xFF16A34A)),
+            Text(
+              'Rebuild: $_dZeroRebuilds',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A)),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -304,18 +312,24 @@ class _QrBattleViewState extends State<QrBattleView>
                 ),
               ),
             ),
-            if (finished) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Completed 1000 QR codes (${_dZeroFinishSec!.toStringAsFixed(2)}s)',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF16A34A),
-                ),
-              ),
-            ],
+            ValueListenableBuilder<double?>(
+              valueListenable: _dZeroFinishSec,
+              builder: (context, finishSec, _) {
+                if (finishSec == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Completed 1000 QR codes (${finishSec.toStringAsFixed(2)}s)',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF16A34A),
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -323,6 +337,11 @@ class _QrBattleViewState extends State<QrBattleView>
   }
 
   Widget _buildTradCard() {
+    if (_resettingTrad) {
+      _resettingTrad = false;
+    } else {
+      _tradRebuilds++;
+    }
     return Card(
       elevation: 0,
       color: Colors.white,

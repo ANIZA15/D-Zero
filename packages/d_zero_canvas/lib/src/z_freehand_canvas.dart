@@ -183,10 +183,19 @@ class RenderZFreehandCanvas extends ZeroRenderBox {
   Color _backgroundColor;
 
   late Float32List _scratchBuffer;
+  late List<Float32List> _scratchViews;
   final Paint _bgPaint = Paint()..style = PaintingStyle.fill;
   final Paint _strokePaint = Paint()
     ..style = PaintingStyle.stroke
     ..strokeCap = StrokeCap.round;
+
+  static List<Float32List> _buildScratchViews(Float32List buf, int maxSegs) {
+    return List<Float32List>.generate(
+      maxSegs + 1,
+      (n) => Float32List.sublistView(buf, 0, n * 4),
+      growable: false,
+    );
+  }
 
   /// Creates a [RenderZFreehandCanvas].
   RenderZFreehandCanvas({
@@ -204,7 +213,9 @@ class RenderZFreehandCanvas extends ZeroRenderBox {
     if (_externalController == null) {
       _internalController = ZeroFreehandController();
     }
-    _scratchBuffer = Float32List(_activeController.maxSegments * 4);
+    final int maxSegs = _activeController.maxSegments;
+    _scratchBuffer = Float32List(maxSegs * 4);
+    _scratchViews = _buildScratchViews(_scratchBuffer, maxSegs);
     _rebuildPaints();
   }
 
@@ -226,9 +237,11 @@ class RenderZFreehandCanvas extends ZeroRenderBox {
     } else {
       _internalController ??= ZeroFreehandController();
     }
-    final int needed = _activeController.maxSegments * 4;
+    final int maxSegs = _activeController.maxSegments;
+    final int needed = maxSegs * 4;
     if (_scratchBuffer.length < needed) {
       _scratchBuffer = Float32List(needed);
+      _scratchViews = _buildScratchViews(_scratchBuffer, maxSegs);
     }
     if (attached) {
       _activeController.addListener(_onStrokeUpdated);
@@ -342,8 +355,11 @@ class RenderZFreehandCanvas extends ZeroRenderBox {
 
     canvas.save();
     canvas.clipRect(rect);
-    final Float32List view = Float32List.sublistView(_scratchBuffer, 0, floatCount);
-    canvas.drawRawPoints(ui.PointMode.lines, view, _strokePaint);
+    canvas.drawRawPoints(
+      ui.PointMode.lines,
+      _scratchViews[floatCount >> 2],
+      _strokePaint,
+    );
     canvas.restore();
   }
 }

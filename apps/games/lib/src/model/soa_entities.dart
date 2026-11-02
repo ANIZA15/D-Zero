@@ -23,6 +23,9 @@ class SoaProjectilePool {
   final Float32List _playerLineBuffer;
   final Float32List _novaLineBuffer;
   final Float32List _enemyPointBuffer;
+  late final List<Float32List> _playerLineViews;
+  late final List<Float32List> _novaLineViews;
+  late final List<Float32List> _enemyPointViews;
 
   int _cursor = 0;
   int _activeCount = 0;
@@ -41,27 +44,43 @@ class SoaProjectilePool {
         team = Uint8List(capacity),
         _playerLineBuffer = Float32List(capacity * 4),
         _novaLineBuffer = Float32List(capacity * 4),
-        _enemyPointBuffer = Float32List(capacity * 2);
+        _enemyPointBuffer = Float32List(capacity * 2) {
+    _playerLineViews = List<Float32List>.generate(
+      capacity + 1,
+      (n) => Float32List.sublistView(_playerLineBuffer, 0, n * 4),
+      growable: false,
+    );
+    _novaLineViews = List<Float32List>.generate(
+      capacity + 1,
+      (n) => Float32List.sublistView(_novaLineBuffer, 0, n * 4),
+      growable: false,
+    );
+    _enemyPointViews = List<Float32List>.generate(
+      capacity + 1,
+      (n) => Float32List.sublistView(_enemyPointBuffer, 0, n * 2),
+      growable: false,
+    );
+  }
 
   bool get isDisposed => _isDisposed;
   int get activeCount => _isDisposed ? 0 : _activeCount;
 
   /// View of active player bolt line segments (`[x0, y0, x1, y1, ...]`).
   Float32List get playerBoltSegments {
-    if (_isDisposed || _playerLineFloats == 0) return _emptyFloat32;
-    return Float32List.sublistView(_playerLineBuffer, 0, _playerLineFloats);
+    if (_isDisposed || _playerLineFloats <= 0) return _emptyFloat32;
+    return _playerLineViews[_playerLineFloats >> 2];
   }
 
   /// View of active overdrive nova bolt line segments (`[x0, y0, x1, y1, ...]`).
   Float32List get novaBoltSegments {
-    if (_isDisposed || _novaLineFloats == 0) return _emptyFloat32;
-    return Float32List.sublistView(_novaLineBuffer, 0, _novaLineFloats);
+    if (_isDisposed || _novaLineFloats <= 0) return _emptyFloat32;
+    return _novaLineViews[_novaLineFloats >> 2];
   }
 
   /// View of active enemy bullet coordinates (`[x0, y0, x1, y1, ...]`).
   Float32List get enemyOrbPoints {
-    if (_isDisposed || _enemyPointFloats == 0) return _emptyFloat32;
-    return Float32List.sublistView(_enemyPointBuffer, 0, _enemyPointFloats);
+    if (_isDisposed || _enemyPointFloats <= 0) return _emptyFloat32;
+    return _enemyPointViews[_enemyPointFloats >> 1];
   }
 
   /// Spawns a single projectile in O(1) time.
@@ -308,6 +327,7 @@ class SoaSparkPool {
   final Uint8List colorBucket;
 
   late final List<Float32List> _bucketLines;
+  late final List<List<Float32List>> _bucketLineViews;
   final Int32List _bucketFloatCounts = Int32List(bucketCount);
   final math.Random _rng;
 
@@ -329,6 +349,15 @@ class SoaSparkPool {
       (_) => Float32List(capacity * 4),
       growable: false,
     );
+    _bucketLineViews = List<List<Float32List>>.generate(
+      bucketCount,
+      (b) => List<Float32List>.generate(
+        capacity + 1,
+        (n) => Float32List.sublistView(_bucketLines[b], 0, n * 4),
+        growable: false,
+      ),
+      growable: false,
+    );
   }
 
   bool get isDisposed => _isDisposed;
@@ -339,7 +368,7 @@ class SoaSparkPool {
     if (_isDisposed || bucket < 0 || bucket >= bucketCount) return _emptyFloat32;
     final int floatCount = _bucketFloatCounts[bucket];
     if (floatCount <= 0) return _emptyFloat32;
-    return Float32List.sublistView(_bucketLines[bucket], 0, floatCount);
+    return _bucketLineViews[bucket][floatCount >> 2];
   }
 
   /// Emits a radial burst of [count] neon sparks at ([ox], [oy]).

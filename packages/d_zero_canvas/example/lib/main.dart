@@ -50,7 +50,9 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
   CanvasBenchMode _mode = CanvasBenchMode.dZero;
   int _schedulerSlot = -1;
   int _tickCount = 0;
+  int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
+  bool _resettingMode = true;
 
   late final ZeroDanmakuController _danmakuCtrl;
   late final ZeroViewportController _viewportCtrl;
@@ -96,8 +98,19 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
     _viewportCtrl.pan(0.5, 0.25);
 
     if (_mode == CanvasBenchMode.traditional) {
-      _tradRebuilds++;
       setState(() {});
+    }
+  }
+
+  void _recordRebuild(bool isDZero) {
+    if (_resettingMode) {
+      _resettingMode = false;
+      return;
+    }
+    if (isDZero) {
+      _dZeroRebuilds++;
+    } else {
+      _tradRebuilds++;
     }
   }
 
@@ -113,6 +126,7 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
   @override
   Widget build(BuildContext context) {
     final bool isDZero = _mode == CanvasBenchMode.dZero;
+    _recordRebuild(isDZero);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -145,8 +159,10 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
                       ),
                     ],
                     selected: {_mode},
-                    onSelectionChanged: (s) =>
-                        setState(() => _mode = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _mode = s.first;
+                      _resettingMode = true;
+                    }),
                   ),
                   const SizedBox(height: 16),
                   isDZero ? _buildDZeroCard() : _buildTradCard(),
@@ -172,10 +188,10 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'D-Zero キャンバス',
                   style: TextStyle(
                     fontSize: 15,
@@ -184,8 +200,8 @@ class _CanvasBenchmarkScreenState extends State<CanvasBenchmarkScreen>
                   ),
                 ),
                 Text(
-                  'Rebuild: 0',
-                  style: TextStyle(
+                  'Rebuild: $_dZeroRebuilds',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF16A34A),

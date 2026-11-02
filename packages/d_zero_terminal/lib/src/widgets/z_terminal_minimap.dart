@@ -76,6 +76,14 @@ class RenderZTerminalMinimap extends ZeroRenderBox {
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.0;
 
+  final Uint32List _cachedRawBinColors =
+      Uint32List(ZeroTerminalStateView.minimapBinCount);
+  final List<Color> _cachedBinColors = List<Color>.filled(
+    ZeroTerminalStateView.minimapBinCount,
+    const Color(0xB8000000),
+    growable: false,
+  );
+
   /// Creates a [RenderZTerminalMinimap].
   RenderZTerminalMinimap({
     required ZeroPtyController controller,
@@ -198,7 +206,12 @@ class RenderZTerminalMinimap extends ZeroRenderBox {
       if (fill <= 0) continue;
       final double barW = (fill / 255.0) * availW;
       final double y = offset.dy + (i / binCount) * size.height;
-      _barPaint.color = Color(colors[i]).withValues(alpha: 0.72);
+      final int rawArgb = colors[i];
+      if (_cachedRawBinColors[i] != rawArgb) {
+        _cachedRawBinColors[i] = rawArgb;
+        _cachedBinColors[i] = Color((rawArgb & 0x00FFFFFF) | 0xB8000000);
+      }
+      _barPaint.color = _cachedBinColors[i];
       canvas.drawRect(
         Rect.fromLTWH(offset.dx + 4.0, y, barW, math.max(1.2, binH - 0.5)),
         _barPaint,

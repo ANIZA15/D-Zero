@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:d_zero_core/d_zero_core.dart';
 import 'package:d_zero_counter/d_zero_counter.dart';
 import 'package:d_zero_particles/d_zero_particles.dart';
@@ -27,7 +28,10 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   Duration? _lastElapsed;
 
   final Stopwatch _cpuStopwatch = Stopwatch();
-  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(5.2);
+  final Stopwatch _buildStopwatch = Stopwatch();
+  final ZeroDoubleNotifier _cpuPct = ZeroDoubleNotifier(0.0);
+  int _lastEngineFrameUs = 0;
+  int _lastBuildUs = 0;
 
   late final ZeroParticleController _zController;
   late final List<TraditionalParticle> _traditionalParticles;
@@ -55,6 +59,14 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
       );
     });
     ZeroFrameScheduler.instance.subscribe(this);
+    SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
+  }
+
+  void _onFrameTimings(List<FrameTiming> timings) {
+    if (!mounted || timings.isEmpty) return;
+    final FrameTiming last = timings.last;
+    _lastEngineFrameUs =
+        last.buildDuration.inMicroseconds + last.rasterDuration.inMicroseconds;
   }
 
   @override
@@ -73,13 +85,15 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
     if (_mode == ParticleRenderMode.traditional) {
       _updateTraditionalPhysics(dt);
       setState(() {});
+    } else {
+      _lastBuildUs = 0;
     }
 
     _cpuStopwatch.stop();
-    final double overhead = _mode == ParticleRenderMode.dZero ? 200.0 : 3200.0;
-    final double pct =
-        ((_cpuStopwatch.elapsedMicroseconds + overhead) / 8333.0 * 100.0)
-            .clamp(1.2, 99.9);
+    final int stepUs = _cpuStopwatch.elapsedMicroseconds;
+    final int measuredUs =
+        _lastEngineFrameUs > 0 ? _lastEngineFrameUs : (stepUs + _lastBuildUs);
+    final double pct = (measuredUs / 8333.0 * 100.0).clamp(0.1, 100.0);
     _cpuPct.value = _cpuPct.value * 0.85 + pct * 0.15;
   }
 
@@ -103,6 +117,7 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
   @override
   void dispose() {
     ZeroFrameScheduler.instance.unsubscribe(this);
+    SchedulerBinding.instance.removeTimingsCallback(_onFrameTimings);
     _zController.dispose();
     _cpuPct.dispose();
     super.dispose();
@@ -110,7 +125,10 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    _buildStopwatch
+      ..reset()
+      ..start();
+    final Widget tree = SingleChildScrollView(
       padding: const EdgeInsets.all(12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,6 +184,9 @@ class _ParticlesBenchmarkViewState extends State<ParticlesBenchmarkView>
         ],
       ),
     );
+    _buildStopwatch.stop();
+    _lastBuildUs = _buildStopwatch.elapsedMicroseconds;
+    return tree;
   }
 }
 
