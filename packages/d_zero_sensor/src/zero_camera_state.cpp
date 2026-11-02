@@ -139,6 +139,40 @@ inline void record_payload_unlocked(
     }
 }
 
+inline void stamp_qr_cell_in_luma(
+    uint8_t* luma,
+    const RoiWindow& roi,
+    int32_t cell_size,
+    int32_t gx,
+    int32_t gy,
+    uint8_t luma_val
+) {
+    const int32_t y0 = roi.top + gy * cell_size;
+    const int32_t x0 = roi.left + gx * cell_size;
+    for (int32_t dy = 0; dy < cell_size; ++dy) {
+        uint8_t* row = luma + (y0 + dy) * roi.stride + x0;
+        std::memset(row, luma_val, static_cast<size_t>(cell_size));
+    }
+}
+
+inline void stamp_qr_matrix_in_luma(
+    uint8_t* luma,
+    const RoiWindow& roi,
+    uint32_t qr_token
+) {
+    const int32_t cell = std::max(1, roi.side / ZERO_CAM_LUMA_GRID_SIDE);
+    uint32_t state_bits = qr_token ^ 0xA5A55A5Au;
+    for (int32_t gy = 0; gy < ZERO_CAM_LUMA_GRID_SIDE; ++gy) {
+        for (int32_t gx = 0; gx < ZERO_CAM_LUMA_GRID_SIDE; ++gx) {
+            state_bits ^= state_bits << 13u;
+            state_bits ^= state_bits >> 17u;
+            state_bits ^= state_bits << 5u;
+            const uint8_t val = (state_bits & 1u) != 0u ? 16u : 240u;
+            stamp_qr_cell_in_luma(luma, roi, cell, gx, gy, val);
+        }
+    }
+}
+
 }  // namespace
 
 extern "C" {
@@ -241,6 +275,29 @@ void zero_camera_commit_detection_payload(
     seq_end_write(state);
 }
 
+int32_t zero_camera_ingest_yuv_luma(
+    ZeroCameraSharedState* state,
+    const uint8_t* luma_ptr,
+    int32_t width,
+    int32_t height,
+    int32_t row_stride,
+    float window_fraction
+) {
+    if (!state || !luma_ptr || width < 21 || height < 21) return 0;
+    const int64_t now_us = now_monotonic_us();
+    const RoiWindow roi = compute_roi(width, height, row_stride, window_fraction);
+
+    uint8_t min_luma = 255;
+    uint8_t max_luma = 0;
+    const float mean = compute_roi_mean_and_contrast(luma_ptr, roi, &min_luma, &max_luma);
+    state->mean_luma.store(mean, std::memory_order_relaxed);
+    state->frame_width.store(width, std::memory_order_relaxed);
+    state->frame_height.store(height, std::memory_order_relaxed);
+    update_fps_estimate(state, now_us);
+    state->frame_count.fetch_add(1u, std::memory_order_relaxed);
+    return static_cast<int32_t>(max_luma) - static_cast<int32_t>(min_luma);
+}
+
 int32_t zero_camera_scan_luma_frame(
     ZeroCameraSharedState* state,
     const uint8_t* luma_ptr,
@@ -290,6 +347,20 @@ int32_t zero_camera_scan_luma_frame(
     state->last_decode_us.store(elapsed_us, std::memory_order_relaxed);
     seq_end_write(state);
     return 1;
+}
+
+int32_t zero_camera_stamp_and_scan_luma(
+    ZeroCameraSharedState* state,
+    uint8_t* luma_ptr,
+    int32_t width,
+    int32_t height,
+    int32_t row_stride,
+    uint32_t qr_token
+) {
+    if (!state || !luma_ptr || width < 21 || height < 21) return 0;
+    const RoiWindow roi = compute_roi(width, height, row_stride, 0.72f);
+    stamp_qr_matrix_in_luma(luma_ptr, roi, qr_token);
+    return zero_camera_scan_luma_frame(state, luma_ptr, width, height, row_stride, 0.72f);
 }
 
 float* zero_camera_get_boxes_ptr(ZeroCameraSharedState* state) {

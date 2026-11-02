@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:d_zero_core/d_zero_core.dart';
 import 'camera_state_ffi.dart';
@@ -22,12 +23,18 @@ typedef ZZeroCamera = ZCameraScanner;
 ///    polled at VSync by [RenderZCameraScanner] in `0 ns`.
 class ZeroCameraController {
   static const int _maxLumaDimension = 2048;
+  static const MethodChannel _channel =
+      MethodChannel('com.fexcy.d_zero_sensor');
 
   final ZeroCameraNativeBindings _bindings = ZeroCameraNativeBindings.instance;
   late final ZeroCameraStateView _view;
   late final ffi.Pointer<ffi.Uint8> _payloadScratch;
   ffi.Pointer<ffi.Uint8> _lumaScratch = ffi.nullptr;
   int _lumaScratchCap = 0;
+
+  int? _textureId;
+  bool _useFrontCamera = false;
+  int _preferredFps = 120;
 
   final ZeroIntNotifier _revision = ZeroIntNotifier(0);
   bool _isDisposed = false;
@@ -41,6 +48,19 @@ class ZeroCameraController {
 
   /// Whether this controller has been disposed.
   bool get isDisposed => _isDisposed;
+
+  /// Active GPU `FlutterTexture` ID when the native `AVCaptureSession` is running.
+  int? get textureId => _isDisposed ? null : _textureId;
+
+  /// Whether a native zero-copy GPU camera texture is currently registered.
+  bool get hasNativeTexture =>
+      !_isDisposed && _textureId != null && _textureId! >= 0;
+
+  /// Whether the native camera is currently using the front-facing sensor.
+  bool get isFrontCamera => _useFrontCamera;
+
+  /// Target hardware capture frame rate (`60` / `120` / `240` fps).
+  int get preferredFps => _preferredFps;
 
   /// Whether the native C++17 shared library (`libzero_sensor_native`) is active.
   bool get isNativeCppActive =>
@@ -200,6 +220,132 @@ class ZeroCameraController {
     return hit;
   }
 
+  /// Acquires a persistent native `ffi.Pointer<ffi.Uint8>` YUV420 Y-plane buffer
+  /// (`width * height` bytes) so callers can feed or mutate YUV planes directly in C++
+  /// without allocating or copying Dart `Uint8List` buffers per frame.
+  ffi.Pointer<ffi.Uint8> acquireNativeYuvBuffer(int width, int height) {
+    if (_isDisposed || width < 21 || height < 21) return ffi.nullptr;
+    final int requiredBytes =
+        width.clamp(21, _maxLumaDimension) * height.clamp(21, _maxLumaDimension);
+    _ensureLumaScratchCapacity(requiredBytes);
+    return _lumaScratch;
+  }
+
+  /// Passes a raw native YUV420 Plane 0 pointer [yPlanePtr] directly into C++
+  /// `zero_camera_scan_luma_frame` with zero memory copies and zero heap allocations.
+  int scanNativeYuvPointer(
+    ffi.Pointer<ffi.Uint8> yPlanePtr, {
+    required int width,
+    required int height,
+    int rowStride = 0,
+    double windowFraction = 0.72,
+  }) {
+    if (_isDisposed || yPlanePtr.address == 0) return 0;
+    final int clampedW = width.clamp(21, _maxLumaDimension);
+    final int clampedH = height.clamp(21, _maxLumaDimension);
+    final int effStride = rowStride >= clampedW ? rowStride : clampedW;
+    final int hit = _bindings.scanLumaFrame(
+      _view,
+      yPlanePtr,
+      clampedW,
+      clampedH,
+      effStride,
+      windowFraction,
+    );
+    if (hit != 0) {
+      _revision.add(1);
+    }
+    return hit;
+  }
+
+  /// Stamps a 21×21 QR matrix for [qrToken] directly into the persistent native YUV420
+  /// Y-plane pointer and scans it in C++ (`zero_camera_stamp_and_scan_luma`).
+  int stampAndScanNativeYuv({
+    required int qrToken,
+    int width = 320,
+    int height = 240,
+  }) {
+    if (_isDisposed) return 0;
+    final ffi.Pointer<ffi.Uint8> yPtr = acquireNativeYuvBuffer(width, height);
+    if (yPtr.address == 0) return 0;
+    final int hit = _bindings.stampAndScanLuma(
+      _view,
+      yPtr,
+      width,
+      height,
+      width,
+      qrToken,
+    );
+    if (hit != 0) {
+      _revision.add(1);
+    }
+    return hit;
+  }
+
+  /// Starts the native `AVCaptureVideoDataOutput` -> `CVPixelBuffer` Plane 0 YUV pointer
+  /// -> C++ `ZeroCameraSharedState` pipeline (zero per-frame MethodChannel traffic).
+  Future<bool> startNativeCamera({
+    bool useFrontCamera = false,
+    int preferredFps = 120,
+  }) async {
+    if (_isDisposed) return false;
+    _useFrontCamera = useFrontCamera;
+    _preferredFps = preferredFps;
+    try {
+      if (_textureId != null) {
+        await _channel.invokeMethod<void>('startCamera', <String, Object>{
+          'textureId': _textureId!,
+        });
+        _revision.add(1);
+        return true;
+      }
+      final Map<Object?, Object?>? reply =
+          await _channel.invokeMethod<Map<Object?, Object?>>(
+        'createCamera',
+        <String, Object>{
+          'stateAddress': stateAddress,
+          'facing': useFrontCamera ? 1 : 0,
+          'preferredFps': preferredFps,
+        },
+      );
+      if (_isDisposed || reply == null) return false;
+      final Object? rawTex = reply['textureId'];
+      if (rawTex is int && rawTex >= 0) {
+        _textureId = rawTex;
+        _revision.add(1);
+        return true;
+      }
+    } catch (_) {
+      return false;
+    }
+    return false;
+  }
+
+  /// Pauses the native `AVCaptureSession` without freeing C++ shared memory.
+  Future<void> stopNativeCamera() async {
+    final int? tex = _textureId;
+    if (_isDisposed || tex == null) return;
+    try {
+      await _channel.invokeMethod<void>('stopCamera', <String, Object>{
+        'textureId': tex,
+      });
+    } catch (_) {}
+  }
+
+  /// Switches the native camera between back (`0`) and front (`1`) sensors.
+  Future<void> switchNativeCamera() async {
+    final int? tex = _textureId;
+    if (_isDisposed || tex == null) return;
+    _useFrontCamera = !_useFrontCamera;
+    try {
+      await _channel.invokeMethod<void>('switchCamera', <String, Object>{
+        'textureId': tex,
+        'facing': _useFrontCamera ? 1 : 0,
+        'preferredFps': _preferredFps,
+      });
+    } catch (_) {}
+  }
+
   void _ensureLumaScratchCapacity(int requiredBytes) {
     if (_lumaScratchCap >= requiredBytes && _lumaScratch.address != 0) return;
     if (_lumaScratch.address != 0) {
@@ -220,6 +366,13 @@ class ZeroCameraController {
   void dispose() {
     if (_isDisposed) return;
     _isDisposed = true;
+    final int? tex = _textureId;
+    _textureId = null;
+    if (tex != null) {
+      _channel.invokeMethod<void>('disposeCamera', <String, Object>{
+        'textureId': tex,
+      }).ignore();
+    }
     if (_lumaScratch.address != 0) {
       pkg_ffi.calloc.free(_lumaScratch);
       _lumaScratch = ffi.nullptr;
@@ -496,14 +649,14 @@ class RenderZCameraScanner extends ZeroRenderBox
 
   @override
   void paintZero(PaintingContext context, Offset offset) {
-    final Canvas canvas = context.canvas;
     final Rect viewport = offset & size;
     if (child != null) {
       context.paintChild(child!, offset);
     } else if (_backgroundColor.a > 0.0) {
-      canvas.drawRect(viewport, _bgPaint);
+      context.canvas.drawRect(viewport, _bgPaint);
     }
 
+    final Canvas canvas = context.canvas;
     final Rect reticleRect = viewport.deflate(22.0);
     _paintReticle(canvas, reticleRect);
     if (_isScanning) {
@@ -546,22 +699,44 @@ class RenderZCameraScanner extends ZeroRenderBox
     final int count = view.copyBoxesInto(_boxSnapshot);
     if (count <= 0) return;
 
+    final int fw = view.frameWidth;
+    final int fh = view.frameHeight;
     final ZeroNumberPainter? painter = _hudPainter;
     for (int i = 0; i < count; i++) {
       final int b = i * ZeroCameraStateView.floatsPerBox;
-      final double left = offset.dx + _boxSnapshot[b];
-      final double top = offset.dy + _boxSnapshot[b + 1];
-      final double right = offset.dx + _boxSnapshot[b + 2];
-      final double bottom = offset.dy + _boxSnapshot[b + 3];
+      final Rect rect = _resolveBoxRect(offset, b, fw, fh);
       final double conf = _boxSnapshot[b + 4];
-      canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), _boxPaint);
+      canvas.drawRect(rect, _boxPaint);
       painter?.paintPercent(
         canvas,
-        Offset(left + 4.0, top + 4.0),
+        Offset(rect.left + 4.0, rect.top + 4.0),
         conf,
         fractionDigits: 0,
       );
     }
+  }
+
+  Rect _resolveBoxRect(Offset offset, int baseIdx, int fw, int fh) {
+    final double rawL = _boxSnapshot[baseIdx];
+    final double rawT = _boxSnapshot[baseIdx + 1];
+    final double rawR = _boxSnapshot[baseIdx + 2];
+    final double rawB = _boxSnapshot[baseIdx + 3];
+    if (rawR <= 1.05 && rawB <= 1.05) {
+      return Rect.fromLTRB(
+        offset.dx + rawL * size.width,
+        offset.dy + rawT * size.height,
+        offset.dx + rawR * size.width,
+        offset.dy + rawB * size.height,
+      );
+    }
+    final double sx = fw > 0 ? (size.width / fw) : 1.0;
+    final double sy = fh > 0 ? (size.height / fh) : 1.0;
+    return Rect.fromLTRB(
+      offset.dx + rawL * sx,
+      offset.dy + rawT * sy,
+      offset.dx + rawR * sx,
+      offset.dy + rawB * sy,
+    );
   }
 
   void _paintTelemetryStrip(Canvas canvas, Rect viewport) {

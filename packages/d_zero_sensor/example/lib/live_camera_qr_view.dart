@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:d_zero_core/d_zero_core.dart';
@@ -8,10 +7,10 @@ import 'package:d_zero_sensor/d_zero_sensor.dart';
 
 /// UI & Native pipeline mode for the live camera QR scanner.
 enum QrCameraEngineMode {
-  /// D-Zero C++17 Seqlock Shared Memory (`ZeroCameraController` + `ZCameraScanner` + `ZCounter`).
+  /// D-Zero Native `AVCaptureVideoDataOutput` YUV420 Plane 0 pointer -> C++17 Seqlock Shared Memory.
   dZero,
 
-  /// Traditional Flutter pipeline (`setState` + `Stack`/`Positioned` + `Text`).
+  /// Traditional Flutter pipeline (`MobileScanner` MethodChannel + `setState`).
   traditional,
 }
 
@@ -31,9 +30,9 @@ class ScannedQrItem {
 }
 
 /// Clean, ToDo-app style live camera QR scanner with a one-tap toggle
-/// between **D-Zero** and **Traditional (`従来`)**.
+/// between **D-Zero (YUV420 Pointer -> C++ Seqlock)** and **Traditional (`従来`)**.
 class LiveCameraQrView extends StatefulWidget {
-  /// Whether to mount the native platform [MobileScanner] preview.
+  /// Whether to mount the native platform camera preview.
   final bool enablePlatformCamera;
 
   const LiveCameraQrView({
@@ -53,20 +52,21 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
   QrCameraEngineMode _engineMode = QrCameraEngineMode.dZero;
   bool _isScanning = true;
   int _schedulerSlot = -1;
+  int _lastObservedNativeSeq = 0;
+  int _lastObservedPayloadHash = 0;
 
   MobileScannerController? _cameraController;
   final Stopwatch _sessionTimer = Stopwatch();
 
   late final ZeroCameraController _zeroCamCtrl;
-  late final Uint8List _syntheticLumaFrame;
   final ZeroIntNotifier _scanCount = ZeroIntNotifier(0);
   final ZeroDoubleNotifier _elapsedSec = ZeroDoubleNotifier(0.0);
+  final ZeroIntNotifier _decodeUs = ZeroIntNotifier(0);
 
   final List<Rect> _tradBoxes = <Rect>[];
   final List<ScannedQrItem> _recentItems = <ScannedQrItem>[];
   int _dZeroRebuilds = 0;
   int _tradRebuilds = 0;
-  bool _resettingMode = true;
 
   @override
   int get zeroSchedulerSlot => _schedulerSlot;
@@ -78,27 +78,31 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
   void initState() {
     super.initState();
     _zeroCamCtrl = ZeroCameraController();
-    _syntheticLumaFrame = _buildHighContrastLumaFrame(320, 240);
+    _zeroCamCtrl.acquireNativeYuvBuffer(320, 240);
     if (widget.enablePlatformCamera) {
-      _cameraController = MobileScannerController(
-        detectionSpeed: DetectionSpeed.unrestricted,
-        facing: CameraFacing.back,
-        formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
-        returnImage: false,
-      );
+      _initCameraPipelines();
     }
     ZeroFrameScheduler.instance.subscribe(this);
   }
 
-  static Uint8List _buildHighContrastLumaFrame(int w, int h) {
-    final Uint8List buf = Uint8List(w * h);
-    for (int y = 0; y < h; y++) {
-      final int row = y * w;
-      for (int x = 0; x < w; x++) {
-        buf[row + x] = ((x ~/ 8 + y ~/ 8) & 1) == 0 ? 16 : 240;
-      }
+  Future<void> _initCameraPipelines() async {
+    final bool ok = await _zeroCamCtrl.startNativeCamera(preferredFps: 120);
+    if (!mounted) return;
+    if (ok) {
+      setState(() {});
+      return;
     }
-    return buf;
+    _ensureTraditionalController();
+  }
+
+  void _ensureTraditionalController() {
+    if (_cameraController != null || !widget.enablePlatformCamera) return;
+    _cameraController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.unrestricted,
+      facing: CameraFacing.back,
+      formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
+      returnImage: false,
+    );
   }
 
   @override
@@ -108,12 +112,16 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     _zeroCamCtrl.dispose();
     _scanCount.dispose();
     _elapsedSec.dispose();
+    _decodeUs.dispose();
     super.dispose();
   }
 
   @override
   void onZeroFrame(Duration elapsed) {
     if (!mounted) return;
+    if (_engineMode == QrCameraEngineMode.dZero) {
+      _pollNativeSharedMemory();
+    }
     if (_sessionTimer.isRunning && _scanCount.value < targetQrCount) {
       _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
       if (_engineMode == QrCameraEngineMode.traditional) {
@@ -122,7 +130,32 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     }
   }
 
-  /// Processes a live camera [BarcodeCapture] frame.
+  void _pollNativeSharedMemory() {
+    final int seq = _zeroCamCtrl.seq;
+    if (seq == _lastObservedNativeSeq || (seq & 1) != 0) return;
+    _lastObservedNativeSeq = seq;
+
+    final int nativeScans = _zeroCamCtrl.scanCount;
+    if (nativeScans <= 0) return;
+    if (!_sessionTimer.isRunning && _scanCount.value < targetQrCount) {
+      _sessionTimer.start();
+    }
+    final int clamped = math.min(targetQrCount, nativeScans);
+    _scanCount.value = clamped;
+    _decodeUs.value = _zeroCamCtrl.lastDecodeUs;
+    _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
+
+    final int hash = _zeroCamCtrl.lastPayloadHash;
+    if (hash != 0 && hash != _lastObservedPayloadHash) {
+      _lastObservedPayloadHash = hash;
+    }
+    if (clamped >= targetQrCount) {
+      _sessionTimer.stop();
+    }
+  }
+
+  /// Processes a live camera [BarcodeCapture] frame when running in Traditional mode
+  /// or when falling back to [MobileScanner].
   void handleBarcodeCapture(BarcodeCapture capture) {
     if (!_isScanning || capture.barcodes.isEmpty) return;
     if (_scanCount.value >= targetQrCount) return;
@@ -136,17 +169,18 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     }
 
     if (_engineMode == QrCameraEngineMode.dZero) {
-      _processDZeroDetection(codes, capture.size, raw);
+      _processDZeroFallbackDetection(codes, capture.size, raw);
     } else {
       _processTraditionalDetection(codes, capture.size, raw);
     }
   }
 
-  void _processDZeroDetection(
+  void _processDZeroFallbackDetection(
     List<Barcode> codes,
     Size sourceSize,
     String raw,
   ) {
+    final Stopwatch decodeWatch = Stopwatch()..start();
     _zeroCamCtrl.beginDetectionBatch();
     final int limit = math.min(codes.length, ZeroCameraStateView.maxDetections);
     for (int i = 0; i < limit; i++) {
@@ -160,15 +194,10 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
         99.0,
       );
     }
-    _zeroCamCtrl.commitDetectionBatch(payload: raw, decodeMicros: 8);
-
-    final int next = math.min(targetQrCount, _scanCount.value + 1);
-    _scanCount.value = next;
-    _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
-
-    if (next >= targetQrCount) {
-      _sessionTimer.stop();
-    }
+    decodeWatch.stop();
+    final int realUs = math.max(1, decodeWatch.elapsedMicroseconds);
+    _zeroCamCtrl.commitDetectionBatch(payload: raw, decodeMicros: realUs);
+    _pollNativeSharedMemory();
   }
 
   void _processTraditionalDetection(
@@ -176,6 +205,7 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     Size sourceSize,
     String raw,
   ) {
+    final Stopwatch decodeWatch = Stopwatch()..start();
     _tradBoxes.clear();
     for (int i = 0; i < codes.length; i++) {
       _tradBoxes.add(_mapBarcodeRect(codes[i], sourceSize));
@@ -184,6 +214,8 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     _scanCount.value = next;
     _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
     _pushHistoryItem(next, raw, isDZero: false);
+    decodeWatch.stop();
+    _decodeUs.value = math.max(1, decodeWatch.elapsedMicroseconds);
 
     if (next >= targetQrCount) {
       _sessionTimer.stop();
@@ -231,25 +263,19 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     );
   }
 
-  /// Simulates a single QR scan frame for desktop / widget testing.
+  /// Feeds a single 320×240 YUV420 frame directly into the active pipeline.
   void simulateQrFrame() {
     final int idx = _scanCount.value + 1;
-    _syntheticLumaFrame[idx % _syntheticLumaFrame.length] = (idx * 73) & 0xFF;
     if (_engineMode == QrCameraEngineMode.dZero) {
       if (!_sessionTimer.isRunning && _scanCount.value < targetQrCount) {
         _sessionTimer.start();
       }
-      _zeroCamCtrl.scanLumaPlaneZeroCopy(
-        _syntheticLumaFrame,
+      _zeroCamCtrl.stampAndScanNativeYuv(
+        qrToken: 100000 + idx * 97,
         width: 320,
         height: 240,
       );
-      final int next = math.min(targetQrCount, _scanCount.value + 1);
-      _scanCount.value = next;
-      _elapsedSec.value = _sessionTimer.elapsedMicroseconds / 1000000.0;
-      if (next >= targetQrCount) {
-        _sessionTimer.stop();
-      }
+      _pollNativeSharedMemory();
       return;
     }
 
@@ -271,14 +297,37 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     );
   }
 
+  Future<void> _switchEngineMode(QrCameraEngineMode nextMode) async {
+    if (_engineMode == nextMode) return;
+    setState(() {
+      _engineMode = nextMode;
+    });
+    if (!widget.enablePlatformCamera) return;
+    if (nextMode == QrCameraEngineMode.dZero) {
+      await _cameraController?.stop();
+      await _zeroCamCtrl.startNativeCamera(preferredFps: 120);
+    } else {
+      await _zeroCamCtrl.stopNativeCamera();
+      _ensureTraditionalController();
+      await _cameraController?.start();
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   void _toggleStartStop() {
     setState(() {
-      _resettingMode = true;
       _isScanning = !_isScanning;
       if (_isScanning) {
-        _cameraController?.start();
+        if (_engineMode == QrCameraEngineMode.dZero) {
+          _zeroCamCtrl.startNativeCamera(preferredFps: 120);
+        } else {
+          _cameraController?.start();
+        }
       } else {
         _sessionTimer.stop();
+        _zeroCamCtrl.stopNativeCamera();
         _cameraController?.stop();
       }
     });
@@ -289,11 +338,13 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
       ..stop()
       ..reset();
     _zeroCamCtrl.resetCounters();
+    _lastObservedNativeSeq = _zeroCamCtrl.seq;
+    _lastObservedPayloadHash = 0;
     _tradBoxes.clear();
     _scanCount.value = 0;
     _elapsedSec.value = 0.0;
+    _decodeUs.value = 0;
     setState(() {
-      _resettingMode = true;
       _recentItems.clear();
       _dZeroRebuilds = 0;
       _tradRebuilds = 0;
@@ -301,22 +352,14 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     });
   }
 
-  void _recordRebuild(bool isDZero) {
-    if (_resettingMode) {
-      _resettingMode = false;
-      return;
-    }
+  @override
+  Widget build(BuildContext context) {
+    final bool isDZero = _engineMode == QrCameraEngineMode.dZero;
     if (isDZero) {
       _dZeroRebuilds++;
     } else {
       _tradRebuilds++;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isDZero = _engineMode == QrCameraEngineMode.dZero;
-    _recordRebuild(isDZero);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -349,16 +392,20 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
               ),
             ],
             selected: {_engineMode},
-            onSelectionChanged: (s) => setState(() {
-              _engineMode = s.first;
-              _resettingMode = true;
-            }),
+            onSelectionChanged: (s) => _switchEngineMode(s.first),
           ),
         ),
         const SizedBox(width: 8),
         IconButton(
           tooltip: 'カメラ切替',
-          onPressed: () => _cameraController?.switchCamera(),
+          onPressed: () {
+            if (_engineMode == QrCameraEngineMode.dZero &&
+                _zeroCamCtrl.hasNativeTexture) {
+              _zeroCamCtrl.switchNativeCamera();
+            } else {
+              _cameraController?.switchCamera();
+            }
+          },
           icon: const Icon(Icons.cameraswitch_outlined),
         ),
       ],
@@ -383,7 +430,7 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
                 Flexible(
                   child: Text(
                     isDZero
-                        ? 'D-Zero Live Scanner'
+                        ? 'D-Zero YUV420 Direct Scanner'
                         : 'Traditional Flutter Scanner',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -443,12 +490,12 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
                 detectionColor: const Color(0xFF16A34A),
                 isScanning: _isScanning,
                 showTelemetryHud: false,
-                child: _buildCameraFeedLayer(),
+                child: _buildCameraFeedLayer(isDZero: true),
               )
             : Stack(
                 fit: StackFit.expand,
                 children: [
-                  _buildCameraFeedLayer(),
+                  _buildCameraFeedLayer(isDZero: false),
                   _buildTraditionalOverlayLayer(),
                 ],
               ),
@@ -456,28 +503,17 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
     );
   }
 
-  Widget _buildCameraFeedLayer() {
+  Widget _buildCameraFeedLayer({required bool isDZero}) {
+    if (!widget.enablePlatformCamera) {
+      return _buildPlaceholderPreview();
+    }
+    if (isDZero && _zeroCamCtrl.hasNativeTexture) {
+      return Texture(textureId: _zeroCamCtrl.textureId!);
+    }
+    _ensureTraditionalController();
     final MobileScannerController? ctrl = _cameraController;
-    if (!widget.enablePlatformCamera || ctrl == null) {
-      return Container(
-        color: const Color(0xFFF1F5F9),
-        alignment: Alignment.center,
-        child: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.qr_code_scanner,
-              size: 40,
-              color: Color(0xFF94A3B8),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'カメラプレビュー',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-      );
+    if (ctrl == null) {
+      return _buildPlaceholderPreview();
     }
     return MobileScanner(
       controller: ctrl,
@@ -489,12 +525,34 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
           padding: const EdgeInsets.all(16),
           alignment: Alignment.center,
           child: const Text(
-            'カメラの権限を許可するか、「+1 テスト読取」を押してください',
+            'カメラの権限を許可するか、「テスト読取」を押してください',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPlaceholderPreview() {
+    return Container(
+      color: const Color(0xFFF1F5F9),
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.qr_code_scanner,
+            size: 40,
+            color: Color(0xFF94A3B8),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'カメラプレビュー (YUV420 Direct)',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -584,6 +642,39 @@ class LiveCameraQrViewState extends State<LiveCameraQrView>
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF334155),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+        Container(width: 1, height: 36, color: const Color(0xFFE2E8F0)),
+        Column(
+          children: [
+            const Text(
+              '解析時間 (µs)',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 36,
+              child: Center(
+                child: isDZero
+                    ? ZCounter(
+                        valueListenable: _decodeUs,
+                        minDigits: 1,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF16A34A),
+                        ),
+                      )
+                    : Text(
+                        '${_decodeUs.value}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
                         ),
                       ),
               ),

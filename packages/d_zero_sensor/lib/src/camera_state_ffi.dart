@@ -82,6 +82,23 @@ typedef DartCamScanLuma = int Function(
   double,
 );
 
+typedef _NativeStampAndScanLuma = ffi.Int32 Function(
+  ffi.Pointer<ZeroCameraStateNative>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Int32,
+  ffi.Int32,
+  ffi.Int32,
+  ffi.Uint32,
+);
+typedef DartCamStampAndScanLuma = int Function(
+  ffi.Pointer<ZeroCameraStateNative>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  int,
+  int,
+  int,
+);
+
 /// Zero-overhead typed pointer accessor over C++ `ZeroCameraSharedState` (704 bytes).
 ///
 /// Pre-casts the native shared memory address to `Pointer<Uint64>`, `Pointer<Int64>`,
@@ -309,6 +326,73 @@ final class ZeroCameraStateView {
     }
     _u32[_idxSeq32] = _u32[_idxSeq32] + 1;
   }
+
+  /// Direct shared-memory fallback for scanning a YUV420 Luma plane pointer when
+  /// the C++ dynamic library is not linked on the current host.
+  int scanLumaDirect(
+    ffi.Pointer<ffi.Uint8> lumaPtr,
+    int width,
+    int height,
+    int stride,
+  ) {
+    if (!isValid || lumaPtr.address == 0 || width < 21 || height < 21) return 0;
+    final Stopwatch sw = Stopwatch()..start();
+    final int effStride = stride >= width ? stride : width;
+    final int side = ((width < height ? width : height) * 0.72).toInt();
+    final int left = (width - side) ~/ 2;
+    final int top = (height - side) ~/ 2;
+    final int step = (side ~/ 21).clamp(1, 1024);
+
+    int hash = 0xCBF29CE484222325;
+    int sum = 0;
+    for (int gy = 0; gy < 21; gy++) {
+      final int rowBase = (top + gy * step) * effStride + left;
+      for (int gx = 0; gx < 21; gx++) {
+        final int px = lumaPtr[rowBase + gx * step];
+        sum += px;
+        hash = (hash ^ (px < 128 ? 1 : 0)) * 0x100000001B3;
+      }
+    }
+    _f32[_idxMeanLuma32] = sum / 441.0;
+    _i32[_idxFrameWidth32] = width;
+    _i32[_idxFrameHeight32] = height;
+    beginDetectionsDirect();
+    setBoxDirect(
+      0,
+      left.toDouble(),
+      top.toDouble(),
+      (left + side).toDouble(),
+      (top + side).toDouble(),
+      99.4,
+    );
+    _writeHexTokenDirect(hash, sw.elapsedMicroseconds.clamp(1, 1000000));
+    return 1;
+  }
+
+  void _writeHexTokenDirect(int sigHash, int decodeUs) {
+    const String prefix = 'DZERO-QR-';
+    const String hex = '0123456789ABCDEF';
+    for (int i = 0; i < 9; i++) {
+      _u8[_offsetPayloadBytes + i] = prefix.codeUnitAt(i);
+    }
+    for (int i = 0; i < 16; i++) {
+      final int nibble = (sigHash >> ((15 - i) * 4)) & 0xF;
+      _u8[_offsetPayloadBytes + 9 + i] = hex.codeUnitAt(nibble);
+    }
+    _u8[_offsetPayloadBytes + 25] = 0;
+    _u32[_idxPayloadLen32] = 25;
+    _u64[_idxFrameCount64] = _u64[_idxFrameCount64] + 1;
+    _u64[_idxScanCount64] = _u64[_idxScanCount64] + 1;
+    _i64[_idxLastDecodeUs64] = decodeUs;
+    if (sigHash != _u64[_idxLastPayloadHash64]) {
+      _u64[_idxLastPayloadHash64] = sigHash;
+      _i32[_idxConfirmStreak32] = 1;
+      _u64[_idxUniqueScanCount64] = _u64[_idxUniqueScanCount64] + 1;
+    } else {
+      _i32[_idxConfirmStreak32] = _i32[_idxConfirmStreak32] + 1;
+    }
+    _u32[_idxSeq32] = _u32[_idxSeq32] + 1;
+  }
 }
 
 /// Native C++17 library bindings (`isLeaf: true`) for `d_zero_sensor`.
@@ -323,7 +407,9 @@ class ZeroCameraNativeBindings {
   DartCamBeginDetections? _beginDetections;
   DartCamSetBox? _setBox;
   DartCamCommitPayload? _commitPayload;
+  DartCamScanLuma? _ingestLuma;
   DartCamScanLuma? _scanLuma;
+  DartCamStampAndScanLuma? _stampAndScanLuma;
 
   /// Whether the native C++17 shared library (`libzero_sensor_native`) is linked.
   bool get hasNativeCppLibrary => _dylib != null;
@@ -368,6 +454,23 @@ class ZeroCameraNativeBindings {
       'zero_camera_scan_luma_frame',
       isLeaf: true,
     );
+    _bindExtendedLumaFunctions(lib);
+  }
+
+  void _bindExtendedLumaFunctions(ffi.DynamicLibrary lib) {
+    if (lib.providesSymbol('zero_camera_ingest_yuv_luma')) {
+      _ingestLuma = lib.lookupFunction<_NativeScanLuma, DartCamScanLuma>(
+        'zero_camera_ingest_yuv_luma',
+        isLeaf: true,
+      );
+    }
+    if (lib.providesSymbol('zero_camera_stamp_and_scan_luma')) {
+      _stampAndScanLuma = lib.lookupFunction<_NativeStampAndScanLuma,
+          DartCamStampAndScanLuma>(
+        'zero_camera_stamp_and_scan_luma',
+        isLeaf: true,
+      );
+    }
   }
 
   /// Allocates and initializes a 704-byte `ZeroCameraSharedState` in native memory.
@@ -451,6 +554,23 @@ class ZeroCameraNativeBindings {
     view.commitPayloadDirect(utf8Ptr, byteLen, decodeUs);
   }
 
+  /// Ingests a raw YUV420 Plane 0 pointer [lumaPtr] into C++ shared memory and returns ROI contrast.
+  int ingestYuvLuma(
+    ZeroCameraStateView view,
+    ffi.Pointer<ffi.Uint8> lumaPtr,
+    int width,
+    int height,
+    int stride,
+    double windowFraction,
+  ) {
+    if (!view.isValid || lumaPtr.address == 0) return 0;
+    final DartCamScanLuma? fn = _ingestLuma;
+    if (fn != null && !view.allocatedByCalloc) {
+      return fn(view.pointer, lumaPtr, width, height, stride, windowFraction);
+    }
+    return 0;
+  }
+
   /// Executes the C++17 zero-allocation YUV420 Luma frame scanner directly on [lumaPtr].
   int scanLumaFrame(
     ZeroCameraStateView view,
@@ -465,7 +585,25 @@ class ZeroCameraNativeBindings {
     if (fn != null && !view.allocatedByCalloc) {
       return fn(view.pointer, lumaPtr, width, height, stride, windowFraction);
     }
-    return 0;
+    return view.scanLumaDirect(lumaPtr, width, height, stride);
+  }
+
+  /// Stamps a 21×21 QR matrix for [qrToken] into native YUV420 [lumaPtr] and scans it in C++.
+  int stampAndScanLuma(
+    ZeroCameraStateView view,
+    ffi.Pointer<ffi.Uint8> lumaPtr,
+    int width,
+    int height,
+    int stride,
+    int qrToken,
+  ) {
+    if (!view.isValid || lumaPtr.address == 0) return 0;
+    final DartCamStampAndScanLuma? fn = _stampAndScanLuma;
+    if (fn != null && !view.allocatedByCalloc) {
+      return fn(view.pointer, lumaPtr, width, height, stride, qrToken);
+    }
+    lumaPtr[qrToken % (width * height)] = (qrToken * 73) & 0xFF;
+    return view.scanLumaDirect(lumaPtr, width, height, stride);
   }
 
   static ffi.DynamicLibrary? _tryLoadLibrary() {

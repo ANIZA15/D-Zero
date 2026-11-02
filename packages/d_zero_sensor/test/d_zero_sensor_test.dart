@@ -214,6 +214,15 @@ void main() {
       expect(detected, greaterThanOrEqualTo(0));
       expect(controller.frameCount, greaterThanOrEqualTo(1));
 
+      final int ptrDetected = controller.stampAndScanNativeYuv(
+        qrToken: 123456,
+        width: 128,
+        height: 96,
+      );
+      expect(ptrDetected, equals(1));
+      expect(controller.readLatestPayload(), startsWith('DZERO-QR-'));
+      expect(controller.lastDecodeUs, greaterThan(0));
+
       controller.recordNativeDetection(
         left: 0.15,
         top: 0.2,

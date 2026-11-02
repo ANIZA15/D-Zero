@@ -138,6 +138,15 @@ ZERO_CAM_EXPORT void zero_camera_commit_detection_payload(
 // C++17 ゼロコピー YUV420 Luma フレーム解析エンジン
 // Isolate コピーや Uint8List 新規確保を一切行わず、ネイティブ Y プレーン上で
 // ROI 輝度解析・ファインダーパターン検出・21x21 QR マトリクス抽出・FNV-1a トークン化を完遂する。
+ZERO_CAM_EXPORT int32_t zero_camera_ingest_yuv_luma(
+    ZeroCameraSharedState* state,
+    const uint8_t* luma_ptr,
+    int32_t width,
+    int32_t height,
+    int32_t row_stride,
+    float window_fraction
+);
+
 ZERO_CAM_EXPORT int32_t zero_camera_scan_luma_frame(
     ZeroCameraSharedState* state,
     const uint8_t* luma_ptr,
@@ -145,6 +154,15 @@ ZERO_CAM_EXPORT int32_t zero_camera_scan_luma_frame(
     int32_t height,
     int32_t row_stride,
     float window_fraction
+);
+
+ZERO_CAM_EXPORT int32_t zero_camera_stamp_and_scan_luma(
+    ZeroCameraSharedState* state,
+    uint8_t* luma_ptr,
+    int32_t width,
+    int32_t height,
+    int32_t row_stride,
+    uint32_t qr_token
 );
 
 // ポインタのオフセット取得ヘルパー (Dart FFI 側でのゼロオーバーヘッド view 構築用)
