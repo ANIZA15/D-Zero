@@ -2,6 +2,10 @@
 
 All notable changes to the **D-Zero** monorepo and its packages are documented in this file.
 
+## 0.1.6 - 2026-11-02
+
+* fix(3dengine,tool): replace numeric-prefixed topic '3d' with 'graphics-3d' and validate topics in distribute_widgets (e2871f9)
+
 ## 0.1.5 - 2026-11-02
 
 * Synchronized release of D-Zero workspace packages.

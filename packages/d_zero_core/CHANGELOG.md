@@ -1,3 +1,7 @@
+## 0.1.6
+
+* Synchronized release of `d_zero_core` v0.1.6.
+
 ## 0.1.5
 
 * Synchronized release of `d_zero_core` v0.1.5.
