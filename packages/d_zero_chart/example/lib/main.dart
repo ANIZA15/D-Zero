@@ -336,6 +336,11 @@ class _ChartBenchmarkScreenState extends State<ChartBenchmarkScreen>
 }
 
 class _TradSparklinePainter extends CustomPainter {
+  static final Paint _linePaint = Paint()
+    ..color = const Color(0xFF2563EB)
+    ..strokeWidth = 2.0
+    ..style = PaintingStyle.stroke;
+
   final List<double> prices;
   _TradSparklinePainter(this.prices);
 
@@ -360,13 +365,7 @@ class _TradSparklinePainter extends CustomPainter {
         path.lineTo(x, y);
       }
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = const Color(0xFF2563EB)
-        ..strokeWidth = 2.0
-        ..style = PaintingStyle.stroke,
-    );
+    canvas.drawPath(path, _linePaint);
   }
 
   @override

@@ -110,6 +110,54 @@ class _FlutterGameStageState extends State<FlutterGameStage>
 }
 
 class _TraditionalArenaPainter extends CustomPainter {
+  static final Paint _bgPaint = Paint()..color = ZeroGamePalette.bgVoid;
+  static final Paint _gridLinePaint = Paint()
+    ..color = const Color(0xFF151E32)
+    ..strokeWidth = 1.0;
+  static final Paint _ambientPaint = Paint()
+    ..color = const Color(0x88FF5252)
+    ..style = PaintingStyle.fill;
+  static final List<Paint> _sparkPaints = List<Paint>.generate(
+    ZeroGamePalette.sparkBucketColors.length,
+    (b) => Paint()
+      ..color = ZeroGamePalette.sparkBucketColors[b]
+      ..strokeWidth = 2.0,
+    growable: false,
+  );
+  static final Paint _confettiPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..strokeWidth = 3.5;
+  static final Paint _projTeam0Paint = Paint()
+    ..color = ZeroGamePalette.neonCyan
+    ..strokeWidth = 3.0;
+  static final Paint _projTeam1Paint = Paint()
+    ..color = ZeroGamePalette.neonMagenta
+    ..strokeWidth = 3.0;
+  static final Paint _projTeam2Paint = Paint()
+    ..color = ZeroGamePalette.neonAmber
+    ..strokeWidth = 3.0;
+  static final Paint _enemyKind0Paint = Paint()
+    ..color = ZeroGamePalette.dangerRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.4;
+  static final Paint _enemyKind1Paint = Paint()
+    ..color = ZeroGamePalette.neonPurple
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.4;
+  static final Paint _enemyKind2Paint = Paint()
+    ..color = ZeroGamePalette.neonAmber
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.4;
+  static final Paint _ripplePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.0;
+  static final Paint _shipPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.fill;
+  static final Paint _aimPaint = Paint()
+    ..color = ZeroGamePalette.dangerRed
+    ..strokeWidth = 2.5;
+
   final ZeroGameController controller;
   final int frameSerial;
 
@@ -134,26 +182,19 @@ class _TraditionalArenaPainter extends CustomPainter {
   }
 
   int _paintTraditionalGrid(Canvas canvas, Size size) {
-    int allocs = 2; // bgPaint + Rect
-    final bgPaint = Paint()..color = ZeroGamePalette.bgVoid;
-    canvas.drawRect(Offset.zero & size, bgPaint);
+    int allocs = 1; // Rect
+    canvas.drawRect(Offset.zero & size, _bgPaint);
 
     const double step = 32.0;
     final double ox = controller.gridViewportCtrl.panX % step;
     final double oy = controller.gridViewportCtrl.panY % step;
     for (double x = ox; x < size.width; x += step) {
-      final linePaint = Paint()
-        ..color = const Color(0xFF151E32)
-        ..strokeWidth = 1.0;
-      canvas.drawLine(Offset(x, 0.0), Offset(x, size.height), linePaint);
-      allocs += 3; // Paint + 2 Offsets
+      canvas.drawLine(Offset(x, 0.0), Offset(x, size.height), _gridLinePaint);
+      allocs += 2; // 2 Offsets
     }
     for (double y = oy; y < size.height; y += step) {
-      final linePaint = Paint()
-        ..color = const Color(0xFF151E32)
-        ..strokeWidth = 1.0;
-      canvas.drawLine(Offset(0.0, y), Offset(size.width, y), linePaint);
-      allocs += 3; // Paint + 2 Offsets
+      canvas.drawLine(Offset(0.0, y), Offset(size.width, y), _gridLinePaint);
+      allocs += 2; // 2 Offsets
     }
     return allocs;
   }
@@ -164,12 +205,12 @@ class _TraditionalArenaPainter extends CustomPainter {
     int allocs = 0;
     for (int i = 0; i < count; i++) {
       final int idx = i << 1;
-      // Traditional anti-pattern: per-particle Paint + Offset allocation & drawCircle
-      final paint = Paint()
-        ..color = const Color(0x88FF5252)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(positions[idx], positions[idx + 1]), 1.6, paint);
-      allocs += 2;
+      canvas.drawCircle(
+        Offset(positions[idx], positions[idx + 1]),
+        1.6,
+        _ambientPaint,
+      );
+      allocs += 1; // Offset
     }
     return allocs;
   }
@@ -180,16 +221,14 @@ class _TraditionalArenaPainter extends CustomPainter {
     for (int i = 0; i < rCtrl.capacity; i++) {
       if (rCtrl.isActiveAt(i)) {
         final double p = rCtrl.progressAt(i);
-        final paint = Paint()
-          ..color = ZeroGamePalette.neonCyan.withValues(alpha: (1.0 - p) * 0.45)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.0;
+        _ripplePaint.color =
+            ZeroGamePalette.neonCyan.withValues(alpha: (1.0 - p) * 0.45);
         canvas.drawCircle(
           Offset(rCtrl.xAt(i), rCtrl.yAt(i)),
           12.0 + 150.0 * p,
-          paint,
+          _ripplePaint,
         );
-        allocs += 3; // Paint + Color + Offset
+        allocs += 2; // Color + Offset
       }
     }
     return allocs;
@@ -201,17 +240,14 @@ class _TraditionalArenaPainter extends CustomPainter {
     for (int i = 0; i < sparks.capacity; i++) {
       if (sparks.active[i] != 0) {
         final int bucket = sparks.colorBucket[i];
-        final paint = Paint()
-          ..color = ZeroGamePalette.sparkBucketColors[bucket]
-          ..strokeWidth = 2.0;
         final double sx = sparks.x[i];
         final double sy = sparks.y[i];
         canvas.drawLine(
           Offset(sx - sparks.vx[i] * 0.03, sy - sparks.vy[i] * 0.03),
           Offset(sx, sy),
-          paint,
+          _sparkPaints[bucket],
         );
-        allocs += 3; // Paint + 2 Offsets
+        allocs += 2; // 2 Offsets
       }
     }
     return allocs;
@@ -226,11 +262,9 @@ class _TraditionalArenaPainter extends CustomPainter {
     int allocs = 0;
     for (int i = 0; i < xs.length; i++) {
       if (lifes[i] > 0.0) {
-        final paint = Paint()
-          ..color = Color(colors[i])
-          ..strokeWidth = 3.5;
-        canvas.drawCircle(Offset(xs[i], ys[i]), 3.0, paint);
-        allocs += 3; // Paint + Color + Offset
+        _confettiPaint.color = Color(colors[i]);
+        canvas.drawCircle(Offset(xs[i], ys[i]), 3.0, _confettiPaint);
+        allocs += 2; // Color + Offset
       }
     }
     return allocs;
@@ -242,13 +276,15 @@ class _TraditionalArenaPainter extends CustomPainter {
     for (int i = 0; i < proj.capacity; i++) {
       if (proj.active[i] != 0) {
         final int t = proj.team[i];
-        final paint = Paint()
-          ..color = t == 1
-              ? ZeroGamePalette.neonMagenta
-              : (t == 2 ? ZeroGamePalette.neonAmber : ZeroGamePalette.neonCyan)
-          ..strokeWidth = 3.0;
-        canvas.drawCircle(Offset(proj.x[i], proj.y[i]), t == 1 ? 4.0 : 2.5, paint);
-        allocs += 2; // Paint + Offset
+        final Paint paint = t == 1
+            ? _projTeam1Paint
+            : (t == 2 ? _projTeam2Paint : _projTeam0Paint);
+        canvas.drawCircle(
+          Offset(proj.x[i], proj.y[i]),
+          t == 1 ? 4.0 : 2.5,
+          paint,
+        );
+        allocs += 1; // Offset
       }
     }
     return allocs;
@@ -260,18 +296,15 @@ class _TraditionalArenaPainter extends CustomPainter {
     for (int i = 0; i < pool.capacity; i++) {
       if (pool.active[i] != 0) {
         final int k = pool.kind[i];
-        final paint = Paint()
-          ..color = k == 2
-              ? ZeroGamePalette.neonAmber
-              : (k == 1 ? ZeroGamePalette.neonPurple : ZeroGamePalette.dangerRed)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4;
+        final Paint paint = k == 2
+            ? _enemyKind2Paint
+            : (k == 1 ? _enemyKind1Paint : _enemyKind0Paint);
         canvas.drawCircle(
           Offset(pool.x[i], pool.y[i]),
           pool.radius[i],
           paint,
         );
-        allocs += 2; // Paint + Offset
+        allocs += 1; // Offset
       }
     }
     return allocs;
@@ -281,18 +314,12 @@ class _TraditionalArenaPainter extends CustomPainter {
     final double px = controller.playerX;
     final double py = controller.playerY;
     final double ang = controller.aimAngle;
-    final shipPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(px, py), 8.0, shipPaint);
+    canvas.drawCircle(Offset(px, py), 8.0, _shipPaint);
 
-    final aimPaint = Paint()
-      ..color = ZeroGamePalette.dangerRed
-      ..strokeWidth = 2.5;
     canvas.drawLine(
       Offset(px, py),
       Offset(px + math.cos(ang) * 20.0, py + math.sin(ang) * 20.0),
-      aimPaint,
+      _aimPaint,
     );
 
     final tp = TextPainter(
@@ -309,7 +336,7 @@ class _TraditionalArenaPainter extends CustomPainter {
     )..layout();
     tp.paint(canvas, Offset(px - 14.0, py + 18.0));
     tp.dispose();
-    return 9; // 2 Paints + 4 Offsets + String + TextSpan + TextPainter
+    return 7; // 4 Offsets + String + TextSpan + TextPainter
   }
 
   @override

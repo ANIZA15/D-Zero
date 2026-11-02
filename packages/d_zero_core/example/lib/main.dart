@@ -402,6 +402,14 @@ class _RenderZCoreCanvasBench extends ZeroRenderBox {
 }
 
 class _TraditionalCorePainter extends CustomPainter {
+  static final Paint _wavePaint = Paint()
+    ..color = const Color(0xFF64748B)
+    ..strokeWidth = 2.0
+    ..style = PaintingStyle.stroke;
+  static final Paint _dotPaint = Paint()
+    ..color = const Color(0xFF94A3B8)
+    ..style = PaintingStyle.fill;
+
   final List<double> history;
   final List<_PooledDot> dots;
 
@@ -409,27 +417,19 @@ class _TraditionalCorePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = const Color(0xFF64748B)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-    final Path path = Path();
     if (history.isNotEmpty) {
+      final Path path = Path();
       final double dx = size.width / math.max(1, history.length - 1);
       final double midY = size.height * 0.5;
       path.moveTo(0, midY + history[0]);
       for (int i = 1; i < history.length; i++) {
         path.lineTo(i * dx, midY + history[i]);
       }
-      canvas.drawPath(path, paint);
+      canvas.drawPath(path, _wavePaint);
     }
     for (int i = 0; i < dots.length; i++) {
       final _PooledDot d = dots[i];
-      canvas.drawCircle(
-        Offset(d.x, d.y),
-        3.0,
-        Paint()..color = const Color(0xFF94A3B8),
-      );
+      canvas.drawCircle(Offset(d.x, d.y), 3.0, _dotPaint);
     }
   }
 
